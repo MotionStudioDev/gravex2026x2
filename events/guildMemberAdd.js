@@ -18,9 +18,14 @@ module.exports = async (member) => {
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
       .setFooter({ text: 'Sayaç sistemi' });
 
-    const kanal = member.guild.systemChannel || member.guild.channels.cache.find(c => c.type === 0 && c.permissionsFor(client.user).has('SendMessages'));
+    const kanalId = client.sayaçKanalları?.get(guildId);
+    const kanal = kanalId
+      ? member.guild.channels.cache.get(kanalId)
+      : member.guild.systemChannel || member.guild.channels.cache.find(c => c.type === 0 && c.permissionsFor(client.user).has('SendMessages'));
+
     if (kanal) kanal.send({ embeds: [embed] });
 
     client.sayaçlar.delete(guildId);
+    client.sayaçKanalları.delete(guildId);
   }
 };
