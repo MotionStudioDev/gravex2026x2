@@ -57,6 +57,7 @@ module.exports = client;
  * Events loader.
  */
 client.sayaçlar = new Map();
+client.sayaçKanalları = new Map();
 require("./events/message.js")
 require("./events/ready.js")
 
