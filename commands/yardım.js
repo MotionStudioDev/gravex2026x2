@@ -3,7 +3,7 @@ const { EmbedBuilder } = require('discord.js');
 module.exports.run = async (client, message, args) => {
   const embed = new EmbedBuilder()
     .setColor('Blurple')
-    .setTitle('📘 Yardım Menüsü')
+    .setTitle('Grave Yardım Menüsü')
     .setDescription('Aşağıda botun komutları kategorilere göre listelenmiştir.')
     .addFields(
       {
@@ -13,7 +13,7 @@ module.exports.run = async (client, message, args) => {
       },
       {
         name: '🎭 Kullanıcı Komutları',
-        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`',
+        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`', `g!emojiler`',
         inline: false
       },
       {
