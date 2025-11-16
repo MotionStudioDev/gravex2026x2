@@ -62,6 +62,7 @@ client.kufurEngel = new Map();        // guildId → true/false
 client.kufurLogKanalları = new Map(); // guildId → kanalId
 client.on('guildMemberAdd', require('./events/guildMemberAdd'));
 client.on('guildMemberRemove', require('./events/guildMemberRemove'));
+client.on('messageCreate', require('./events/messageCreate'));
 require("./events/message.js")
 require("./events/ready.js")
 
