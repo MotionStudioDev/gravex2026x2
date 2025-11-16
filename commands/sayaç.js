@@ -15,13 +15,13 @@ module.exports.run = async (client, message, args) => {
   const sub = args[0]?.toLowerCase();
   const guildId = message.guild.id;
 
-  if (!sub || !['ayarla', 'göster', 'sıfırla'].includes(sub)) {
+  if (!sub || !['ayarla', 'göster', 'sıfırla', 'kanal'].includes(sub)) {
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor('Orange')
           .setTitle('ℹ️ Sayaç Komutu')
-          .setDescription('Kullanım:\n`g!sayaç ayarla <sayı>`\n`g!sayaç göster`\n`g!sayaç sıfırla`')
+          .setDescription('Kullanım:\n`g!sayaç ayarla <sayı>`\n`g!sayaç göster`\n`g!sayaç sıfırla`\n`g!sayaç kanal <#kanal>`')
       ]
     });
   }
@@ -98,13 +98,39 @@ module.exports.run = async (client, message, args) => {
     }
 
     client.sayaçlar.delete(guildId);
+    client.sayaçKanalları.delete(guildId);
 
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor('Green')
           .setTitle('✅ Sayaç Sıfırlandı')
-          .setDescription('Sayaç hedefi başarıyla kaldırıldı.')
+          .setDescription('Sayaç hedefi ve kanal bilgisi kaldırıldı.')
+      ]
+    });
+  }
+
+  if (sub === 'kanal') {
+    const kanal = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
+    if (!kanal || kanal.type !== 0) {
+      return message.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Geçersiz Kanal')
+            .setDescription('Lütfen geçerli bir metin kanalı etiketle veya ID gir.\nÖrnek: `g!sayaç kanal #genel`')
+        ]
+      });
+    }
+
+    client.sayaçKanalları.set(guildId, kanal.id);
+
+    return message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor('Green')
+          .setTitle('✅ Sayaç Kanalı Ayarlandı')
+          .setDescription(`Sayaç bilgileri artık <#${kanal.id}> kanalına gönderilecek.`)
       ]
     });
   }
