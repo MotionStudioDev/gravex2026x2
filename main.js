@@ -62,9 +62,10 @@ client.sayaçKanalları = new Map();
 client.kufurEngel = new Map();        // guildId → true/false
 client.kufurLogKanalları = new Map(); // guildId → kanalId
 
-client.antiRaid = new Map();             // guildId → { aktif: true, eşik: 5, süre: 10 }
-client.antiRaidLogKanalları = new Map(); // guildId → kanalId
-client.antiRaidGirişler = new Map();     // guildId → [timestamp1, timestamp2, ...]
+client.antiRaid = new Map();                   // guildId → { aktif: true, eşik: 5, süre: 10 }
+client.antiRaidLogKanalları = new Map();       // guildId → kanalId
+client.antiRaidGirişler = new Map();           // guildId → [timestamp1, timestamp2, ...]
+client.antiRaidBotWhitelist = new Map();       // guildId → Set(botId)
 
 client.on('guildMemberAdd', require('./events/guildMemberAdd'));
 client.on('guildMemberRemove', require('./events/guildMemberRemove'));
