@@ -5,7 +5,7 @@ module.exports = async (member) => {
   const guildId = member.guild.id;
   const user = member.user;
 
-  // ✅ SAYAÇ SİSTEMİ
+  // ✅ SAYAÇ
   const hedef = client.sayaçlar?.get(guildId);
   if (hedef) {
     const mevcut = member.guild.memberCount;
@@ -19,9 +19,7 @@ module.exports = async (member) => {
       .setFooter({ text: 'Sayaç sistemi' });
 
     const kanalId = client.sayaçKanalları?.get(guildId);
-    const kanal = kanalId
-      ? member.guild.channels.cache.get(kanalId)
-      : member.guild.systemChannel;
+    const kanal = kanalId ? member.guild.channels.cache.get(kanalId) : member.guild.systemChannel;
 
     if (kanal && kanal.permissionsFor(client.user).has('SendMessages')) {
       kanal.send({ embeds: [embed] });
@@ -32,16 +30,20 @@ module.exports = async (member) => {
         .setColor('Gold')
         .setTitle('🎉 Sayaç Tamamlandı!')
         .setDescription(`Sunucumuz **${hedef}** üyeye ulaştı!\nHoş geldin ${user}, seni aramızda görmek harika!`);
-
       kanal?.send({ embeds: [kutlama] });
       client.sayaçlar.delete(guildId);
       client.sayaçKanalları.delete(guildId);
     }
   }
 
-  // ✅ ANTI-RAID SİSTEMİ
+  // ✅ ANTI-RAID
   const ayar = client.antiRaid?.get(guildId);
   if (ayar?.aktif) {
+    if (user.bot) {
+      const whitelist = client.antiRaidBotWhitelist.get(guildId);
+      if (whitelist?.has(user.id)) return;
+    }
+
     const now = Date.now();
     const girişler = client.antiRaidGirişler.get(guildId) || [];
     const yeniGirişler = [...girişler, now].filter(t => now - t <= ayar.süre * 1000);
@@ -55,16 +57,7 @@ module.exports = async (member) => {
         .setColor('DarkRed')
         .setTitle('🚨 Raid Algılandı')
         .setDescription(`**${ayar.süre} saniye** içinde **${yeniGirişler.length}** kişi sunucuya katıldı.`)
-        .addFields(
-          { name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false }
-        )
+        .addFields({ name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false })
         .setFooter({ text: 'Anti-Raid sistemi' });
 
-      if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
-        logKanal.send({ embeds: [raidEmbed] });
-      }
-
-      client.antiRaidGirişler.set(guildId, []);
-    }
-  }
-};
+      if (logKanal && logKanal.permissionsFor
