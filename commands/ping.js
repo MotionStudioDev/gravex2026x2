@@ -1,34 +1,31 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder } = require('discord.js');
 
-module.exports = {
-    name: 'ping', // Prefix komutlarında çalışacak komut adı: !ping
-    description: 'Botun gecikme sürelerini gösterir.',
+module.exports.run = async (client, message, args) => {
+  const loadingEmbed = new EmbedBuilder()
+    .setColor('Yellow')
+    .setDescription('⏳ Lütfen bekleyin, veriler analiz ediliyor...');
 
-    /**
-     * @param {Client} client 
-     * @param {Message} message 
-     * @param {string[]} args 
-     */
-    async execute(client, message, args) {
-        // Önce 'Pong!' yazan bir mesaj gönderiyoruz
-        const msg = await message.channel.send("Ping ölçülüyor...");
+  const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
-        // Mesaj gecikmesini hesapla: Gönderilen mesajın oluşturulma süresi ile yeni mesajın gönderilme süresi arasındaki fark.
-        const latency = msg.createdTimestamp - message.createdTimestamp;
+  const latency = Date.now() - message.createdTimestamp;
+  const apiPing = Math.round(client.ws.ping);
 
-        // API gecikmesini al: Discord.js'in bot ile Discord API arasındaki gecikme süresi.
-        const apiLatency = client.ws.ping;
+  const resultEmbed = new EmbedBuilder()
+    .setColor('Green')
+    .setTitle('📡 Ping Verileri')
+    .addFields(
+      { name: 'Mesaj Gecikmesi', value: `${latency}ms`, inline: true },
+      { name: 'Bot Ping (API)', value: `${apiPing}ms`, inline: true }
+    )
+    .setFooter({ text: 'Veriler analiz edildi.' });
 
-        const embed = new EmbedBuilder()
-            .setColor(0x00cc99)
-            .setTitle("🏓 Pong!")
-            .addFields(
-                { name: "Mesaj Gecikmesi", value: `\`${latency}ms\``, inline: true },
-                { name: "API Gecikmesi", value: `\`${apiLatency}ms\``, inline: true }
-            )
-            .setTimestamp();
-        
-        // Ölçüm mesajını düzenleyip sonucu gösteriyoruz
-        msg.edit({ content: `**${message.author.username}**, işte gecikme sürem!`, embeds: [embed] });
-    }
+  await msg.edit({ embeds: [resultEmbed] });
+};
+
+module.exports.conf = {
+  aliases: []
+};
+
+module.exports.help = {
+  name: 'ping'
 };
