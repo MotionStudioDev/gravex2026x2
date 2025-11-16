@@ -6,20 +6,28 @@ module.exports.run = async (client, message, args) => {
     id: `ID: \`${e.id}\``
   }));
 
-  if (emojis.length === 0) return message.reply('Sunucuda özel emoji yok.');
+  if (emojis.length === 0) {
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle('🚫 Emoji Bulunamadı')
+      .setDescription('Bu sunucuda hiç özel emoji yok.')
+      .setFooter({ text: 'Emoji sistemi' });
+
+    return message.channel.send({ embeds: [embed] });
+  }
 
   const sayfaBoyutu = 10;
   let sayfa = 0;
 
   const gösterEmbed = (index) => {
     const sliced = emojis.slice(index * sayfaBoyutu, (index + 1) * sayfaBoyutu);
-    const emojiSatırları = sliced.map(e => `${e.gösterim}`);
-    const idSatırları = sliced.map(e => `${e.id}`);
+    const emojiSatırları = sliced.map(e => e.gösterim).join('\n');
+    const idSatırları = sliced.map(e => e.id).join('\n');
 
     return new EmbedBuilder()
       .setColor('Orange')
       .setTitle(`📦 Sunucu Emojileri (Sayfa ${index + 1}/${Math.ceil(emojis.length / sayfaBoyutu)})`)
-      .setDescription(`${emojiSatırları.join('\n')}\n\n**ID'ler:**\n${idSatırları.join('\n')}`)
+      .setDescription(`${emojiSatırları}\n\n**ID'ler:**\n${idSatırları}`)
       .setFooter({ text: '⬅️ / ➡️ ile sayfa değiştir.' });
   };
 
