@@ -58,7 +58,8 @@ module.exports = client;
  */
 client.sayaçlar = new Map();
 client.sayaçKanalları = new Map();
-
+client.kufurEngel = new Map();        // guildId → true/false
+client.kufurLogKanalları = new Map(); // guildId → kanalId
 client.on('guildMemberAdd', require('./events/guildMemberAdd'));
 client.on('guildMemberRemove', require('./events/guildMemberRemove'));
 require("./events/message.js")
