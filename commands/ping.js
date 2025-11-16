@@ -1,22 +1,18 @@
-const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 module.exports.run = async (client, message, args) => {
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('ping_guncelle')
-      .setLabel('Verileri Güncelle')
-      .setStyle(ButtonStyle.Primary)
-  );
-
+  // İlk embed: analiz başlıyor
   const loadingEmbed = new EmbedBuilder()
     .setColor('Yellow')
     .setDescription('⏳ Lütfen bekleyin, veriler analiz ediliyor...');
 
   const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
+  // Ölçüm
   const latency = Date.now() - message.createdTimestamp;
   const apiPing = Math.round(client.ws.ping);
 
+  // Sonuç embed'i
   const resultEmbed = new EmbedBuilder()
     .setColor('Green')
     .setTitle('📡 Ping Verileri')
@@ -24,9 +20,9 @@ module.exports.run = async (client, message, args) => {
       { name: 'Mesaj Gecikmesi', value: `${latency}ms`, inline: true },
       { name: 'Bot Ping (API)', value: `${apiPing}ms`, inline: true }
     )
-    .setFooter({ text: 'Verileri Güncelle butonunu kullanabilirsiniz.' });
+    .setFooter({ text: 'Veriler analiz edildi.' });
 
-  await msg.edit({ embeds: [resultEmbed], components: [row] });
+  await msg.edit({ embeds: [resultEmbed] });
 };
 
 module.exports.conf = {
