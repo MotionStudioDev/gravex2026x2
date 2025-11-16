@@ -58,6 +58,9 @@ module.exports = client;
  */
 client.sayaçlar = new Map();
 client.sayaçKanalları = new Map();
+
+client.on('guildMemberAdd', require('./events/guildMemberAdd'));
+client.on('guildMemberRemove', require('./events/guildMemberRemove'));
 require("./events/message.js")
 require("./events/ready.js")
 
