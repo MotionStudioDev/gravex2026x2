@@ -92,3 +92,14 @@ client.login(x).catch(e => {
 
 
 /*=======================================================================================*/
+////// 7/24 
+// Express sunucusu (Render gibi platformlarda botu canlı tutmak için)
+const express = require("express");
+const app = express();
+app.get("/", (req, res) => res.sendStatus(200));
+app.listen(process.env.PORT || 3000, () => {
+    console.log("Web sunucusu aktif. Botunuz aktif kalacaktır.");
+});
+
+// Botu başlat (Bu kısım zaten kodunuzun en sonundadır)
+// client.login(token).catch(...);
