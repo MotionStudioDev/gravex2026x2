@@ -3,36 +3,32 @@ const { EmbedBuilder } = require('discord.js');
 module.exports.run = async (client, message, args) => {
   const emojiRaw = args[0];
   if (!emojiRaw) {
-    const embed = new EmbedBuilder()
-      .setColor('Red')
-      .setTitle('🚫 Hatalı Kullanım')
-      .setDescription('Lütfen bir özel emoji belirt.')
-      .setFooter({ text: 'Örnek: g!emoji-bilgi <:emoji:1234567890>' });
-
-    return message.channel.send({ embeds: [embed] });
+    return message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor('Red')
+          .setTitle('🚫 Hatalı Kullanım')
+          .setDescription('Lütfen bir özel emoji belirt.')
+          .setFooter({ text: 'Örnek: g!emoji-bilgi <:emoji:1234567890> veya g!emoji-bilgi 1234567890' })
+      ]
+    });
   }
 
-  const emojiMatch = emojiRaw.match(/<a?:\w+:(\d+)>/);
-  if (!emojiMatch) {
-    const embed = new EmbedBuilder()
-      .setColor('Red')
-      .setTitle('❌ Geçersiz Emoji')
-      .setDescription('Sadece özel emojiler destekleniyor.')
-      .setFooter({ text: 'Standart emojiler (😎🔥😂) desteklenmez.' });
+  // Mention veya ID ayıklama
+  const mentionMatch = emojiRaw.match(/<a?:\w+:(\d+)>/);
+  const emojiId = mentionMatch ? mentionMatch[1] : emojiRaw;
 
-    return message.channel.send({ embeds: [embed] });
-  }
-
-  const emojiId = emojiMatch[1];
   const emoji = client.emojis.cache.get(emojiId);
   if (!emoji) {
-    const embed = new EmbedBuilder()
-      .setColor('Red')
-      .setTitle('🔍 Emoji Bulunamadı')
-      .setDescription('Bu emoji botun erişiminde değil veya silinmiş.')
-      .setFooter({ text: `Emoji ID: ${emojiId}` });
-
-    return message.channel.send({ embeds: [embed] });
+    return message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor('Red')
+          .setTitle('🔍 Emoji Bulunamadı')
+          .setDescription('Bu emoji botun erişiminde değil veya silinmiş.')
+          .setFooter({ text: `Emoji ID: ${emojiId}` })
+      ]
+    });
   }
 
   const embed = new EmbedBuilder()
