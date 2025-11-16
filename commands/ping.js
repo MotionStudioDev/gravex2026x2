@@ -1,30 +1,34 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require("discord.js");
 
 module.exports = {
-  name: 'ping',
-  async execute(message, args, client) {
-    // İlk embed: analiz başlıyor
-    const loadingEmbed = new EmbedBuilder()
-      .setColor('Yellow')
-      .setDescription('⏳ Lütfen bekleyin, veriler analiz ediliyor...');
+    name: 'ping', // Prefix komutlarında çalışacak komut adı: !ping
+    description: 'Botun gecikme sürelerini gösterir.',
 
-    const msg = await message.reply({ embeds: [loadingEmbed] });
+    /**
+     * @param {Client} client 
+     * @param {Message} message 
+     * @param {string[]} args 
+     */
+    async execute(client, message, args) {
+        // Önce 'Pong!' yazan bir mesaj gönderiyoruz
+        const msg = await message.channel.send("Ping ölçülüyor...");
 
-    // Ölçüm
-    const latency = Date.now() - message.createdTimestamp;
-    const apiPing = Math.round(client.ws.ping);
+        // Mesaj gecikmesini hesapla: Gönderilen mesajın oluşturulma süresi ile yeni mesajın gönderilme süresi arasındaki fark.
+        const latency = msg.createdTimestamp - message.createdTimestamp;
 
-    // Sonuç embed'i
-    const resultEmbed = new EmbedBuilder()
-      .setColor('Green')
-      .setTitle('📡 Ping Verileri')
-      .addFields(
-        { name: 'Mesaj Gecikmesi', value: `${latency}ms`, inline: true },
-        { name: 'Bot Ping (API)', value: `${apiPing}ms`, inline: true }
-      )
-      .setFooter({ text: 'Veriler analiz edildi.' });
+        // API gecikmesini al: Discord.js'in bot ile Discord API arasındaki gecikme süresi.
+        const apiLatency = client.ws.ping;
 
-    // Mesajı güncelle
-    await msg.edit({ embeds: [resultEmbed] });
-  }
+        const embed = new EmbedBuilder()
+            .setColor(0x00cc99)
+            .setTitle("🏓 Pong!")
+            .addFields(
+                { name: "Mesaj Gecikmesi", value: `\`${latency}ms\``, inline: true },
+                { name: "API Gecikmesi", value: `\`${apiLatency}ms\``, inline: true }
+            )
+            .setTimestamp();
+        
+        // Ölçüm mesajını düzenleyip sonucu gösteriyoruz
+        msg.edit({ content: `**${message.author.username}**, işte gecikme sürem!`, embeds: [embed] });
+    }
 };
