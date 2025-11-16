@@ -13,6 +13,7 @@ module.exports.run = async (client, message, args) => {
   }
 
   const sub = args[0];
+  const guildId = message.guild.id;
 
   if (!sub || !['ayarla', 'göster', 'sıfırla'].includes(sub)) {
     return message.channel.send({
@@ -24,8 +25,6 @@ module.exports.run = async (client, message, args) => {
       ]
     });
   }
-
-  const guildId = message.guild.id;
 
   if (sub === 'ayarla') {
     const hedef = parseInt(args[1]);
@@ -83,6 +82,17 @@ module.exports.run = async (client, message, args) => {
   }
 
   if (sub === 'sıfırla') {
+    if (!client.sayaçlar.has(guildId)) {
+      return message.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle('ℹ️ Sayaç Zaten Ayarlanmamış')
+            .setDescription('Sıfırlanacak sayaç hedefi bulunamadı.')
+        ]
+      });
+    }
+
     client.sayaçlar.delete(guildId);
 
     return message.channel.send({
@@ -90,7 +100,7 @@ module.exports.run = async (client, message, args) => {
         new EmbedBuilder()
           .setColor('Green')
           .setTitle('✅ Sayaç Sıfırlandı')
-          .setDescription('Sayaç hedefi kaldırıldı.')
+          .setDescription('Sayaç hedefi başarıyla kaldırıldı.')
       ]
     });
   }
