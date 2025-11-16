@@ -63,25 +63,32 @@ require("./events/ready.js")
 /*=======================================================================================*/
 
 /*=======================================================================================*/
-let x = "TOKEN"
-    /**
+let x = process.env.TOKEN;
+
+/**
  * Token
  */
 client.login(x).catch(e => {
-if(!x){
-console.log("Lütfen bir token gir")
-process.exit(0)
-}
-if(e.toString().includes("TOKEN_INVALID")){
-console.log("Lütfen düzgün bir token gir")
-process.exit(0)
-}
-if(e.toString().includes("DISALLOWED_INTENTS")){
-console.log("Lütfen tokenini girdiğin botun intentlerini aç (tek yapman gereken https://discord.com/developers/applications sayfasına girip bot kısmına girip alta inip tüm gri yerleri açıp mavi yap.)")
-process.exit(0)
-} 
-console.error(e)
-process.exit(0)
-})
+  
+  if (!x) {
+    console.log("Lütfen bir token gir (process.env.TOKEN ayarlanmamış)");
+    process.exit(0);
+  }
+
+  if (e.toString().includes("TOKEN_INVALID")) {
+    console.log("Lütfen düzgün bir token gir");
+    process.exit(0);
+  }
+
+  if (e.toString().includes("DISALLOWED_INTENTS")) {
+    console.log("Lütfen botunun intentlerini aç. (Discord Developer Portal → Bot → Privileged Gateway Intents)");
+    process.exit(0);
+  }
+
+  console.error(e);
+  process.exit(0);
+
+});
+
 
 /*=======================================================================================*/
