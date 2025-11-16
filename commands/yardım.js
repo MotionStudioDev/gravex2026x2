@@ -13,7 +13,7 @@ module.exports.run = async (client, message, args) => {
       },
       {
         name: '🎭 Kullanıcı Komutları',
-        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`', `g!profil`,
+        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`', `g!emojiler`,
         inline: false
       },
       {
