@@ -12,7 +12,7 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  const sub = args[0];
+  const sub = args[0]?.toLowerCase();
   const guildId = message.guild.id;
 
   if (!sub || !['ayarla', 'göster', 'sıfırla'].includes(sub)) {
@@ -28,13 +28,15 @@ module.exports.run = async (client, message, args) => {
 
   if (sub === 'ayarla') {
     const hedef = parseInt(args[1]);
-    if (!hedef || isNaN(hedef) || hedef < message.guild.memberCount) {
+    const mevcut = message.guild.memberCount;
+
+    if (!hedef || isNaN(hedef) || hedef <= mevcut) {
       return message.channel.send({
         embeds: [
           new EmbedBuilder()
             .setColor('Red')
             .setTitle('❌ Geçersiz Hedef')
-            .setDescription(`Lütfen geçerli bir sayı gir. Mevcut üye sayısından büyük olmalı.\nSunucudaki üye sayısı: **${message.guild.memberCount}**`)
+            .setDescription(`Lütfen geçerli bir sayı gir. Mevcut üye sayısından büyük olmalı.\nSunucudaki üye sayısı: **${mevcut}**`)
         ]
       });
     }
@@ -53,6 +55,8 @@ module.exports.run = async (client, message, args) => {
 
   if (sub === 'göster') {
     const hedef = client.sayaçlar.get(guildId);
+    const mevcut = message.guild.memberCount;
+
     if (!hedef) {
       return message.channel.send({
         embeds: [
@@ -64,7 +68,7 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    const kalan = hedef - message.guild.memberCount;
+    const kalan = hedef - mevcut;
 
     return message.channel.send({
       embeds: [
@@ -72,7 +76,7 @@ module.exports.run = async (client, message, args) => {
           .setColor('Blurple')
           .setTitle('📊 Sayaç Durumu')
           .addFields(
-            { name: 'Mevcut Üye Sayısı', value: `${message.guild.memberCount}`, inline: true },
+            { name: 'Mevcut Üye Sayısı', value: `${mevcut}`, inline: true },
             { name: 'Hedef', value: `${hedef}`, inline: true },
             { name: 'Kalan', value: `${kalan > 0 ? kalan : 'Tamamlandı!'}`, inline: true }
           )
