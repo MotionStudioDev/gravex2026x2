@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 
-const küfürler = new Set(['salak', 'aptal', 'oç', 'amk', 'yarrak', 'piç', 'sik', 'orospu', 'ananı', 'göt']);
+const küfürler = new Set(['amk', 'oç', 'yarrak', 'sik', 'piç', 'orospu', 'ananı', 'göt', 'salak', 'aptal']);
 
 module.exports = async (message) => {
   if (!message.guild || message.author.bot) return;
@@ -17,8 +17,8 @@ module.exports = async (message) => {
   try {
     await message.delete();
 
-    // Kullanıcıya uyarı
-    await message.channel.send({
+    // Kullanıcıya geçici uyarı
+    const uyarı = await message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor('Red')
@@ -26,6 +26,10 @@ module.exports = async (message) => {
           .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)
       ]
     });
+
+    setTimeout(() => {
+      uyarı.delete().catch(() => {});
+    }, 3000);
 
     // Log embed
     const logKanalId = client.kufurLogKanalları?.get(guildId);
