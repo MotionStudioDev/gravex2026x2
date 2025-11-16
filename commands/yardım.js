@@ -3,8 +3,8 @@ const { EmbedBuilder } = require('discord.js');
 module.exports.run = async (client, message, args) => {
   const embed = new EmbedBuilder()
     .setColor('Blurple')
-    .setTitle('Grave Yardım Menüsü')
-    .setDescription('Tek bir menüden devam edebilirsiniz. - BAKIM MODU AKTİF')
+    .setTitle('📘 Yardım Menüsü')
+    .setDescription('Aşağıda botun komutları kategorilere göre listelenmiştir.')
     .addFields(
       {
         name: '🔧 Genel Komutlar',
@@ -13,7 +13,7 @@ module.exports.run = async (client, message, args) => {
       },
       {
         name: '🎭 Kullanıcı Komutları',
-        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`', `g!emojiler`,
+        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`',
         inline: false
       },
       {
@@ -27,7 +27,7 @@ module.exports.run = async (client, message, args) => {
         inline: false
       }
     )
-    .setFooter({ text: 'g!yardım Tüm komutlara - g!bilgi Yazarak Grave hakkında bilgi alabilirsin' });
+    .setFooter({ text: 'g!komut-adı yazarak detaylı bilgi alabilirsiniz.' });
 
   message.channel.send({ embeds: [embed] });
 };
