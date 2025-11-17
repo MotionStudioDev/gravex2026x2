@@ -24,7 +24,7 @@ module.exports.run = async (client, message, args) => {
         },
         {
           name: '📚 Sistem',
-          value: '`g!sayaç`, `g!küfür-engel`, `g!anti-raid`, `g!emoji-log`',
+          value: '`g!sayaç`, `g!küfür-engel`, `g!anti-raid`, `g!otorol`, `g!emoji-log`',
           inline: false
         }
       )
