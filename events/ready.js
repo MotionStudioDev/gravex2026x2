@@ -1,7 +1,5 @@
-const chalk = require('chalk');
 const moment = require('moment');
 const { ActivityType } = require('discord.js');
-const ayarlar = require('../ayarlar.json');
 
 const prefix = ayarlar.prefix;
 
