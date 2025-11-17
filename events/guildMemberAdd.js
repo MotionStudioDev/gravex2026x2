@@ -5,6 +5,32 @@ module.exports = async (member) => {
   const guildId = member.guild.id;
   const user = member.user;
 
+  // ✅ OTO-ROL SİSTEMİ
+  const rolId = client.otoroller?.get(guildId);
+  if (rolId) {
+    const rol = member.guild.roles.cache.get(rolId);
+    if (rol) {
+      try {
+        await member.roles.add(rol);
+
+        const kanal = member.guild.systemChannel;
+        if (kanal && kanal.permissionsFor(client.user).has('SendMessages')) {
+          kanal.send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor('Green')
+                .setTitle('✅ Otorol Verildi')
+                .setDescription(`${member} kullanıcısına <@&${rol.id}> rolü verildi.`)
+                .setFooter({ text: 'Otorol sistemi' })
+            ]
+          });
+        }
+      } catch (err) {
+        console.error('Otorol verilemedi:', err);
+      }
+    }
+  }
+
   // ✅ SAYAÇ SİSTEMİ
   const hedef = client.sayaçlar?.get(guildId);
   if (hedef) {
@@ -55,9 +81,7 @@ module.exports = async (member) => {
         .setColor('DarkRed')
         .setTitle('🚨 Raid Algılandı')
         .setDescription(`**${ayar.süre} saniye** içinde **${yeniGirişler.length}** kişi sunucuya katıldı.`)
-        .addFields(
-          { name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false }
-        )
+        .addFields({ name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false })
         .setFooter({ text: 'Anti-Raid sistemi' });
 
       if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
