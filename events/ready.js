@@ -1,7 +1,7 @@
 const moment = require('moment');
 const { ActivityType } = require('discord.js');
 
-const prefix = ayarlar.prefix;
+const prefix = confıg.prefix;
 
 module.exports = (client) => {
   console.log(`${client.user.username} ismi ile giriş yapıldı!`);
