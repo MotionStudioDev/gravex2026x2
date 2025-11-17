@@ -6,14 +6,22 @@ module.exports.run = async (client, message, args) => {
   const guildId = message.guild.id;
   const bot = message.guild.members.me;
 
-  if (!sub || !['çek', 'git', 'log', 'durum'].includes(sub)) {
+  if (!sub || !['çek', 'git', 'log', 'durum', 'çek-hepsini'].includes(sub)) {
     return message.channel.send({
-      embeds: [new EmbedBuilder().setColor('Orange').setTitle('ℹ️ Ses Sistemi Komutu').setDescription('Kullanım:\n`g!ses-sistemi çek <@kişi>`\n`g!ses-sistemi git <@kişi>`\n`g!ses-sistemi log <#kanal>`\n`g!ses-sistemi durum`')]
+      embeds: [new EmbedBuilder().setColor('Orange').setTitle('ℹ️ Ses Sistemi Komutu').setDescription(
+        'Kullanım:\n`g!ses-sistemi çek <@kişi>`\n`g!ses-sistemi git <@kişi>`\n`g!ses-sistemi çek-hepsini`\n`g!ses-sistemi log <#kanal>`\n`g!ses-sistemi durum`'
+      )]
     });
   }
 
-  // ✅ LOG AYARLAMA
+  // ✅ LOG AYARLAMA (sadece yönetici)
   if (sub === 'log') {
+    if (!message.member.permissions.has('Administrator')) {
+      return message.channel.send({
+        embeds: [new EmbedBuilder().setColor('Red').setTitle('🚫 Yetki Yok').setDescription('Log kanalını ayarlamak için `Yönetici` yetkisine sahip olmalısın.')]
+      });
+    }
+
     const kanal = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
     if (!kanal || kanal.type !== 0) {
       return message.channel.send({
@@ -27,8 +35,14 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  // ✅ DURUM GÖSTERME
+  // ✅ DURUM GÖSTERME (sadece yönetici)
   if (sub === 'durum') {
+    if (!message.member.permissions.has('Administrator')) {
+      return message.channel.send({
+        embeds: [new EmbedBuilder().setColor('Red').setTitle('🚫 Yetki Yok').setDescription('Sistem durumunu görüntülemek için `Yönetici` yetkisine sahip olmalısın.')]
+      });
+    }
+
     const logKanalId = client.sesLogKanalları?.get(guildId);
     return message.channel.send({
       embeds: [new EmbedBuilder().setColor('Blurple').setTitle('🔍 Ses Sistemi Durumu').addFields(
@@ -37,7 +51,7 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  // ✅ YETKİ KONTROL
+  // ✅ BOT YETKİ KONTROLÜ
   if (!bot.permissions.has('MoveMembers')) {
     return message.channel.send({
       embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Yetki Eksik').setDescription('Botun `Üyeleri Taşı` yetkisi yok.')]
@@ -125,6 +139,62 @@ module.exports.run = async (client, message, args) => {
         embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Taşıma Başarısız').setDescription('Kendini taşıyamadım. Yetki veya sistem hatası olabilir.')]
       });
     }
+  }
+
+  // ✅ ÇEK-HEPSİNİ
+  if (sub === 'çek-hepsini') {
+    const kanalım = message.member.voice?.channel;
+    if (!kanalım) {
+      return message.channel.send({
+        embeds: [new EmbedBuilder().setColor('Red').setTitle('🚫 Ses Kanalı Gerekli').setDescription('Bu komutu kullanmak için bir ses kanalında olmalısın.')]
+      });
+    }
+
+    const taşınacaklar = message.guild.members.cache.filter(m =>
+      m.voice?.channel && m.voice.channel.id !== kanalım.id && !m.user.bot
+    );
+
+    if (taşınacaklar.size === 0) {
+      return message.channel.send({
+        embeds: [new EmbedBuilder().setColor('Orange').setTitle('ℹ️ Kimse Yok').setDescription('Taşınacak başka sesli kullanıcı yok.')]
+      });
+    }
+
+    let başarı = 0;
+    for (const member of taşınacaklar.values()) {
+      try {
+        await member.voice.setChannel(kanalım);
+        başarı++;
+      } catch (err) {
+        console.warn(`Taşıma hatası: ${member.user.tag}`, err);
+      }
+    }
+
+        const logKanalId = client.sesLogKanalları?.get(guildId);
+    const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : null;
+
+    if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+      logKanal.send({
+        embeds: [new EmbedBuilder()
+          .setColor('Green')
+          .setTitle('📥 Toplu Sesli Çekim')
+          .addFields(
+            { name: 'Çeken', value: `${message.author}`, inline: true },
+            { name: 'Kanal', value: `<#${kanalım.id}>`, inline: true },
+            { name: 'Toplam Taşınan', value: `${başarı} kişi`, inline: true }
+          )
+          .setFooter({ text: 'Ses sistemi' })
+        ]
+      });
+    }
+
+    return message.channel.send({
+      embeds: [new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('✅ Toplu Çekildi')
+        .setDescription(`${başarı} kişi kanalına çekildi.`)
+      ]
+    });
   }
 };
 
