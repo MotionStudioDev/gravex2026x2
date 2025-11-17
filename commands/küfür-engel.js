@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-
+const db = require("orio.db");
 module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has('Administrator')) {
     return message.channel.send({
