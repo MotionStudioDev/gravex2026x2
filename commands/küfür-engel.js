@@ -20,15 +20,14 @@ module.exports.run = async (client, message, args) => {
       embeds: [
         new EmbedBuilder()
           .setColor('Orange')
-          .setTitle('Grave Küfür Engel Sistemi')
+          .setTitle('ℹ️ Küfür Engel Komutu')
           .setDescription('Kullanım:\n`g!küfür-engel aç`\n`g!küfür-engel kapat`\n`g!küfür-engel durum`\n`g!küfür-engel log <#kanal>`')
       ]
     });
   }
 
-  // Küfür Engel Aç
   if (sub === 'aç') {
-    db.set(`kufurEngel_${guildId}`, true);
+    client.kufurEngel.set(guildId, true);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -39,9 +38,8 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  // Küfür Engel Kapat
   if (sub === 'kapat') {
-    db.delete(`kufurEngel_${guildId}`);
+    client.kufurEngel.delete(guildId);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -52,10 +50,9 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  // Durum Kontrol
   if (sub === 'durum') {
-    const aktif = db.has(`kufurEngel_${guildId}`);
-    const logKanal = db.get(`kufurLog_${guildId}`);
+    const aktif = client.kufurEngel.has(guildId);
+    const logKanal = client.kufurLogKanalları.get(guildId);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -69,7 +66,6 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  // Log Kanalı Ayarla
   if (sub === 'log') {
     const kanal = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
     if (!kanal || kanal.type !== 0) {
@@ -83,7 +79,7 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    db.set(`kufurLog_${guildId}`, kanal.id);
+    client.kufurLogKanalları.set(guildId, kanal.id);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
