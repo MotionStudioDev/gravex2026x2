@@ -70,7 +70,7 @@ client.emojiLogKanalları = new Map(); // guildId → kanalId
 
 client.otoroller = new Map();           // guildId → rolId
 client.otorolLogKanalları = new Map();  // guildId → kanalId
-
+client.reklamLogKanalları = new Map(); // guildId → kanalId
 client.on('guildMemberAdd', require('./events/guildMemberAdd'));
 client.on('guildMemberRemove', require('./events/guildMemberRemove'));
 client.on('messageCreate', require('./events/messageCreate'));
