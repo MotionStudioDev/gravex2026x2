@@ -10,12 +10,14 @@ module.exports = async (member) => {
   if (rolId) {
     const rol = member.guild.roles.cache.get(rolId);
     if (rol) {
+      const logKanalId = client.otorolLogKanalları?.get(guildId);
+      const logKanal = logKanalId ? member.guild.channels.cache.get(logKanalId) : member.guild.systemChannel;
+
       try {
         await member.roles.add(rol);
 
-        const kanal = member.guild.systemChannel;
-        if (kanal && kanal.permissionsFor(client.user).has('SendMessages')) {
-          kanal.send({
+        if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+          logKanal.send({
             embeds: [
               new EmbedBuilder()
                 .setColor('Green')
@@ -26,6 +28,18 @@ module.exports = async (member) => {
           });
         }
       } catch (err) {
+        if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+          logKanal.send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor('Red')
+                .setTitle('❌ Otorol Verilemedi')
+                .setDescription(`**${user.tag}** için <@&${rol.id}> rolü verilemedi.\nHata: \`Missing Permissions\``)
+                .setFooter({ text: 'Otorol sistemi' })
+            ]
+          });
+        }
+
         console.error('Otorol verilemedi:', err);
       }
     }
@@ -45,9 +59,7 @@ module.exports = async (member) => {
       .setFooter({ text: 'Sayaç sistemi' });
 
     const kanalId = client.sayaçKanalları?.get(guildId);
-    const kanal = kanalId
-      ? member.guild.channels.cache.get(kanalId)
-      : member.guild.systemChannel;
+    const kanal = kanalId ? member.guild.channels.cache.get(kanalId) : member.guild.systemChannel;
 
     if (kanal && kanal.permissionsFor(client.user).has('SendMessages')) {
       kanal.send({ embeds: [embed] });
