@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const db = require("orio.db");
+
 module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has('Administrator')) {
     return message.channel.send({
@@ -26,8 +27,9 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // Küfür Engel Aç
   if (sub === 'aç') {
-    client.kufurEngel.set(guildId, true);
+    db.set(`kufurEngel_${guildId}`, true);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -38,8 +40,9 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // Küfür Engel Kapat
   if (sub === 'kapat') {
-    client.kufurEngel.delete(guildId);
+    db.delete(`kufurEngel_${guildId}`);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -50,9 +53,10 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // Durum Kontrol
   if (sub === 'durum') {
-    const aktif = client.kufurEngel.has(guildId);
-    const logKanal = client.kufurLogKanalları.get(guildId);
+    const aktif = db.has(`kufurEngel_${guildId}`);
+    const logKanal = db.get(`kufurLog_${guildId}`);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -66,6 +70,7 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // Log Kanalı Ayarla
   if (sub === 'log') {
     const kanal = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
     if (!kanal || kanal.type !== 0) {
@@ -79,7 +84,7 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    client.kufurLogKanalları.set(guildId, kanal.id);
+    db.set(`kufurLog_${guildId}`, kanal.id);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
