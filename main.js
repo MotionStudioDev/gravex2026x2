@@ -67,7 +67,7 @@ client.antiRaidLogKanalları = new Map();       // guildId → kanalId
 client.antiRaidGirişler = new Map();           // guildId → [timestamp1, timestamp2, ...]
 
 client.emojiLogKanalları = new Map(); // guildId → kanalId
-
+client.sesLogKanalları = new Map(); // guildId → kanalId
 client.otoroller = new Map();           // guildId → rolId
 client.otorolLogKanalları = new Map();  // guildId → kanalId
 client.reklamLogKanalları = new Map(); // guildId → kanalId
