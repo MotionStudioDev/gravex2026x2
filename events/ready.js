@@ -5,7 +5,7 @@ const db = require('orio.db')
 client.on("ready", () => {
 console.log(`${client.user.tag} Aktif!`)
   let x = [
-    `g!yardım - Bakım modu aktif`
+    `g!yardım - g!davet - Grave v1.0.0`
   ]
   let q = x[Math.floor(Math.random() * x.length)]
 client.user.setActivity(q)
