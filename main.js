@@ -71,6 +71,11 @@ client.sesLogKanalları = new Map(); // guildId → kanalId
 client.otoroller = new Map();           // guildId → rolId
 client.otorolLogKanalları = new Map();  // guildId → kanalId
 client.reklamLogKanalları = new Map(); // guildId → kanalId
+
+client.on('emojiCreate', require('./events/emojiCreate'));
+client.on('emojiDelete', require('./events/emojiDelete'));
+client.on('emojiUpdate', require('./events/emojiUpdate'));
+
 client.on('guildMemberAdd', require('./events/guildMemberAdd'));
 client.on('guildMemberRemove', require('./events/guildMemberRemove'));
 client.on('messageCreate', require('./events/messageCreate'));
