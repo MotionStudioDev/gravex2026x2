@@ -9,7 +9,7 @@ module.exports.run = async (client, message, args) => {
   if (emojis.length === 0) {
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('🚫 Emoji Bulunamadı')
+      .setTitle('<:x_:1416529392955555871> Emoji Bulunamadı')
       .setDescription('Bu sunucuda hiç özel emoji yok.')
       .setFooter({ text: 'Emoji sistemi' });
 
