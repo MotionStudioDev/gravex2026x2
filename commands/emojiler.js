@@ -9,7 +9,7 @@ module.exports.run = async (client, message, args) => {
   if (emojis.length === 0) {
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('<:x_:1416529392955555871> Emoji Bulunamadı')
+      .setTitle(' Emoji Bulunamadı')
       .setDescription('Bu sunucuda hiç özel emoji yok.')
       .setFooter({ text: 'Emoji sistemi' });
 
@@ -27,7 +27,7 @@ module.exports.run = async (client, message, args) => {
     return new EmbedBuilder()
       .setColor('Orange')
       .setTitle(`📦 Sunucu Emojileri (Sayfa ${index + 1}/${Math.ceil(emojis.length / sayfaBoyutu)})`)
-      .setDescription(`${emojiSatırları}\n\n**<:ID:1416530654006349967> ID'ler:**\n${idSatırları}`)
+      .setDescription(`${emojiSatırları}\n\n**ID'ler:**\n${idSatırları}`)
       .setFooter({ text: '⬅️ / ➡️ ile sayfa değiştir.' });
   };
 
