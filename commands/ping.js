@@ -15,7 +15,7 @@ module.exports.run = async (client, message, args) => {
   // Sonuç embed'i
   const resultEmbed = new EmbedBuilder()
     .setColor('Green')
-    .setTitle('<:ping:1416529425813737544> Ping Verileri')
+    .setTitle('<:PİNG:1416529425813737544> Ping Verileri')
     .addFields(
       { name: 'Mesaj Gecikmesi', value: `${latency}ms`, inline: true },
       { name: 'Bot Ping (API)', value: `${apiPing}ms`, inline: true }
