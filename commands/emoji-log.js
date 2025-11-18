@@ -45,16 +45,30 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // ✅ sistem-log → sistem açık mı kontrolü
+  if (sub === 'sistem-log') {
+    const logKanalId = client.emojiLogKanalları?.get(guildId);
+    return message.channel.send({
+      embeds: [new EmbedBuilder()
+        .setColor(logKanalId ? 'Green' : 'Red')
+        .setTitle(logKanalId ? '✅ Sistem Aktif' : '❌ Sistem Kapalı')
+        .setDescription(logKanalId
+          ? `Emoji log sistemi aktif. Loglar <#${logKanalId}> kanalına gönderiliyor.`
+          : 'Emoji log sistemi bu sunucuda aktif değil.')
+      ]
+    });
+  }
+
   // ❓ Geçersiz kullanım
   return message.channel.send({
     embeds: [new EmbedBuilder().setColor('Orange').setTitle('ℹ️ Emoji Log Komutu').setDescription(
-      'Kullanım:\n`g!emoji-log ayarla <#kanal>`\n`g!emoji-log durum`\n`g!emoji-log kapat`'
+      'Kullanım:\n`g!emoji-log ayarla <#kanal>`\n`g!emoji-log durum`\n`g!emoji-log kapat`\n`g!emoji-log sistem-log`'
     )]
   });
 };
 
 module.exports.conf = {
-  aliases: []
+  aliases: ['sistem-log']
 };
 
 module.exports.help = {
