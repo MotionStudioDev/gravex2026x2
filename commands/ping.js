@@ -4,7 +4,7 @@ module.exports.run = async (client, message, args) => {
   // İlk embed: analiz başlıyor
   const loadingEmbed = new EmbedBuilder()
     .setColor('Yellow')
-    .setDescription('⏳ Lütfen bekleyin, veriler analiz ediliyor...');
+    .setDescription('<a:yukle:1440677432976867448> Lütfen bekleyin, veriler analiz ediliyor...');
 
   const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
