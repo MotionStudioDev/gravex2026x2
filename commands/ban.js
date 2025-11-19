@@ -5,8 +5,8 @@ module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('🚫 Yetki Yok')
-      .setDescription('Bu komutu kullanmak için `Üyeleri Yasakla` yetkisine sahip olmalısın.');
+      .setTitle('<:x_:1416529392955555871> | Yetki Yok')
+      .setDescription('<a:uyar1:1416526541030035530> | Bu komutu kullanmak için `Üyeleri Yasakla` yetkisine sahip olmalısın.');
     return message.channel.send({ embeds: [embed] });
   }
 
@@ -16,16 +16,16 @@ module.exports.run = async (client, message, args) => {
   if (!target) {
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('❌ Kullanıcı Bulunamadı')
-      .setDescription('Lütfen geçerli bir kullanıcı etiketle veya ID gir.');
+      .setTitle('<:x_:1416529392955555871> | Kullanıcı Bulunamadı')
+      .setDescription('<a:uyar1:1416526541030035530> | Lütfen geçerli bir kullanıcı etiketle veya ID gir.');
     return message.channel.send({ embeds: [embed] });
   }
 
   if (!target.bannable) {
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('🔒 Ban Başarısız')
-      .setDescription('Bu kullanıcıyı banlayamıyorum. Yetkim yetersiz olabilir.');
+      .setTitle('<a:uyar1:1416526541030035530> | Ban Başarısız')
+      .setDescription('<a:uyar1:1416526541030035530> | Bu kullanıcıyı banlayamıyorum. Yetkim yetersiz olabilir.');
     return message.channel.send({ embeds: [embed] });
   }
 
@@ -36,7 +36,7 @@ module.exports.run = async (client, message, args) => {
 
   const embed = new EmbedBuilder()
     .setColor('Green')
-    .setTitle('✅ Ban Başarılı')
+    .setTitle('<:tik1:1416526332803809401> | Ban Başarılı')
     .addFields(
       { name: 'Kullanıcı', value: `${target.user.tag} (${target.id})`, inline: false },
       { name: 'Yetkili', value: `${message.author.tag} (${message.author.id})`, inline: false },
