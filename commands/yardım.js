@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports.run = async (client, message) => {
   try {
@@ -21,44 +21,41 @@ module.exports.run = async (client, message) => {
       }
     };
 
-    const anaEmbed = new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor('Blurple')
       .setTitle('📖 Grave Yardım Menüsü')
       .setDescription('Aşağıdan kategori seçerek komutları görüntüleyebilirsin.')
       .setFooter({ text: 'g!komut-adı yazarak detaylı bilgi alabilirsin.' });
 
-    const msg = await message.channel.send({ embeds: [anaEmbed] });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('kullanıcı').setLabel('Kullanıcı').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('moderasyon').setLabel('Moderasyon').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Primary)
+    );
 
-    const tepkiler = {
-      '🔧': 'genel',
-      '🎭': 'kullanıcı',
-      '🛡️': 'moderasyon',
-      '📚': 'sistem'
-    };
+    const msg = await message.channel.send({ embeds: [embed], components: [row] });
 
-    for (const emoji of Object.keys(tepkiler)) {
-      await msg.react(emoji);
-    }
+    const collector = msg.createMessageComponentCollector({
+      filter: i => i.user.id === message.author.id,
+      time: 30000
+    });
 
-    const filter = (reaction, user) =>
-      Object.keys(tepkiler).includes(reaction.emoji.name) && user.id === message.author.id;
+    collector.on('collect', async i => {
+      const kategori = kategoriler[i.customId];
+      if (!kategori) return;
 
-    const collector = msg.createReactionCollector({ filter, time: 30000 });
-
-    collector.on('collect', async (reaction) => {
-      const kategori = tepkiler[reaction.emoji.name];
-      const embed = new EmbedBuilder()
+      const yeniEmbed = new EmbedBuilder()
         .setColor('Blurple')
-        .setTitle(`📖 ${kategoriler[kategori].title}`)
-        .setDescription(kategoriler[kategori].value)
+        .setTitle(`📖 ${kategori.title}`)
+        .setDescription(kategori.value)
         .setFooter({ text: 'g!komut-adı yazarak detaylı bilgi alabilirsin.' });
 
-      await msg.edit({ embeds: [embed] });
-      await reaction.users.remove(message.author.id);
+      await i.update({ embeds: [yeniEmbed], components: [row] });
     });
 
     collector.on('end', () => {
-      msg.reactions.removeAll().catch(() => {});
+      msg.edit({ components: [] }).catch(() => {});
     });
   } catch (err) {
     console.error('Yardım komutu hatası:', err);
