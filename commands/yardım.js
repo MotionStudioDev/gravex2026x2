@@ -4,19 +4,19 @@ module.exports.run = async (client, message) => {
   try {
     const kategoriler = {
       genel: {
-        title: '🔧 Genel Komutlar',
+        title: '<a:discord:1441131310717599886> | Genel Komutlar',
         value: '`ping`,`istatistik`,`uptime`,`yardım`'
       },
       kullanıcı: {
-        title: '🎭 Kullanıcı Komutları',
+        title: '<:user:1441128594117099664> | Kullanıcı Komutları',
         value: '`avatar`,`profil`,`emoji-bilgi`,`profil`,`emojiler`'
       },
       moderasyon: {
-        title: '<:gvenlik:1416529478112383047> Moderasyon',
+        title: '<:gvenlik:1416529478112383047> | Moderasyon',
         value: '`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`uyar`'
       },
       sistem: {
-        title: '📚 Sistem',
+        title: '<a:sistemx:1441130022340399124> | Sistem',
         value: '`sayaç`,`reklam-engel`,`küfür-engel`,`anti-raid`,`otorol`,`ses-sistemi`,`emoji-log`'
       }
     };
