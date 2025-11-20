@@ -25,7 +25,7 @@ module.exports.run = async (client, message) => {
       .setColor('Blurple')
       .setTitle('Grave Yardım Menüsü')
       .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin prefix g! (Örnek: g!yardım)')
-      .setFooter({ text: '<a:uyar2:1416526724182835282> | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
+      .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
@@ -49,7 +49,7 @@ module.exports.run = async (client, message) => {
         .setColor('Blurple')
         .setTitle(`${kategori.title}`)
         .setDescription(kategori.value)
-        .setFooter({ text: '<a:uyar2:1416526724182835282> | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
+        .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
       await i.update({ embeds: [yeniEmbed], components: [row] });
     });
@@ -59,7 +59,7 @@ module.exports.run = async (client, message) => {
     });
   } catch (err) {
     console.error('Yardım komutu hatası:', err);
-    message.channel.send('<:x_:1416529392955555871> | Yardım menüsü oluşturulurken bir hata oluştu.');
+    message.channel.send('⚠️| Yardım menüsü oluşturulurken bir hata oluştu.');
   }
 };
 
