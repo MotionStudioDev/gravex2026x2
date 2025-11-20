@@ -5,27 +5,27 @@ module.exports.run = async (client, message) => {
     const kategoriler = {
       genel: {
         title: '🔧 Genel Komutlar',
-        value: '`g!ping`, `g!istatistik`, `g!uptime`, `g!yardım`'
+        value: '`ping`,`istatistik`,`uptime`,`yardım`'
       },
       kullanıcı: {
         title: '🎭 Kullanıcı Komutları',
-        value: '`g!avatar`, `g!profil`, `g!emoji-bilgi`, `g!emojiler`'
+        value: '`avatar`,`profil`,`emoji-bilgi`,`profil`,`emojiler`'
       },
       moderasyon: {
         title: '🛡️ Moderasyon',
-        value: '`g!ban`, `g!kick`, `g!sil`, `g!rol-ver`, `g!rol-al`, `g!uyar`'
+        value: '`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`uyar`'
       },
       sistem: {
         title: '📚 Sistem',
-        value: '`g!sayaç`, `g!reklam-engel`, `g!küfür-engel`, `g!anti-raid`, `g!otorol`, `g!emoji-log`'
+        value: '`sayaç`,`reklam-engel`,`küfür-engel`,`anti-raid`,`otorol`,`ses-sistemi`,`emoji-log`'
       }
     };
 
     const embed = new EmbedBuilder()
       .setColor('Blurple')
-      .setTitle('📖 Grave Yardım Menüsü')
-      .setDescription('Aşağıdan kategori seçerek komutları görüntüleyebilirsin.')
-      .setFooter({ text: 'g!komut-adı yazarak detaylı bilgi alabilirsin.' });
+      .setTitle('Grave Yardım Menüsü')
+      .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin prefix g! (Örnek: g!yardım)')
+      .setFooter({ text: 'Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
@@ -49,7 +49,7 @@ module.exports.run = async (client, message) => {
         .setColor('Blurple')
         .setTitle(`📖 ${kategori.title}`)
         .setDescription(kategori.value)
-        .setFooter({ text: 'g!komut-adı yazarak detaylı bilgi alabilirsin.' });
+        .setFooter({ text: 'Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
       await i.update({ embeds: [yeniEmbed], components: [row] });
     });
