@@ -12,7 +12,7 @@ module.exports.run = async (client, message) => {
         value: '`avatar`,`profil`,`emoji-bilgi`,`profil`,`emojiler`'
       },
       moderasyon: {
-        title: '🛡️ Moderasyon',
+        title: '<:gvenlik:1416529478112383047 Moderasyon',
         value: '`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`uyar`'
       },
       sistem: {
