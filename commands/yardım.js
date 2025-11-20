@@ -25,7 +25,7 @@ module.exports.run = async (client, message) => {
       .setColor('Blurple')
       .setTitle('Grave Yardım Menüsü')
       .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin prefix g! (Örnek: g!yardım)')
-      .setFooter({ text: '<a:uyar1:1416526541030035530> | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
+      .setFooter({ text: 'Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
@@ -49,7 +49,7 @@ module.exports.run = async (client, message) => {
         .setColor('Blurple')
         .setTitle(`📖 ${kategori.title}`)
         .setDescription(kategori.value)
-        .setFooter({ text: '<a:uyar1:1416526541030035530> | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
+        .setFooter({ text: 'Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
       await i.update({ embeds: [yeniEmbed], components: [row] });
     });
