@@ -47,7 +47,7 @@ module.exports.run = async (client, message) => {
 
       const yeniEmbed = new EmbedBuilder()
         .setColor('Blurple')
-        .setTitle(`📖 ${kategori.title}`)
+        .setTitle(`${kategori.title}`)
         .setDescription(kategori.value)
         .setFooter({ text: 'Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
 
