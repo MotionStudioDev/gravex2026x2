@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
-const GuildConfig = require('../models/GuildConfig');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -30,7 +30,11 @@ module.exports.run = async (client, message, args) => {
         return i.reply({ content: "❌ Bu butonu sadece yöneticiler kullanabilir.", ephemeral: true });
       }
       if (i.customId === "kayıtEvet") {
-        await GuildConfig.findOneAndUpdate({ guildId: message.guild.id }, { kayıtAktif: true }, { upsert: true });
+        await GuildSettings.findOneAndUpdate(
+          { guildId: message.guild.id },
+          { kayıtAktif: true },
+          { upsert: true }
+        );
         const aktifEmbed = new EmbedBuilder()
           .setColor(0x00FF7F)
           .setTitle("✅ Kayıt Sistemi Aktif")
@@ -50,14 +54,22 @@ module.exports.run = async (client, message, args) => {
   }
 
   if (sub === "kapat") {
-    await GuildConfig.findOneAndUpdate({ guildId: message.guild.id }, { kayıtAktif: false }, { upsert: true });
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { kayıtAktif: false },
+      { upsert: true }
+    );
     return message.channel.send("📴 Bu sunucu için kayıt sistemi kapatıldı.");
   }
 
   if (sub === "kanal") {
     const kanal = message.mentions.channels.first();
     if (!kanal) return message.reply("❌ Bir kanal etiketlemelisin.");
-    await GuildConfig.findOneAndUpdate({ guildId: message.guild.id }, { kayıtKanal: kanal.id }, { upsert: true });
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { kayıtKanal: kanal.id },
+      { upsert: true }
+    );
     return message.channel.send(`✅ Kayıt kanalı <#${kanal.id}> olarak ayarlandı.`);
   }
 
@@ -65,7 +77,7 @@ module.exports.run = async (client, message, args) => {
     const kızRol = message.mentions.roles.first();
     const erkekRol = message.mentions.roles.at(1);
     if (!kızRol || !erkekRol) return message.reply("❌ İki rol etiketlemelisin (kız ve erkek).");
-    await GuildConfig.findOneAndUpdate(
+    await GuildSettings.findOneAndUpdate(
       { guildId: message.guild.id },
       { kızRol: kızRol.id, erkekRol: erkekRol.id },
       { upsert: true }
@@ -76,7 +88,11 @@ module.exports.run = async (client, message, args) => {
   if (sub === "yetkili") {
     const rol = message.mentions.roles.first();
     if (!rol) return message.reply("❌ Bir rol etiketlemelisin.");
-    await GuildConfig.findOneAndUpdate({ guildId: message.guild.id }, { yetkiliRol: rol.id }, { upsert: true });
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { yetkiliRol: rol.id },
+      { upsert: true }
+    );
     return message.channel.send(`✅ Kayıt yetkilisi rolü ${rol} olarak ayarlandı.`);
   }
 };
