@@ -11,86 +11,79 @@ module.exports = async (message) => {
   const guildId = message.guild.id;
   const içerik = message.content.toLowerCase();
 
-  // ✅ BOT ETİKET KONTROLÜ
+  // BOT ETİKET KONTROLÜ
   if (message.mentions.has(client.user) && message.content.trim() === `<@${client.user.id}>`) {
-    const embed = new EmbedBuilder()
-      .setColor('Blurple')
-      .setTitle('👋 Merhaba!')
-      .setDescription('Beni etiketlemişsin.\nKomutlar için `g!yardım` yazabilirsin!')
-      .setFooter({ text: 'GraveBOT 2026' });
-
-    return message.channel.send({ embeds: [embed] });
+    return message.channel.send({
+      embeds: [new EmbedBuilder()
+        .setColor('Blurple')
+        .setTitle('👋 Merhaba!')
+        .setDescription('Beni etiketlemişsin.\nKomutlar için `g!yardım` yazabilirsin!')
+        .setFooter({ text: 'GraveBOT 2026' })]
+    });
   }
 
-  // ✅ KÜFÜR ENGEL
-  if (client.kufurEngel?.has(guildId)) {
+  // KÜFÜR ENGEL
+  const kufurAktif = db.get(`kufurEngel_${guildId}`);
+  if (kufurAktif) {
     const küfür = [...küfürler].find(k => içerik.includes(k));
     if (küfür) {
       try {
         await message.delete();
 
         const uyarı = await message.channel.send({
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('🚫 Küfür Tespit Edildi')
-              .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)
-          ]
+          embeds: [new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('🚫 Küfür Tespit Edildi')
+            .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)]
         });
 
-        setTimeout(() => {
-          uyarı.delete().catch(() => {});
-        }, 3000);
+        setTimeout(() => uyarı.delete().catch(() => {}), 3000);
 
-        const logKanalId = client.kufurLogKanalları?.get(guildId);
+        const logKanalId = db.get(`kufurLog_${guildId}`);
         const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : null;
 
         if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
-          const logEmbed = new EmbedBuilder()
-            .setColor('DarkRed')
-            .setTitle('🛑 Küfür Logu')
-            .addFields(
-              { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
-              { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-              { name: 'Küfür', value: `**${küfür}**`, inline: true },
-              { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
-              { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
-            )
-            .setFooter({ text: 'Küfür engel sistemi' });
-
-          logKanal.send({ embeds: [logEmbed] });
+          logKanal.send({
+            embeds: [new EmbedBuilder()
+              .setColor('DarkRed')
+              .setTitle('🛑 Küfür Logu')
+              .addFields(
+                { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
+                { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
+                { name: 'Küfür', value: `**${küfür}**`, inline: true },
+                { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
+                { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+              )
+              .setFooter({ text: 'Küfür engel sistemi' })]
+          });
         }
-      } catch (err) {
-        console.error('Küfür mesajı silinemedi veya log gönderilemedi:', err);
-      }
+      } catch (err) { console.error(err); }
     }
   }
 
-  // ✅ REKLAM ENGEL
+  // REKLAM ENGEL
   const reklamAktif = db.get(`reklamEngel_${guildId}`);
   if (reklamAktif && reklamlar.some(r => içerik.includes(r))) {
     try {
       await message.delete();
 
-      const logKanalId = client.reklamLogKanalları?.get(guildId);
-      const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : message.channel;
+      const logKanalId = db.get(`reklamLog_${guildId}`) || message.channel.id;
+      const logKanal = message.guild.channels.cache.get(logKanalId);
 
-      const embed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('🚫 Reklam Mesajı Silindi')
-        .addFields(
-          { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
-          { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-          { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
-          { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
-        )
-        .setFooter({ text: 'Reklam engel sistemi' });
+      if (!logKanal) return;
 
-      if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
-        logKanal.send({ embeds: [embed] });
-      }
-    } catch (err) {
-      console.error('Reklam mesajı silinemedi veya log gönderilemedi:', err);
-    }
+      logKanal.send({
+        embeds: [new EmbedBuilder()
+          .setColor('Red')
+          .setTitle('🚫 Reklam Mesajı Silindi')
+          .addFields(
+            { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
+            { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
+            { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
+            { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+          )
+          .setFooter({ text: 'Reklam engel sistemi' })]
+      });
+    } catch (err) { console.error(err); }
   }
 };
