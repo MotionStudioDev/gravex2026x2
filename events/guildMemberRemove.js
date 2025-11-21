@@ -1,14 +1,16 @@
 const { EmbedBuilder } = require('discord.js');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports = async (member) => {
   const client = member.client;
   const guildId = member.guild.id;
 
-  const hedef = client.sayaçlar?.get(guildId);
-  if (!hedef) return;
+  // Sunucu ayarlarını DB’den çek
+  const settings = await GuildSettings.findOne({ guildId });
+  if (!settings || !settings.sayaçHedef) return;
 
   const mevcut = member.guild.memberCount;
-  const kalan = hedef - mevcut;
+  const kalan = settings.sayaçHedef - mevcut;
 
   const embed = new EmbedBuilder()
     .setColor('Red')
@@ -16,9 +18,8 @@ module.exports = async (member) => {
     .setDescription(`**${member.user.tag}** sunucudan ayrıldı.\nHedefe ulaşmak için **${kalan}** kişi kaldı.`)
     .setFooter({ text: 'Sayaç sistemi' });
 
-  const kanalId = client.sayaçKanalları?.get(guildId);
-  const kanal = kanalId
-    ? member.guild.channels.cache.get(kanalId)
+  const kanal = settings.sayaçKanal
+    ? member.guild.channels.cache.get(settings.sayaçKanal)
     : member.guild.systemChannel;
 
   if (kanal && kanal.permissionsFor(client.user).has('SendMessages')) {
