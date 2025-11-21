@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
-const db = require('orio.db');
+const GuildSettings = require('../models/GuildSettings');
 
-const küfürler = new Set(['amk', 'oç', 'yarrak', 'sik', 'piç', 'orospu', 'ananı', 'göt', 'salak', 'aptal']);
-const reklamlar = ['discord.gg/', '.gg/', 'http://', 'https://', '.com', '.net', '.org'];
+const küfürler = ['amk','oç','yarrak','sik','piç','orospu','ananı','göt','salak','aptal'];
+const reklamlar = ['discord.gg/','.gg/','http://','https://','.com','.net','.org'];
 
 module.exports = async (message) => {
   if (!message.guild || message.author.bot) return;
@@ -22,9 +22,13 @@ module.exports = async (message) => {
     return message.channel.send({ embeds: [embed] });
   }
 
+  // Sunucu ayarlarını DB’den çek
+  const settings = await GuildSettings.findOne({ guildId });
+  if (!settings) return;
+
   // ✅ KÜFÜR ENGEL
-  if (client.kufurEngel?.has(guildId)) {
-    const küfür = [...küfürler].find(k => içerik.includes(k));
+  if (settings.kufurEngel) {
+    const küfür = küfürler.find(k => içerik.includes(k));
     if (küfür) {
       try {
         await message.delete();
@@ -37,12 +41,9 @@ module.exports = async (message) => {
               .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)
           ]
         });
+        setTimeout(() => uyarı.delete().catch(() => {}), 3000);
 
-        setTimeout(() => {
-          uyarı.delete().catch(() => {});
-        }, 3000);
-
-        const logKanalId = client.kufurLogKanalları?.get(guildId);
+        const logKanalId = settings.kufurLog;
         const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : null;
 
         if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
@@ -50,14 +51,13 @@ module.exports = async (message) => {
             .setColor('DarkRed')
             .setTitle('🛑 Küfür Logu')
             .addFields(
-              { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
+              { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})` },
               { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
               { name: 'Küfür', value: `**${küfür}**`, inline: true },
-              { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
-              { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+              { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\`` },
+              { name: 'Zaman', value: `<t:${Math.floor(Date.now()/1000)}:F>` }
             )
             .setFooter({ text: 'Küfür engel sistemi' });
-
           logKanal.send({ embeds: [logEmbed] });
         }
       } catch (err) {
@@ -67,22 +67,21 @@ module.exports = async (message) => {
   }
 
   // ✅ REKLAM ENGEL
-  const reklamAktif = db.get(`reklamEngel_${guildId}`);
-  if (reklamAktif && reklamlar.some(r => içerik.includes(r))) {
+  if (settings.reklamEngel && reklamlar.some(r => içerik.includes(r))) {
     try {
       await message.delete();
 
-      const logKanalId = client.reklamLogKanalları?.get(guildId);
+      const logKanalId = settings.reklamLog;
       const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : message.channel;
 
       const embed = new EmbedBuilder()
         .setColor('Red')
         .setTitle('🚫 Reklam Mesajı Silindi')
         .addFields(
-          { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
+          { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})` },
           { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-          { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
-          { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+          { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\`` },
+          { name: 'Zaman', value: `<t:${Math.floor(Date.now()/1000)}:F>` }
         )
         .setFooter({ text: 'Reklam engel sistemi' });
 
