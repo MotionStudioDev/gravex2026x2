@@ -4,7 +4,6 @@ const Skor = require('../models/Skor');
 
 module.exports.run = async (client, message, args) => {
   try {
-    // Rastgele kelime listesi
     const kelimeListesi = [
       "İZMİR","ANKARA","KEDİ","KÖPEK","BİLGİSAYAR","ARABA","UÇAK","DENİZ","DAĞ",
       "COPILOT","DISCORD","OYUN","TÜRKİYE","EGE","ÇİĞLİ","KİTAP","KALEM","MÜZİK","FUTBOL"
@@ -15,20 +14,17 @@ module.exports.run = async (client, message, args) => {
     let yanlis = [];
     let kalanHak = 6;
 
-    // Canvas ile adam çizimi
     function cizAdam(hak) {
       const canvas = createCanvas(200, 200);
       const ctx = canvas.getContext('2d');
       ctx.strokeStyle = 'black'; ctx.lineWidth = 3;
 
-      // Direk
       ctx.beginPath();
       ctx.moveTo(20,180); ctx.lineTo(180,180);
       ctx.moveTo(50,180); ctx.lineTo(50,20);
       ctx.lineTo(120,20); ctx.lineTo(120,40);
       ctx.stroke();
 
-      // Adam parçaları
       if (hak <= 5) { ctx.beginPath(); ctx.arc(120,55,15,0,Math.PI*2); ctx.stroke(); }
       if (hak <= 4) { ctx.beginPath(); ctx.moveTo(120,70); ctx.lineTo(120,110); ctx.stroke(); }
       if (hak <= 3) { ctx.beginPath(); ctx.moveTo(120,80); ctx.lineTo(100,100); ctx.stroke(); }
@@ -45,9 +41,9 @@ module.exports.run = async (client, message, args) => {
         embeds: [
           new EmbedBuilder()
             .setColor(kalanHak > 2 ? 0x00FF7F : 0xFF4500)
-            .setTitle("🎮 Adam Asmaca")
+            .setTitle(`🎮 Adam Asmaca - ${kelime.length} Harf`)
             .setDescription(
-              `Kelime: ${tahmin.join(" ")}\n\n` +
+              `Kelime: ${tahmin.join(" ")} (${kelime.length} harf)\n\n` +
               `Yanlış Harfler: ${yanlis.join(", ") || "Yok"}\n` +
               `Kalan Hak: ${kalanHak}`
             )
@@ -59,7 +55,6 @@ module.exports.run = async (client, message, args) => {
       };
     };
 
-    // Alfabe iki menüye bölünüyor (max 25 seçenek kuralı)
     const alfabe = "ABCDEFGHIJKLMNOPQRSTUVWXYZÇĞİÖŞÜ".split("");
     const options1 = alfabe.slice(0, 25).map(harf => ({ label: harf, value: harf }));
     const options2 = alfabe.slice(25).map(harf => ({ label: harf, value: harf }));
@@ -99,7 +94,7 @@ module.exports.run = async (client, message, args) => {
       await interaction.update({ ...generateEmbed(), components: [row1, row2] });
     });
 
-    collector.on('end', async (collected, reason) => {
+    collector.on('end', async (_, reason) => {
       let finalEmbed;
       if (reason === "kazandi") {
         finalEmbed = new EmbedBuilder().setColor(0x00FF7F).setTitle("🎉 Kazandın!").setDescription(`Kelime: **${kelime}**`);
