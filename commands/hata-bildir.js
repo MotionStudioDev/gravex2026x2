@@ -41,7 +41,7 @@ module.exports.run = async (client, message, args) => {
       await i.update({
         embeds: [
           new EmbedBuilder()
-            .setColor('RANDOM')
+            .setColor('Orange')
             .setTitle('<a:yukle:1440677432976867448> İşlem Başlatıldı')
             .setDescription('Talebiniz iletiliyor, lütfen bekleyin...')
         ],
