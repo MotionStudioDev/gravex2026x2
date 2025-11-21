@@ -29,7 +29,7 @@ module.exports.run = async (client, message) => {
       .setColor('Blurple')
       .setTitle('Grave Yardım Menüsü')
       .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin.\nPrefix: `g!` (Örnek: `g!yardım`)')
-      .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
+      .setFooter({ text: 'GraveBOT 2026' });
 
     // Satır 1: 4 kategori
     const row1 = new ActionRowBuilder().addComponents(
@@ -65,7 +65,7 @@ module.exports.run = async (client, message) => {
         .setColor('Blurple')
         .setTitle(`${kategori.title}`)
         .setDescription(kategori.value)
-        .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
+        .setFooter({ text: 'Grave 2026' });
 
       await i.update({ embeds: [yeniEmbed], components: [row1, row2] });
     });
