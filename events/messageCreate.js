@@ -92,11 +92,11 @@ module.exports = async (message) => {
       console.error('Reklam mesajı silinemedi veya log gönderilemedi:', err);
     }
   }
-};
-////// SA-AS
-if (settings.saasAktif) {
-  if (içerik === 'sa' || içerik.includes('sa')) {
-    message.reply('Aleyküm selam, Dostum.');
+
+  // ✅ SA-AS SİSTEMİ
+  if (settings.saasAktif) {
+    if (içerik === 'sa' || içerik.startsWith('sa ')) {
+      message.reply('Aleyküm selam, Dostum.');
+    }
   }
-}
-//////
+};
