@@ -8,14 +8,21 @@ module.exports.run = async (client, message, args) => {
       embeds: [
         new EmbedBuilder()
           .setColor('Red')
-          .setTitle('🚫 Yetkisiz')
+          .setTitle('<a:uyar1:1416526541030035530> Yetkisiz')
           .setDescription('Bu komutu sadece bot sahibi kullanabilir.')
       ]
     });
   }
 
-  const hedef = message.mentions.users.first();
-  const içerik = args.slice(1).join(" ");
+  // Hedef kullanıcı: mention varsa onu al, yoksa ID ile bul
+  let hedef = message.mentions.users.first();
+  if (!hedef && args[0]) {
+    try {
+      hedef = await client.users.fetch(args[0]);
+    } catch {}
+  }
+
+  const içerik = hedef ? args.slice(1).join(" ") : args.slice(0).join(" ");
 
   if (!hedef || !içerik) {
     return message.channel.send({
@@ -23,7 +30,7 @@ module.exports.run = async (client, message, args) => {
         new EmbedBuilder()
           .setColor('Red')
           .setTitle('<a:uyar1:1416526541030035530> Hatalı Kullanım')
-          .setDescription('Kullanım: `g!mesaj-gönder @üye <mesaj>`')
+          .setDescription('Kullanım: `g!mesaj-gönder @üye <mesaj>` veya `g!mesaj-gönder <id> <mesaj>`')
       ]
     });
   }
@@ -32,7 +39,7 @@ module.exports.run = async (client, message, args) => {
   const embed = new EmbedBuilder()
     .setColor('Blurple')
     .setTitle('<a:uyar1:1416526541030035530> Mesaj Gönder Onayı')
-    .setDescription(`Şu mesajı **${hedef.tag}** kullanıcısına göndermek üzeresin:\n\`\`\`${içerik}\`\`\`\nOnaylıyorsan **EVET**, iptal için **HAYIR** bas.`);
+    .setDescription(`Şu mesajı **${hedef.tag}** (${hedef.id}) kullanıcısına göndermek üzeresin:\n\`\`\`${içerik}\`\`\`\nOnaylıyorsan **EVET**, iptal için **HAYIR** bas.`);
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('evet').setLabel('EVET').setStyle(ButtonStyle.Success),
@@ -65,6 +72,10 @@ module.exports.run = async (client, message, args) => {
               .setColor('Green')
               .setTitle('<:userx:1441379546929561650> Bot Sahibinden Mesaj')
               .setDescription(içerik)
+              .addFields(
+                { name: 'Üye', value: `${hedef.tag}`, inline: true },
+                { name: 'Üye ID', value: `${hedef.id}`, inline: true }
+              )
               .setFooter({ text: `Gönderen: ${message.author.tag}` })
               .setTimestamp()
           ]
@@ -75,7 +86,7 @@ module.exports.run = async (client, message, args) => {
             new EmbedBuilder()
               .setColor('Green')
               .setTitle('<:tik1:1416526332803809401> Mesaj Gönderildi')
-              .setDescription(`Mesaj başarıyla **${hedef.tag}** kullanıcısına gönderildi.`)
+              .setDescription(`Mesaj başarıyla **${hedef.tag}** (${hedef.id}) kullanıcısına gönderildi.`)
           ]
         });
       } catch (err) {
