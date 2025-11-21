@@ -101,4 +101,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'hava', description: 'Girilen il/ilçe için 5 günlük hava tahminini gösterir (sabah/öğlen/akşam/gece).' };
+module.exports.help = { name: 'hava-durumu', description: 'Girilen il/ilçe için 5 günlük hava tahminini gösterir (sabah/öğlen/akşam/gece).' };
