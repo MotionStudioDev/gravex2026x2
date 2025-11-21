@@ -12,9 +12,19 @@ module.exports.run = async (client, message, args) => {
   }
 
   const sub = args[0]?.toLowerCase();
+  const settings = await GuildSettings.findOne({ guildId: message.guild.id });
 
   // Aç/Kapat
   if (!sub) {
+    if (settings?.kayıtAktif) {
+      const embed = new EmbedBuilder()
+        .setColor('Yellow')
+        .setTitle("⚠️ Kayıt Sistemi Zaten Açık")
+        .setDescription("Bu sunucuda kayıt sistemi zaten aktif durumda.\n\nKomutlar için: `g!kayıt-sistemi`")
+        .setTimestamp();
+      return message.channel.send({ embeds: [embed] });
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x1E90FF)
       .setTitle("📋 Kayıt Sistemi")
@@ -78,6 +88,15 @@ module.exports.run = async (client, message, args) => {
   }
 
   if (sub === "kapat") {
+    if (!settings?.kayıtAktif) {
+      const embed = new EmbedBuilder()
+        .setColor('Yellow')
+        .setTitle("⚠️ Kayıt Sistemi Zaten Kapalı")
+        .setDescription("Bu sunucuda kayıt sistemi zaten kapalı.")
+        .setTimestamp();
+      return message.channel.send({ embeds: [embed] });
+    }
+
     await GuildSettings.findOneAndUpdate(
       { guildId: message.guild.id },
       { kayıtAktif: false },
