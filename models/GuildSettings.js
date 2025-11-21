@@ -27,9 +27,12 @@ const guildSettingsSchema = new mongoose.Schema({
 
   // Anti-Raid
   antiRaidAktif: { type: Boolean, default: false },
-  antiRaidSüre: { type: Number, default: 10 },   // saniye
+  antiRaidSüre: { type: Number, default: 10 },
   antiRaidEşik: { type: Number, default: 5 },
-  antiRaidLog: { type: String, default: null }
+  antiRaidLog: { type: String, default: null },
+
+  // SA-AS sistemi
+  saasAktif: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model('GuildSettings', guildSettingsSchema);
