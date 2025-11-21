@@ -3,35 +3,42 @@ const mongoose = require('mongoose');
 const guildSettingsSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true },
 
-  // Küfür Engel
+  // ✅ Kayıt Sistemi
+  kayıtAktif: { type: Boolean, default: false },
+  kayıtKanal: { type: String, default: null },
+  kızRol: { type: String, default: null },
+  erkekRol: { type: String, default: null },
+  yetkiliRol: { type: String, default: null },
+
+  // ✅ Küfür Engel
   kufurEngel: { type: Boolean, default: false },
   kufurLog: { type: String, default: null },
 
-  // Reklam Engel
+  // ✅ Reklam Engel
   reklamEngel: { type: Boolean, default: false },
   reklamLog: { type: String, default: null },
 
-  // Ses Sistemi
+  // ✅ Ses Sistemi
   sesLog: { type: String, default: null },
 
-  // Emoji Log
+  // ✅ Emoji Log
   emojiLog: { type: String, default: null },
 
-  // Otorol
+  // ✅ Otorol
   otorol: { type: String, default: null },
   otorolLog: { type: String, default: null },
 
-  // Sayaç
+  // ✅ Sayaç
   sayaçHedef: { type: Number, default: null },
   sayaçKanal: { type: String, default: null },
 
-  // Anti-Raid
+  // ✅ Anti-Raid
   antiRaidAktif: { type: Boolean, default: false },
   antiRaidSüre: { type: Number, default: 10 },
   antiRaidEşik: { type: Number, default: 5 },
   antiRaidLog: { type: String, default: null },
 
-  // SA-AS sistemi
+  // ✅ SA-AS sistemi
   saasAktif: { type: Boolean, default: false }
 });
 
