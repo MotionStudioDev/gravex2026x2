@@ -1,22 +1,23 @@
 const { EmbedBuilder } = require('discord.js');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports = async (member) => {
   const client = member.client;
   const guildId = member.guild.id;
   const user = member.user;
 
-  // ✅ OTO-ROL SİSTEMİ
-  const rolId = client.otoroller?.get(guildId);
-  if (rolId) {
-    const rol = member.guild.roles.cache.get(rolId);
-    if (rol) {
-      const logKanalId = client.otorolLogKanalları?.get(guildId);
-      const logKanal = logKanalId ? member.guild.channels.cache.get(logKanalId) : member.guild.systemChannel;
+  // Sunucu ayarlarını DB’den çek
+  const settings = await GuildSettings.findOne({ guildId });
+  if (!settings) return;
 
+  // ✅ OTO-ROL SİSTEMİ
+  if (settings.otorol) {
+    const rol = member.guild.roles.cache.get(settings.otorol);
+    if (rol) {
+      const logKanal = settings.otorolLog ? member.guild.channels.cache.get(settings.otorolLog) : member.guild.systemChannel;
       try {
         await member.roles.add(rol);
-
-        if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+        if (logKanal?.permissionsFor(client.user).has('SendMessages')) {
           logKanal.send({
             embeds: [
               new EmbedBuilder()
@@ -28,7 +29,7 @@ module.exports = async (member) => {
           });
         }
       } catch (err) {
-        if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+        if (logKanal?.permissionsFor(client.user).has('SendMessages')) {
           logKanal.send({
             embeds: [
               new EmbedBuilder()
@@ -39,17 +40,15 @@ module.exports = async (member) => {
             ]
           });
         }
-
         console.error('Otorol verilemedi:', err);
       }
     }
   }
 
   // ✅ SAYAÇ SİSTEMİ
-  const hedef = client.sayaçlar?.get(guildId);
-  if (hedef) {
+  if (settings.sayaçHedef) {
     const mevcut = member.guild.memberCount;
-    const kalan = hedef - mevcut;
+    const kalan = settings.sayaçHedef - mevcut;
 
     const embed = new EmbedBuilder()
       .setColor('Green')
@@ -58,10 +57,8 @@ module.exports = async (member) => {
       .setThumbnail(user.displayAvatarURL({ dynamic: true }))
       .setFooter({ text: 'Sayaç sistemi' });
 
-    const kanalId = client.sayaçKanalları?.get(guildId);
-    const kanal = kanalId ? member.guild.channels.cache.get(kanalId) : member.guild.systemChannel;
-
-    if (kanal && kanal.permissionsFor(client.user).has('SendMessages')) {
+    const kanal = settings.sayaçKanal ? member.guild.channels.cache.get(settings.sayaçKanal) : member.guild.systemChannel;
+    if (kanal?.permissionsFor(client.user).has('SendMessages')) {
       kanal.send({ embeds: [embed] });
     }
 
@@ -69,34 +66,36 @@ module.exports = async (member) => {
       const kutlama = new EmbedBuilder()
         .setColor('Gold')
         .setTitle('🎉 Sayaç Tamamlandı!')
-        .setDescription(`Sunucumuz **${hedef}** üyeye ulaştı!\nHoş geldin ${user}, seni aramızda görmek harika!`);
+        .setDescription(`Sunucumuz **${settings.sayaçHedef}** üyeye ulaştı!\nHoş geldin ${user}, seni aramızda görmek harika!`);
 
       kanal?.send({ embeds: [kutlama] });
-      client.sayaçlar.delete(guildId);
-      client.sayaçKanalları.delete(guildId);
+
+      // Sayaç sıfırlama
+      settings.sayaçHedef = null;
+      settings.sayaçKanal = null;
+      await settings.save();
     }
   }
 
   // ✅ ANTI-RAID SİSTEMİ
-  const ayar = client.antiRaid?.get(guildId);
-  if (ayar?.aktif) {
+  if (settings.antiRaidAktif) {
     const now = Date.now();
+    if (!client.antiRaidGirişler) client.antiRaidGirişler = new Map();
     const girişler = client.antiRaidGirişler.get(guildId) || [];
-    const yeniGirişler = [...girişler, now].filter(t => now - t <= ayar.süre * 1000);
+    const yeniGirişler = [...girişler, now].filter(t => now - t <= settings.antiRaidSüre * 1000);
     client.antiRaidGirişler.set(guildId, yeniGirişler);
 
-    if (yeniGirişler.length >= ayar.eşik) {
-      const logKanalId = client.antiRaidLogKanalları?.get(guildId);
-      const logKanal = logKanalId ? member.guild.channels.cache.get(logKanalId) : null;
+    if (yeniGirişler.length >= settings.antiRaidEşik) {
+      const logKanal = settings.antiRaidLog ? member.guild.channels.cache.get(settings.antiRaidLog) : null;
 
       const raidEmbed = new EmbedBuilder()
         .setColor('DarkRed')
         .setTitle('🚨 Raid Algılandı')
-        .setDescription(`**${ayar.süre} saniye** içinde **${yeniGirişler.length}** kişi sunucuya katıldı.`)
+        .setDescription(`**${settings.antiRaidSüre} saniye** içinde **${yeniGirişler.length}** kişi sunucuya katıldı.`)
         .addFields({ name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false })
         .setFooter({ text: 'Anti-Raid sistemi' });
 
-      if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+      if (logKanal?.permissionsFor(client.user).has('SendMessages')) {
         logKanal.send({ embeds: [raidEmbed] });
       }
 
