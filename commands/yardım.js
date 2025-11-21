@@ -17,7 +17,7 @@ module.exports.run = async (client, message) => {
       },
       sistem: {
         title: '<a:sistemx:1441130022340399124> | Sistem',
-        value: '`sayaç`,`reklam-engel`,`küfür-engel`,`anti-raid`,`otorol`,`ses-sistemi`,`slowmode`,`emoji-log`'
+        value: '`sayaç`,`reklam-engel`,`küfür-engel`,`anti-raid`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`'
       },
       sahip: {
         title: '<:owner:1441129983153147975> | Sahip Komutları',
