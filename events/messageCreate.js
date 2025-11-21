@@ -11,6 +11,17 @@ module.exports = async (message) => {
   const guildId = message.guild.id;
   const içerik = message.content.toLowerCase();
 
+  // ✅ BOT ETİKET KONTROLÜ
+  if (message.mentions.has(client.user) && message.content.trim() === `<@${client.user.id}>`) {
+    const embed = new EmbedBuilder()
+      .setColor('Blurple')
+      .setTitle('👋 Merhaba!')
+      .setDescription('Beni etiketlemişsin.\nKomutlar için `g!yardım` yazabilirsin!')
+      .setFooter({ text: 'GraveBOT 2026' });
+
+    return message.channel.send({ embeds: [embed] });
+  }
+
   // ✅ KÜFÜR ENGEL
   if (client.kufurEngel?.has(guildId)) {
     const küfür = [...küfürler].find(k => içerik.includes(k));
