@@ -22,7 +22,7 @@ module.exports = async (message) => {
     });
   }
 
-  // KÜFÜR ENGEL
+  // ====== KÜFÜR ENGEL ======
   const kufurAktif = db.get(`kufurEngel_${guildId}`);
   if (kufurAktif) {
     const küfür = [...küfürler].find(k => içerik.includes(k));
@@ -31,10 +31,12 @@ module.exports = async (message) => {
         await message.delete();
 
         const uyarı = await message.channel.send({
-          embeds: [new EmbedBuilder()
-            .setColor('Red')
-            .setTitle('🚫 Küfür Tespit Edildi')
-            .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)]
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('🚫 Küfür Tespit Edildi')
+              .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)
+          ]
         });
 
         setTimeout(() => uyarı.delete().catch(() => {}), 3000);
@@ -44,24 +46,26 @@ module.exports = async (message) => {
 
         if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
           logKanal.send({
-            embeds: [new EmbedBuilder()
-              .setColor('DarkRed')
-              .setTitle('🛑 Küfür Logu')
-              .addFields(
-                { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
-                { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-                { name: 'Küfür', value: `**${küfür}**`, inline: true },
-                { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
-                { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
-              )
-              .setFooter({ text: 'Küfür engel sistemi' })]
+            embeds: [
+              new EmbedBuilder()
+                .setColor('DarkRed')
+                .setTitle('🛑 Küfür Logu')
+                .addFields(
+                  { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
+                  { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
+                  { name: 'Küfür', value: `**${küfür}**`, inline: true },
+                  { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
+                  { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+                )
+                .setFooter({ text: 'Küfür engel sistemi' })
+            ]
           });
         }
       } catch (err) { console.error(err); }
     }
   }
 
-  // REKLAM ENGEL
+  // ====== REKLAM ENGEL ======
   const reklamAktif = db.get(`reklamEngel_${guildId}`);
   if (reklamAktif && reklamlar.some(r => içerik.includes(r))) {
     try {
@@ -73,16 +77,18 @@ module.exports = async (message) => {
       if (!logKanal) return;
 
       logKanal.send({
-        embeds: [new EmbedBuilder()
-          .setColor('Red')
-          .setTitle('🚫 Reklam Mesajı Silindi')
-          .addFields(
-            { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
-            { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-            { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
-            { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
-          )
-          .setFooter({ text: 'Reklam engel sistemi' })]
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('🚫 Reklam Mesajı Silindi')
+            .addFields(
+              { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})`, inline: false },
+              { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
+              { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\``, inline: false },
+              { name: 'Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+            )
+            .setFooter({ text: 'Reklam engel sistemi' })
+        ]
       });
     } catch (err) { console.error(err); }
   }
