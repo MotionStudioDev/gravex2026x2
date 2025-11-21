@@ -9,7 +9,7 @@ module.exports.run = async (client, message) => {
       },
       kullanıcı: {
         title: '<:user:1441128594117099664> | Kullanıcı Komutları',
-        value: '`avatar`,`profil`,`emoji-bilgi`,`emojiler`'
+        value: '`avatar`,`profil`,`deprem`,`emoji-bilgi`,`emojiler`'
       },
       moderasyon: {
         title: '<:gvenlik:1416529478112383047> | Moderasyon',
