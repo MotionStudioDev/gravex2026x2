@@ -10,10 +10,10 @@ module.exports = async (member) => {
   const settings = await GuildSettings.findOne({ guildId });
   if (!settings) return;
 
-  // ✅ KAYIT SİSTEMİ
+  // ✅ KAYIT SİSTEMİ (dokunmadım)
   if (settings.kayıtAktif && settings.kayıtKanal) {
     const kanal = member.guild.channels.cache.get(settings.kayıtKanal);
-    if (kanal?.permissionsFor(client.user).has('SendMessages')) {
+    if (kanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
       const embed = new EmbedBuilder()
         .setColor(0x1E90FF)
         .setTitle("📥 Yeni Üye Katıldı")
@@ -35,10 +35,12 @@ module.exports = async (member) => {
   if (settings.otorol) {
     const rol = member.guild.roles.cache.get(settings.otorol);
     if (rol) {
-      const logKanal = settings.otorolLog ? member.guild.channels.cache.get(settings.otorolLog) : member.guild.systemChannel;
+      const logKanal = settings.otorolLog
+        ? member.guild.channels.cache.get(settings.otorolLog)
+        : member.guild.systemChannel;
       try {
         await member.roles.add(rol);
-        if (logKanal?.permissionsFor(client.user).has('SendMessages')) {
+        if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
           logKanal.send({
             embeds: [
               new EmbedBuilder()
@@ -50,7 +52,7 @@ module.exports = async (member) => {
           });
         }
       } catch (err) {
-        if (logKanal?.permissionsFor(client.user).has('SendMessages')) {
+        if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
           logKanal.send({
             embeds: [
               new EmbedBuilder()
@@ -78,8 +80,11 @@ module.exports = async (member) => {
       .setThumbnail(user.displayAvatarURL({ dynamic: true }))
       .setFooter({ text: 'Sayaç sistemi' });
 
-    const kanal = settings.sayaçKanal ? member.guild.channels.cache.get(settings.sayaçKanal) : member.guild.systemChannel;
-    if (kanal?.permissionsFor(client.user).has('SendMessages')) {
+    const kanal = settings.sayaçKanal
+      ? member.guild.channels.cache.get(settings.sayaçKanal)
+      : member.guild.systemChannel;
+
+    if (kanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
       kanal.send({ embeds: [embed] });
     }
 
@@ -107,7 +112,9 @@ module.exports = async (member) => {
     client.antiRaidGirişler.set(guildId, yeniGirişler);
 
     if (yeniGirişler.length >= settings.antiRaidEşik) {
-      const logKanal = settings.antiRaidLog ? member.guild.channels.cache.get(settings.antiRaidLog) : null;
+      const logKanal = settings.antiRaidLog
+        ? member.guild.channels.cache.get(settings.antiRaidLog)
+        : null;
 
       const raidEmbed = new EmbedBuilder()
         .setColor('DarkRed')
@@ -116,7 +123,7 @@ module.exports = async (member) => {
         .addFields({ name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false })
         .setFooter({ text: 'Anti-Raid sistemi' });
 
-      if (logKanal?.permissionsFor(client.user).has('SendMessages')) {
+      if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
         logKanal.send({ embeds: [raidEmbed] });
       }
 
