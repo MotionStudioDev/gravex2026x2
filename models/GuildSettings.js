@@ -6,7 +6,8 @@ const guildSettingsSchema = new mongoose.Schema({
   kufurLog: { type: String, default: null },
   reklamEngel: { type: Boolean, default: false },
   reklamLog: { type: String, default: null },
-  sesLog: { type: String, default: null } // ✅ Ses sistemi log kanalı
+  sesLog: { type: String, default: null },
+  emojiLog: { type: String, default: null } // ✅ Emoji log kanalı
 });
 
 module.exports = mongoose.model('GuildSettings', guildSettingsSchema);
