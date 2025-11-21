@@ -5,7 +5,7 @@ module.exports.run = async (client, message) => {
     const kategoriler = {
       genel: {
         title: '<a:discord:1441131310717599886> | Genel Komutlar',
-        value: '`ping`,`istatistik`,`uptime`,`yardım`'
+        value: '`ping`,`istatistik`,`uptime`,`hata-bildir`,`yardım`'
       },
       kullanıcı: {
         title: '<:user:1441128594117099664> | Kullanıcı Komutları',
