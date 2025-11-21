@@ -10,6 +10,27 @@ module.exports = async (member) => {
   const settings = await GuildSettings.findOne({ guildId });
   if (!settings) return;
 
+  // ✅ KAYIT SİSTEMİ
+  if (settings.kayıtAktif && settings.kayıtKanal) {
+    const kanal = member.guild.channels.cache.get(settings.kayıtKanal);
+    if (kanal?.permissionsFor(client.user).has('SendMessages')) {
+      const embed = new EmbedBuilder()
+        .setColor(0x1E90FF)
+        .setTitle("📥 Yeni Üye Katıldı")
+        .setDescription(
+          `👤 Üye: ${member}\n` +
+          `🆔 ID: ${member.id}\n` +
+          `📅 Hesap Açılış: <t:${Math.floor(user.createdTimestamp / 1000)}:R>\n\n` +
+          "Kayıt için `g!kayıt @üye İsim Yaş` komutunu kullanın."
+        )
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .setFooter({ text: 'Kayıt sistemi' })
+        .setTimestamp();
+
+      kanal.send({ embeds: [embed] });
+    }
+  }
+
   // ✅ OTO-ROL SİSTEMİ
   if (settings.otorol) {
     const rol = member.guild.roles.cache.get(settings.otorol);
