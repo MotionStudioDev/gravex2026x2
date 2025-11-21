@@ -7,7 +7,7 @@ client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
   let x = [
-    `g!yardım - g!hata-bildir - Grave v1.0.0`
+    `Veri bağlantısı sağlanıyor.`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
