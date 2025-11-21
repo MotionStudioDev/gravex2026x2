@@ -21,13 +21,13 @@ module.exports.run = async (client, message) => {
       },
       sahip: {
         title: '<:owner:1441129983153147975> | Sahip Komutları',
-        value: '`reload`'
+        value: '`reload`,`mesaj-gönder`,'
       }
     };
 
     const anaEmbed = new EmbedBuilder()
       .setColor('Blurple')
-      .setTitle('📖 Grave Yardım Menüsü')
+      .setTitle('Grave Yardım Menüsü')
       .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin.\nPrefix: `g!` (Örnek: `g!yardım`)')
       .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
 
