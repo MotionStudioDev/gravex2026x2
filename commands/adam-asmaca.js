@@ -59,17 +59,26 @@ module.exports.run = async (client, message, args) => {
       };
     };
 
-    // Alfabe select menu
+    // Alfabe iki menüye bölünüyor (max 25 seçenek kuralı)
     const alfabe = "ABCDEFGHIJKLMNOPQRSTUVWXYZÇĞİÖŞÜ".split("");
-    const options = alfabe.map(harf => ({ label: harf, value: harf }));
-    const row = new ActionRowBuilder().addComponents(
+    const options1 = alfabe.slice(0, 25).map(harf => ({ label: harf, value: harf }));
+    const options2 = alfabe.slice(25).map(harf => ({ label: harf, value: harf }));
+
+    const row1 = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId('harfSec')
-        .setPlaceholder('Bir harf seç...')
-        .addOptions(options)
+        .setCustomId('harfSec1')
+        .setPlaceholder('Bir harf seç (A–Y)...')
+        .addOptions(options1)
     );
 
-    const msg = await message.channel.send({ ...generateEmbed(), components: [row] });
+    const row2 = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('harfSec2')
+        .setPlaceholder('Bir harf seç (Z + Türkçe)...')
+        .addOptions(options2)
+    );
+
+    const msg = await message.channel.send({ ...generateEmbed(), components: [row1, row2] });
     const collector = msg.createMessageComponentCollector({ time: 120_000 });
 
     collector.on('collect', async (interaction) => {
@@ -87,7 +96,7 @@ module.exports.run = async (client, message, args) => {
       if (!tahmin.includes("_")) collector.stop("kazandi");
       else if (kalanHak <= 0) collector.stop("kaybetti");
 
-      await interaction.update({ ...generateEmbed(), components: [row] });
+      await interaction.update({ ...generateEmbed(), components: [row1, row2] });
     });
 
     collector.on('end', async (collected, reason) => {
@@ -124,4 +133,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'adam', description: 'Canvas + Select Menu + MongoDB puanlı Adam Asmaca oyunu.' };
+module.exports.help = { name: 'adam', description: 'Canvas + Select Menu (iki menü) + MongoDB puanlı Adam Asmaca oyunu.' };
