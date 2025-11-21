@@ -77,5 +77,93 @@ module.exports.run = async (client, message, args) => {
     return;
   }
 
-  // diğer alt komutlar (kapat, kanal, roller, yetkili) aynı şekilde embedli kalıyor...
+  if (sub === "kapat") {
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { kayıtAktif: false },
+      { upsert: true }
+    );
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle("📴 Kayıt Sistemi Kapatıldı")
+      .setDescription("Bu sunucu için kayıt sistemi kapatıldı.")
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
+  }
+
+  if (sub === "kanal") {
+    const kanal = message.mentions.channels.first();
+    if (!kanal) {
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle("❌ Hatalı Kullanım")
+        .setDescription("Bir kanal etiketlemelisin.")
+        .setTimestamp();
+      return message.channel.send({ embeds: [embed] });
+    }
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { kayıtKanal: kanal.id },
+      { upsert: true }
+    );
+    const embed = new EmbedBuilder()
+      .setColor('Green')
+      .setTitle("✅ Kayıt Kanalı Ayarlandı")
+      .setDescription(`Kayıt kanalı <#${kanal.id}> olarak ayarlandı.`)
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
+  }
+
+  if (sub === "roller") {
+    const kızRol = message.mentions.roles.first();
+    const erkekRol = message.mentions.roles.at(1);
+    if (!kızRol || !erkekRol) {
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle("❌ Hatalı Kullanım")
+        .setDescription("İki rol etiketlemelisin (kız ve erkek).")
+        .setTimestamp();
+      return message.channel.send({ embeds: [embed] });
+    }
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { kızRol: kızRol.id, erkekRol: erkekRol.id },
+      { upsert: true }
+    );
+    const embed = new EmbedBuilder()
+      .setColor('Green')
+      .setTitle("✅ Roller Ayarlandı")
+      .setDescription(`Kız rolü ${kızRol}, Erkek rolü ${erkekRol} olarak ayarlandı.`)
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
+  }
+
+  if (sub === "yetkili") {
+    const rol = message.mentions.roles.first();
+    if (!rol) {
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle("❌ Hatalı Kullanım")
+        .setDescription("Bir rol etiketlemelisin.")
+        .setTimestamp();
+      return message.channel.send({ embeds: [embed] });
+    }
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { yetkiliRol: rol.id },
+      { upsert: true }
+    );
+    const embed = new EmbedBuilder()
+      .setColor('Green')
+      .setTitle("✅ Yetkili Rol Ayarlandı")
+      .setDescription(`Kayıt yetkilisi rolü ${rol} olarak ayarlandı.`)
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
+  }
+};
+
+module.exports.conf = { aliases: [] };
+module.exports.help = { 
+  name: 'kayıt-sistemi', 
+  description: 'Sunucuda kayıt sistemini yönetir (aç/kapat/kanal/roller/yetkili).' 
 };
