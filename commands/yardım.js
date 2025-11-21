@@ -13,7 +13,7 @@ module.exports.run = async (client, message) => {
       },
       moderasyon: {
         title: '<:gvenlik:1416529478112383047> | Moderasyon',
-        value: '`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`uyar`'
+        value: '`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`temizle`,`uyar`'
       },
       sistem: {
         title: '<a:sistemx:1441130022340399124> | Sistem',
