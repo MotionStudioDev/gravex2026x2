@@ -21,13 +21,13 @@ module.exports.run = async (client, message) => {
       },
       sahip: {
         title: '<:owner:1441129983153147975> | Sahip Komutları',
-        value: '`sahip reload`,`sahip eval`,`sahip ping`'
+        value: '`reload`'
       }
     };
 
     const anaEmbed = new EmbedBuilder()
       .setColor('Blurple')
-      .setTitle('Grave Yardım Menüsü')
+      .setTitle('📖 Grave Yardım Menüsü')
       .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin.\nPrefix: `g!` (Örnek: `g!yardım`)')
       .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
 
@@ -36,7 +36,8 @@ module.exports.run = async (client, message) => {
       new ButtonBuilder().setCustomId('kullanıcı').setLabel('Kullanıcı').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('moderasyon').setLabel('Moderasyon').setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('sahip').setLabel('Sahip').setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId('sahip').setLabel('Sahip').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('ana').setLabel('Ana Menü').setStyle(ButtonStyle.Primary)
     );
 
     const msg = await message.channel.send({ embeds: [anaEmbed], components: [row] });
@@ -47,6 +48,11 @@ module.exports.run = async (client, message) => {
     });
 
     collector.on('collect', async i => {
+      if (i.customId === 'ana') {
+        await i.update({ embeds: [anaEmbed], components: [row] });
+        return;
+      }
+
       const kategori = kategoriler[i.customId];
       if (!kategori) return;
 
