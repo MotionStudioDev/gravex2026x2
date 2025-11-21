@@ -31,16 +31,21 @@ module.exports.run = async (client, message) => {
       .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin.\nPrefix: `g!` (Örnek: `g!yardım`)')
       .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
 
-    const row = new ActionRowBuilder().addComponents(
+    // Satır 1: 4 kategori
+    const row1 = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId('kullanıcı').setLabel('Kullanıcı').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('moderasyon').setLabel('Moderasyon').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Secondary)
+    );
+
+    // Satır 2: Sahip + Ana Menü
+    const row2 = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('sahip').setLabel('Sahip').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('ana').setLabel('Ana Menü').setStyle(ButtonStyle.Primary)
     );
 
-    const msg = await message.channel.send({ embeds: [anaEmbed], components: [row] });
+    const msg = await message.channel.send({ embeds: [anaEmbed], components: [row1, row2] });
 
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
@@ -49,7 +54,7 @@ module.exports.run = async (client, message) => {
 
     collector.on('collect', async i => {
       if (i.customId === 'ana') {
-        await i.update({ embeds: [anaEmbed], components: [row] });
+        await i.update({ embeds: [anaEmbed], components: [row1, row2] });
         return;
       }
 
@@ -62,7 +67,7 @@ module.exports.run = async (client, message) => {
         .setDescription(kategori.value)
         .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
 
-      await i.update({ embeds: [yeniEmbed], components: [row] });
+      await i.update({ embeds: [yeniEmbed], components: [row1, row2] });
     });
 
     collector.on('end', () => {
