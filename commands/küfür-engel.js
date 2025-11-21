@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const db = require('orio.db');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has('Administrator')) {
@@ -27,8 +27,15 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // Sunucu ayarını bul veya oluştur
+  let settings = await GuildSettings.findOne({ guildId });
+  if (!settings) {
+    settings = new GuildSettings({ guildId });
+  }
+
   if (sub === 'aç') {
-    db.set(`kufurEngel_${guildId}`, true);
+    settings.kufurEngel = true;
+    await settings.save();
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -40,8 +47,9 @@ module.exports.run = async (client, message, args) => {
   }
 
   if (sub === 'kapat') {
-    db.delete(`kufurEngel_${guildId}`);
-    db.delete(`kufurLog_${guildId}`);
+    settings.kufurEngel = false;
+    settings.kufurLog = null;
+    await settings.save();
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -53,16 +61,14 @@ module.exports.run = async (client, message, args) => {
   }
 
   if (sub === 'durum') {
-    const aktif = db.get(`kufurEngel_${guildId}`);
-    const logKanalId = db.get(`kufurLog_${guildId}`);
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor('Blurple')
           .setTitle('🔍 Küfür Engel Durumu')
           .addFields(
-            { name: 'Durum', value: aktif ? 'Aktif' : 'Pasif', inline: true },
-            { name: 'Log Kanalı', value: logKanalId ? `<#${logKanalId}>` : 'Ayarlanmamış', inline: true }
+            { name: 'Durum', value: settings.kufurEngel ? 'Aktif' : 'Pasif', inline: true },
+            { name: 'Log Kanalı', value: settings.kufurLog ? `<#${settings.kufurLog}>` : 'Ayarlanmamış', inline: true }
           )
       ]
     });
@@ -81,7 +87,8 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    db.set(`kufurLog_${guildId}`, kanal.id);
+    settings.kufurLog = kanal.id;
+    await settings.save();
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
