@@ -21,7 +21,7 @@ module.exports.run = async (client, message) => {
       },
       sahip: {
         title: '<:owner:1441129983153147975> | Sahip Komutları',
-        value: '`reload`,`mesaj-gönder`,'
+        value: '`reload`,`mesaj-gönder`'
       }
     };
 
