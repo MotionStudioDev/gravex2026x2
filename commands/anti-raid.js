@@ -1,7 +1,8 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
-  if (!message.member.permissions.has('Administrator')) {
+  if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -21,11 +22,18 @@ module.exports.run = async (client, message, args) => {
         new EmbedBuilder()
           .setColor('Orange')
           .setTitle('ℹ️ Anti-Raid Komutu')
-          .setDescription('Kullanım:\n`g!anti-raid aç <eşik> <saniye>`\n`g!anti-raid kapat`\n`g!anti-raid durum`\n`g!anti-raid log <#kanal>`')
+          .setDescription(
+            "Kullanım:\n" +
+            "`g!anti-raid aç <eşik> <saniye>`\n" +
+            "`g!anti-raid kapat`\n" +
+            "`g!anti-raid durum`\n" +
+            "`g!anti-raid log <#kanal>`"
+          )
       ]
     });
   }
 
+  // ✅ Aç
   if (sub === 'aç') {
     const eşik = parseInt(args[1]);
     const süre = parseInt(args[2]);
@@ -41,8 +49,11 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    client.antiRaid.set(guildId, { aktif: true, eşik, süre });
-    client.antiRaidGirişler.set(guildId, []);
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { antiRaidAktif: true, antiRaidEşik: eşik, antiRaidSüre: süre },
+      { upsert: true }
+    );
 
     return message.channel.send({
       embeds: [
@@ -54,9 +65,12 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // ✅ Kapat
   if (sub === 'kapat') {
-    client.antiRaid.delete(guildId);
-    client.antiRaidGirişler.delete(guildId);
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { antiRaidAktif: false, antiRaidEşik: null, antiRaidSüre: null, antiRaidLog: null }
+    );
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -67,24 +81,25 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // ✅ Durum
   if (sub === 'durum') {
-    const ayar = client.antiRaid.get(guildId);
-    const logKanal = client.antiRaidLogKanalları.get(guildId);
+    const settings = await GuildSettings.findOne({ guildId });
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor('Blurple')
           .setTitle('🔍 Anti-Raid Durumu')
           .addFields(
-            { name: 'Durum', value: ayar?.aktif ? 'Aktif' : 'Pasif', inline: true },
-            { name: 'Eşik', value: ayar?.eşik?.toString() || '-', inline: true },
-            { name: 'Süre', value: ayar?.süre?.toString() + 'sn' || '-', inline: true },
-            { name: 'Log Kanalı', value: logKanal ? `<#${logKanal}>` : 'Ayarlanmamış', inline: false }
+            { name: 'Durum', value: settings?.antiRaidAktif ? 'Aktif' : 'Pasif', inline: true },
+            { name: 'Eşik', value: settings?.antiRaidEşik?.toString() || '-', inline: true },
+            { name: 'Süre', value: settings?.antiRaidSüre ? settings.antiRaidSüre + 'sn' : '-', inline: true },
+            { name: 'Log Kanalı', value: settings?.antiRaidLog ? `<#${settings.antiRaidLog}>` : 'Ayarlanmamış', inline: false }
           )
       ]
     });
   }
 
+  // ✅ Log Kanalı
   if (sub === 'log') {
     const kanal = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
     if (!kanal || kanal.type !== 0) {
@@ -98,7 +113,12 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    client.antiRaidLogKanalları.set(guildId, kanal.id);
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { antiRaidLog: kanal.id },
+      { upsert: true }
+    );
+
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -110,10 +130,5 @@ module.exports.run = async (client, message, args) => {
   }
 };
 
-module.exports.conf = {
-  aliases: ['antiraid']
-};
-
-module.exports.help = {
-  name: 'anti-raid'
-};
+module.exports.conf = { aliases: ['antiraid'] };
+module.exports.help = { name: 'anti-raid', description: 'Sunucuda anti-raid sistemini yönetir.' };
