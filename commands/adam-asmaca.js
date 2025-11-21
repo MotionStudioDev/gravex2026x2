@@ -1,37 +1,40 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas } = require('canvas');
+const Skor = require('../models/Skor');
 
 module.exports.run = async (client, message, args) => {
   try {
-    const kelimeListesi = ["İZMİR", "ANKARA", "KEDİ", "KÖPEK", "BİLGİSAYAR", "ARABA"];
+    // Rastgele kelime listesi
+    const kelimeListesi = [
+      "İZMİR","ANKARA","KEDİ","KÖPEK","BİLGİSAYAR","ARABA","UÇAK","DENİZ","DAĞ",
+      "COPILOT","DISCORD","OYUN","TÜRKİYE","EGE","ÇİĞLİ","KİTAP","KALEM","MÜZİK","FUTBOL"
+    ];
     const kelime = kelimeListesi[Math.floor(Math.random() * kelimeListesi.length)].toUpperCase();
 
     let tahmin = Array(kelime.length).fill("_");
     let yanlis = [];
     let kalanHak = 6;
 
-    // Adam çizimi (Canvas)
+    // Canvas ile adam çizimi
     function cizAdam(hak) {
       const canvas = createCanvas(200, 200);
       const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = 'black'; ctx.lineWidth = 3;
 
       // Direk
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(20, 180); ctx.lineTo(180, 180); // taban
-      ctx.moveTo(50, 180); ctx.lineTo(50, 20);   // dikey
-      ctx.lineTo(120, 20);                       // üst
-      ctx.lineTo(120, 40);                       // ip
+      ctx.moveTo(20,180); ctx.lineTo(180,180);
+      ctx.moveTo(50,180); ctx.lineTo(50,20);
+      ctx.lineTo(120,20); ctx.lineTo(120,40);
       ctx.stroke();
 
       // Adam parçaları
-      if (hak <= 5) { ctx.beginPath(); ctx.arc(120, 55, 15, 0, Math.PI * 2); ctx.stroke(); } // kafa
-      if (hak <= 4) { ctx.beginPath(); ctx.moveTo(120, 70); ctx.lineTo(120, 110); ctx.stroke(); } // gövde
-      if (hak <= 3) { ctx.beginPath(); ctx.moveTo(120, 80); ctx.lineTo(100, 100); ctx.stroke(); } // sol kol
-      if (hak <= 2) { ctx.beginPath(); ctx.moveTo(120, 80); ctx.lineTo(140, 100); ctx.stroke(); } // sağ kol
-      if (hak <= 1) { ctx.beginPath(); ctx.moveTo(120, 110); ctx.lineTo(100, 140); ctx.stroke(); } // sol bacak
-      if (hak <= 0) { ctx.beginPath(); ctx.moveTo(120, 110); ctx.lineTo(140, 140); ctx.stroke(); } // sağ bacak
+      if (hak <= 5) { ctx.beginPath(); ctx.arc(120,55,15,0,Math.PI*2); ctx.stroke(); }
+      if (hak <= 4) { ctx.beginPath(); ctx.moveTo(120,70); ctx.lineTo(120,110); ctx.stroke(); }
+      if (hak <= 3) { ctx.beginPath(); ctx.moveTo(120,80); ctx.lineTo(100,100); ctx.stroke(); }
+      if (hak <= 2) { ctx.beginPath(); ctx.moveTo(120,80); ctx.lineTo(140,100); ctx.stroke(); }
+      if (hak <= 1) { ctx.beginPath(); ctx.moveTo(120,110); ctx.lineTo(100,140); ctx.stroke(); }
+      if (hak <= 0) { ctx.beginPath(); ctx.moveTo(120,110); ctx.lineTo(140,140); ctx.stroke(); }
 
       return new AttachmentBuilder(canvas.toBuffer(), { name: 'adam.png' });
     }
@@ -56,24 +59,17 @@ module.exports.run = async (client, message, args) => {
       };
     };
 
-    // Alfabe butonları
+    // Alfabe select menu
     const alfabe = "ABCDEFGHIJKLMNOPQRSTUVWXYZÇĞİÖŞÜ".split("");
-    const rows = [];
-    for (let i = 0; i < alfabe.length; i += 5) {
-      const row = new ActionRowBuilder();
-      alfabe.slice(i, i + 5).forEach(harf => {
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId(harf)
-            .setLabel(harf)
-            .setStyle(ButtonStyle.Secondary)
-        );
-      });
-      rows.push(row);
-    }
+    const options = alfabe.map(harf => ({ label: harf, value: harf }));
+    const row = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('harfSec')
+        .setPlaceholder('Bir harf seç...')
+        .addOptions(options)
+    );
 
-    const msg = await message.channel.send({ ...generateEmbed(), components: rows });
-
+    const msg = await message.channel.send({ ...generateEmbed(), components: [row] });
     const collector = msg.createMessageComponentCollector({ time: 120_000 });
 
     collector.on('collect', async (interaction) => {
@@ -81,30 +77,35 @@ module.exports.run = async (client, message, args) => {
         return interaction.reply({ content: 'Bu oyunu sadece komutu kullanan kişi oynayabilir.', ephemeral: true });
       }
 
-      const harf = interaction.customId;
+      const harf = interaction.values[0];
       if (kelime.includes(harf)) {
-        kelime.split("").forEach((h, i) => {
-          if (h === harf) tahmin[i] = harf;
-        });
+        kelime.split("").forEach((h, i) => { if (h === harf) tahmin[i] = harf; });
       } else {
-        if (!yanlis.includes(harf)) {
-          yanlis.push(harf);
-          kalanHak--;
-        }
+        if (!yanlis.includes(harf)) { yanlis.push(harf); kalanHak--; }
       }
 
       if (!tahmin.includes("_")) collector.stop("kazandi");
       else if (kalanHak <= 0) collector.stop("kaybetti");
 
-      await interaction.update({ ...generateEmbed(), components: rows });
+      await interaction.update({ ...generateEmbed(), components: [row] });
     });
 
     collector.on('end', async (collected, reason) => {
       let finalEmbed;
       if (reason === "kazandi") {
         finalEmbed = new EmbedBuilder().setColor(0x00FF7F).setTitle("🎉 Kazandın!").setDescription(`Kelime: **${kelime}**`);
+        await Skor.findOneAndUpdate(
+          { userId: message.author.id },
+          { $inc: { kazan: 1 } },
+          { upsert: true }
+        );
       } else if (reason === "kaybetti") {
         finalEmbed = new EmbedBuilder().setColor(0xFF0000).setTitle("💀 Kaybettin!").setDescription(`Doğru kelime: **${kelime}**`);
+        await Skor.findOneAndUpdate(
+          { userId: message.author.id },
+          { $inc: { kaybet: 1 } },
+          { upsert: true }
+        );
       } else {
         finalEmbed = new EmbedBuilder().setColor(0x808080).setTitle("⏰ Süre Doldu").setDescription(`Doğru kelime: **${kelime}**`);
       }
@@ -123,4 +124,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'adam-asmaca', description: 'Canvas ile resimli Adam Asmaca oyunu oynatır.' };
+module.exports.help = { name: 'adam', description: 'Canvas + Select Menu + MongoDB puanlı Adam Asmaca oyunu.' };
