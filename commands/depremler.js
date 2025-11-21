@@ -1,6 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports.run = async (client, message, args) => {
   try {
@@ -40,29 +40,63 @@ module.exports.run = async (client, message, args) => {
     }
 
     const depremler = await getirDepremler();
+    if (depremler.length === 0) return message.channel.send('Deprem verisi bulunamadı.');
 
-    if (depremler.length > 0) {
-      const enSon5Deprem = depremler.slice(0, 5);
+    // Sayfalama ayarları
+    const perPage = 10;
+    let page = 0;
 
-      const embed = new EmbedBuilder()
+    const generateEmbed = (page) => {
+      const slice = depremler.slice(page * perPage, (page + 1) * perPage);
+      return new EmbedBuilder()
         .setColor('#ff7300')
-        .setTitle('Son 5 Deprem')
+        .setTitle(`Son Depremler (Sayfa ${page + 1})`)
         .setTimestamp()
         .setFooter({ text: 'AFAD Deprem Verisi' })
         .setDescription(
-          enSon5Deprem.map(deprem =>
-            `**Tarih:** ${deprem.tarih} ${deprem.saat}\n` +
-            `**Enlem:** ${deprem.enlem} | **Boylam:** ${deprem.boylam}\n` +
-            `**Derinlik:** ${deprem.derinlik} km | **Büyüklük:** ${deprem.buyukluk}\n` +
-            `**Yer:** ${deprem.yer}\n` +
-            `**Şehir:** ${deprem.sehir}`
+          slice.map(d =>
+            `**Tarih:** ${d.tarih} ${d.saat}\n` +
+            `**Enlem:** ${d.enlem} | **Boylam:** ${d.boylam}\n` +
+            `**Derinlik:** ${d.derinlik} km | **Büyüklük:** ${d.buyukluk}\n` +
+            `**Yer:** ${d.yer}\n` +
+            `**Şehir:** ${d.sehir}`
           ).join('\n\n')
         );
+    };
 
-      await message.channel.send({ embeds: [embed] });
-    } else {
-      await message.channel.send('Deprem verisi bulunamadı.');
-    }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('prev')
+        .setLabel('⬅️ Geri')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('next')
+        .setLabel('İleri ➡️')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    const msg = await message.channel.send({ embeds: [generateEmbed(page)], components: [row] });
+
+    const collector = msg.createMessageComponentCollector({ time: 60_000 });
+
+    collector.on('collect', async (interaction) => {
+      if (interaction.user.id !== message.author.id) {
+        return interaction.reply({ content: 'Bu butonları sadece komutu kullanan kişi kullanabilir.', ephemeral: true });
+      }
+
+      if (interaction.customId === 'prev') {
+        page = page > 0 ? page - 1 : page;
+      } else if (interaction.customId === 'next') {
+        if ((page + 1) * perPage < depremler.length) page++;
+      }
+
+      await interaction.update({ embeds: [generateEmbed(page)], components: [row] });
+    });
+
+    collector.on('end', () => {
+      msg.edit({ components: [] }).catch(() => {});
+    });
+
   } catch (error) {
     console.error('Deprem verisi alınırken bir hata oluştu:', error);
     await message.channel.send('Deprem verilerini alırken bir hata oluştu.');
@@ -75,5 +109,5 @@ module.exports.conf = {
 
 module.exports.help = {
   name: 'deprem',
-  description: 'Son depremleri gösterir.'
+  description: 'Son depremleri sayfalı şekilde gösterir.'
 };
