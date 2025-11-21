@@ -7,45 +7,35 @@ module.exports.run = async (client, message, args) => {
       const embed = new EmbedBuilder()
         .setColor(0xFF4500)
         .setTitle('⚠️ Hava Durumu')
-        .setDescription('Lütfen bir il veya ilçe girin.\nÖrn: `!hava İzmir Çiğli`')
+        .setDescription('Lütfen bir şehir girin. Örn: `!hava İzmir`')
         .setTimestamp();
       return message.channel.send({ embeds: [embed] });
     }
 
-    const sehir = args[0];
-    const ilce = args[1] ? args[1] : '';
-    const konum = `${sehir}${ilce ? ' ' + ilce : ''}`;
+    const sehir = args[0].toLowerCase();
 
-    async function getirTahmin(konum) {
-      const url = `https://wttr.in/${encodeURIComponent(konum)}?format=j1`;
-      const { data } = await axios.get(url, { timeout: 10000 });
-      if (!data || !data.weather || !Array.isArray(data.weather)) {
-        throw new Error('Geçersiz hava durumu yanıtı alındı.');
-      }
-      return data.weather;
+    async function getirTahmin(sehir) {
+      const url = `https://api.collectapi.com/weather/getWeather?data.lang=tr&data.city=${encodeURIComponent(sehir)}`;
+      const { data } = await axios.get(url, {
+        headers: {
+          authorization: `apikey ${process.env.COLLECTAPI_KEY}`, // .env’den çekiyoruz
+          "content-type": "application/json"
+        }
+      });
+      if (!data || !data.result) throw new Error("Geçersiz hava durumu yanıtı alındı.");
+      return data.result;
     }
 
-    let tahminler = await getirTahmin(konum);
+    let tahminler = await getirTahmin(sehir);
     let page = 0;
 
     const renkSec = (hava) => {
       const h = (hava || '').toLowerCase();
-      if (h.includes('sunny') || h.includes('güneş')) return 0xFFD700;
-      if (h.includes('rain') || h.includes('yağmur')) return 0x1E90FF;
-      if (h.includes('cloud') || h.includes('bulut')) return 0x808080;
-      if (h.includes('storm') || h.includes('fırtına')) return 0xFF4500;
+      if (h.includes('güneş')) return 0xFFD700;
+      if (h.includes('yağmur')) return 0x1E90FF;
+      if (h.includes('bulut')) return 0x808080;
+      if (h.includes('fırtına')) return 0xFF4500;
       return 0x00FF7F;
-    };
-
-    const getSlotSafe = (hourly, idx) => {
-      const s = Array.isArray(hourly) ? hourly[idx] : null;
-      if (!s) return { weatherDesc: [{ value: 'Veri yok' }], tempC: '-', humidity: '-', windspeedKmph: '-' };
-      return {
-        weatherDesc: s.weatherDesc || [{ value: 'Veri yok' }],
-        tempC: s.tempC ?? '-',
-        humidity: s.humidity ?? '-',
-        windspeedKmph: s.windspeedKmph ?? '-',
-      };
     };
 
     const generateEmbed = (page) => {
@@ -53,35 +43,23 @@ module.exports.run = async (client, message, args) => {
       if (!gun) {
         return new EmbedBuilder()
           .setColor(0xFF4500)
-          .setTitle(`🌤 ${konum} Hava Durumu (Gün ${page + 1})`)
+          .setTitle(`🌤 ${sehir} Hava Durumu (Gün ${page + 1})`)
           .setDescription('Bu gün için tahmin verisi bulunamadı.')
-          .setFooter({ text: `Son güncelleme: ${new Date().toLocaleString('tr-TR')} • 81 il ve ilçeler destekleniyor` })
           .setTimestamp();
       }
 
-      const hourly = gun.hourly || [];
-      const gece = getSlotSafe(hourly, 0);
-      const sabah = getSlotSafe(hourly, 2);
-      const oglen = getSlotSafe(hourly, 4);
-      const aksam = getSlotSafe(hourly, 6);
-
-      const havaGenel = (oglen.weatherDesc[0]?.value) || (sabah.weatherDesc[0]?.value) || 'Veri yok';
-      const ortalama = (gun.avgtempC != null ? `${gun.avgtempC}°C` : '-');
-      const min = (gun.mintempC != null ? `${gun.mintempC}°C` : '-');
-      const max = (gun.maxtempC != null ? `${gun.maxtempC}°C` : '-');
-
       return new EmbedBuilder()
-        .setColor(renkSec(havaGenel))
-        .setTitle(`🌤 ${konum} Hava Durumu (Gün ${page + 1})`)
+        .setColor(renkSec(gun.description))
+        .setTitle(`🌤 ${sehir.toUpperCase()} Hava Durumu (${gun.day})`)
+        .setThumbnail(gun.icon)
         .setDescription(
-          `**Durum (Genel):** ${havaGenel}\n` +
-          `**Ortalama:** ${ortalama} | **Min:** ${min} | **Max:** ${max}\n\n` +
-          `🌙 **Gece:** ${gece.weatherDesc[0].value}, ${gece.tempC}°C, Nem: ${gece.humidity}%\n` +
-          `🌅 **Sabah:** ${sabah.weatherDesc[0].value}, ${sabah.tempC}°C, Nem: ${sabah.humidity}%\n` +
-          `☀️ **Öğlen:** ${oglen.weatherDesc[0].value}, ${oglen.tempC}°C, Nem: ${oglen.humidity}%\n` +
-          `🌇 **Akşam:** ${aksam.weatherDesc[0].value}, ${aksam.tempC}°C, Nem: ${aksam.humidity}%`
+          `**Durum:** ${gun.description}\n` +
+          `**Sıcaklık:** ${gun.degree}°C\n` +
+          `**Min:** ${gun.min}°C | **Max:** ${gun.max}°C\n` +
+          `**Gece:** ${gun.night}°C\n` +
+          `**Nem:** ${gun.humidity}%`
         )
-        .setFooter({ text: `Son güncelleme: ${new Date().toLocaleString('tr-TR')} • 81 il ve ilçeler destekleniyor` })
+        .setFooter({ text: `Son güncelleme: ${new Date().toLocaleString('tr-TR')} • CollectAPI` })
         .setTimestamp();
     };
 
@@ -111,7 +89,7 @@ module.exports.run = async (client, message, args) => {
         if (page + 1 < tahminler.length) page++;
       } else if (interaction.customId === 'refresh') {
         try {
-          tahminler = await getirTahmin(konum);
+          tahminler = await getirTahmin(sehir);
           page = 0;
         } catch (e) {
           const embed = new EmbedBuilder()
@@ -142,4 +120,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'hava', description: 'Girilen il/ilçe için 5 günlük hava tahminini gösterir (sabah/öğlen/akşam/gece, min/max).' };
+module.exports.help = { name: 'hava', description: 'Girilen şehir için CollectAPI üzerinden hava tahminini gösterir.' };
