@@ -4,16 +4,32 @@ const GuildSettings = require('../models/GuildSettings');
 module.exports.run = async (client, message, args) => {
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
   if (!settings || !settings.kayıtAktif) {
-    return message.reply("❌ Bu sunucuda kayıt sistemi aktif değil.");
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle("❌ Kayıt Sistemi Kapalı")
+      .setDescription("Bu sunucuda kayıt sistemi aktif değil.")
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
   }
 
-  // Yetkili kontrolü
   if (!settings.yetkiliRol || !message.member.roles.cache.has(settings.yetkiliRol)) {
-    return message.reply("❌ Bu komutu sadece kayıt yetkilileri kullanabilir.");
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle("❌ Yetki Yok")
+      .setDescription("Bu komutu sadece kayıt yetkilileri kullanabilir.")
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
   }
 
   const uye = message.mentions.members.first();
-  if (!uye) return message.reply("❌ Bir üye etiketlemelisin.");
+  if (!uye) {
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle("❌ Hatalı Kullanım")
+      .setDescription("Bir üye etiketlemelisin.")
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
+  }
 
   const isim = args[1] || "Belirtilmedi";
   const yas = args[2] || "Belirtilmedi";
@@ -21,12 +37,7 @@ module.exports.run = async (client, message, args) => {
   const embed = new EmbedBuilder()
     .setColor(0x1E90FF)
     .setTitle("📋 Kayıt İşlemi")
-    .setDescription(
-      `👤 Üye: ${uye}\n` +
-      `📛 İsim: ${isim}\n` +
-      `🎂 Yaş: ${yas}\n\n` +
-      "Cinsiyet seçimi için aşağıdaki butonları kullanın."
-    )
+    .setDescription(`👤 Üye: ${uye}\n📛 İsim: ${isim}\n🎂 Yaş: ${yas}\n\nCinsiyet seçimi için aşağıdaki butonları kullanın.`)
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
@@ -39,37 +50,34 @@ module.exports.run = async (client, message, args) => {
 
   collector.on('collect', async i => {
     if (!settings.yetkiliRol || !i.member.roles.cache.has(settings.yetkiliRol)) {
-      return i.reply({ content: "❌ Bu butonu sadece kayıt yetkilileri kullanabilir.", ephemeral: true });
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle("❌ Yetki Yok")
+        .setDescription("Bu butonu sadece kayıt yetkilileri kullanabilir.")
+        .setTimestamp();
+      return i.reply({ embeds: [embed], ephemeral: true });
     }
 
     if (i.customId === "kızKayit") {
       if (settings.kızRol) await uye.roles.add(settings.kızRol);
+      await uye.setNickname(`${isim} | ${yas}`).catch(() => {});
       const done = new EmbedBuilder()
         .setColor(0xFF69B4)
         .setTitle("✅ Kayıt Tamamlandı")
         .setDescription(`${uye} başarıyla **Kız** olarak kayıt edildi.\nİsim: ${isim} | Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
-
-      if (settings.kayıtKanal) {
-        const kanal = message.guild.channels.cache.get(settings.kayıtKanal);
-        if (kanal) kanal.send({ embeds: [done] });
-      }
     }
 
     if (i.customId === "erkekKayit") {
       if (settings.erkekRol) await uye.roles.add(settings.erkekRol);
+      await uye.setNickname(`${isim} | ${yas}`).catch(() => {});
       const done = new EmbedBuilder()
         .setColor(0x1E90FF)
         .setTitle("✅ Kayıt Tamamlandı")
         .setDescription(`${uye} başarıyla **Erkek** olarak kayıt edildi.\nİsim: ${isim} | Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
-
-      if (settings.kayıtKanal) {
-        const kanal = message.guild.channels.cache.get(settings.kayıtKanal);
-        if (kanal) kanal.send({ embeds: [done] });
-      }
     }
   });
 };
