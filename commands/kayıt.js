@@ -21,12 +21,17 @@ module.exports.run = async (client, message, args) => {
     return message.channel.send({ embeds: [embed] });
   }
 
-  const uye = message.mentions.members.first();
+  // ✅ Üye mention veya ID ile çek
+  let uye = message.mentions.members.first();
+  if (!uye && args[0]) {
+    uye = await message.guild.members.fetch(args[0]).catch(() => null);
+  }
+
   if (!uye) {
     const embed = new EmbedBuilder()
       .setColor('Red')
       .setTitle("❌ Hatalı Kullanım")
-      .setDescription("Bir üye etiketlemelisin.")
+      .setDescription("Bir üye etiketlemelisin veya ID girmelisin.")
       .setTimestamp();
     return message.channel.send({ embeds: [embed] });
   }
@@ -37,7 +42,7 @@ module.exports.run = async (client, message, args) => {
   const embed = new EmbedBuilder()
     .setColor(0x1E90FF)
     .setTitle("📋 Kayıt İşlemi")
-    .setDescription(`👤 Üye: ${uye}\n📛 İsim: ${isim}\n🎂 Yaş: ${yas}\n\nCinsiyet seçimi için aşağıdaki butonları kullanın.`)
+    .setDescription(`👤 Üye: ${uye}\n🆔 ID: ${uye.id}\n📛 İsim: ${isim}\n🎂 Yaş: ${yas}\n\nCinsiyet seçimi için aşağıdaki butonları kullanın.`)
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
@@ -58,13 +63,16 @@ module.exports.run = async (client, message, args) => {
       return i.reply({ embeds: [embed], ephemeral: true });
     }
 
+    let cinsiyet = null;
+
     if (i.customId === "kızKayit") {
       if (settings.kızRol) await uye.roles.add(settings.kızRol);
       await uye.setNickname(`${isim} | ${yas}`).catch(() => {});
+      cinsiyet = "Kız";
       const done = new EmbedBuilder()
         .setColor(0xFF69B4)
         .setTitle("✅ Kayıt Tamamlandı")
-        .setDescription(`${uye} başarıyla **Kız** olarak kayıt edildi.\nİsim: ${isim} | Yaş: ${yas}`)
+        .setDescription(`${uye} başarıyla **Kız** olarak kayıt edildi.\n🆔 ID: ${uye.id}\nİsim: ${isim} | Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
     }
@@ -72,15 +80,31 @@ module.exports.run = async (client, message, args) => {
     if (i.customId === "erkekKayit") {
       if (settings.erkekRol) await uye.roles.add(settings.erkekRol);
       await uye.setNickname(`${isim} | ${yas}`).catch(() => {});
+      cinsiyet = "Erkek";
       const done = new EmbedBuilder()
         .setColor(0x1E90FF)
         .setTitle("✅ Kayıt Tamamlandı")
-        .setDescription(`${uye} başarıyla **Erkek** olarak kayıt edildi.\nİsim: ${isim} | Yaş: ${yas}`)
+        .setDescription(`${uye} başarıyla **Erkek** olarak kayıt edildi.\n🆔 ID: ${uye.id}\nİsim: ${isim} | Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
+    }
+
+    // ✅ DB'ye kaydet
+    if (cinsiyet) {
+      if (!settings.kayıtlıÜyeler) settings.kayıtlıÜyeler = [];
+      settings.kayıtlıÜyeler.push({
+        userId: uye.id,
+        isim,
+        yas,
+        cinsiyet
+      });
+      await settings.save();
     }
   });
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'kayıt', description: 'Üyeyi kayıt eder (isim/yaş isteğe bağlı, cinsiyet butonlu).' };
+module.exports.help = { 
+  name: 'kayıt', 
+  description: 'Üyeyi kayıt eder (mention veya ID ile, isim/yaş isteğe bağlı, cinsiyet butonlu, DB kaydı).' 
+};
