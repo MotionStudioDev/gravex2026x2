@@ -1,9 +1,14 @@
 const { EmbedBuilder } = require('discord.js');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports = async (emoji) => {
   const client = emoji.client;
-  const kanalId = client.emojiLogKanalları?.get(emoji.guild.id);
-  const kanal = kanalId ? emoji.guild.channels.cache.get(kanalId) : null;
+
+  // Sunucu ayarlarını DB’den çek
+  const settings = await GuildSettings.findOne({ guildId: emoji.guild.id });
+  if (!settings || !settings.emojiLog) return;
+
+  const kanal = emoji.guild.channels.cache.get(settings.emojiLog);
   if (!kanal || !kanal.permissionsFor(client.user).has('SendMessages')) return;
 
   const embed = new EmbedBuilder()
@@ -15,7 +20,7 @@ module.exports = async (emoji) => {
       { name: 'ID', value: emoji.id, inline: false }
     )
     .setTimestamp()
-    .setFooter({ text: 'Emoji Log' });
+    .setFooter({ text: 'Emoji Log Sistemi' });
 
   kanal.send({ embeds: [embed] });
 };
