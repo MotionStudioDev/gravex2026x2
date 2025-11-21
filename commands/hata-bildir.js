@@ -91,11 +91,18 @@ module.exports.run = async (client, message, args) => {
           });
         }
 
-        // Kullanıcıya DM gönder
+        // Kullanıcıya DM gönder (embedli)
         try {
-          await message.author.send(
-            "<:userx:1441379546929561650> Sayın kullanıcı, talebiniz yetkili ekibimize iletilmiştir. Lütfen geri dönüş mesajı gelirse cevaplayınız."
-          );
+          await message.author.send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor('Blurple')
+                .setTitle('<:userx:1441379546929561650> Talebiniz İletildi')
+                .setDescription('Sayın kullanıcı, talebiniz yetkili ekibimize iletilmiştir.\nLütfen geri dönüş mesajı gelirse cevaplayınız.')
+                .setFooter({ text: 'Hata Bildir Sistemi' })
+                .setTimestamp()
+            ]
+          });
         } catch {}
 
         await msg.edit({
