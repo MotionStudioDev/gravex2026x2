@@ -40,7 +40,7 @@ module.exports.run = async (client, message) => {
         embeds: [
           new EmbedBuilder()
             .setColor('Green')
-            .setTitle('🔄 Reload Başlatıldı')
+            .setTitle('<a:yukle:1440677432976867448> Reload Başlatıldı')
             .setDescription('Komutlar yeniden başlatılıyor. Bekle!')
         ],
         components: []
