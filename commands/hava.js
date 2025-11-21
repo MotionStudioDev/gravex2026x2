@@ -7,7 +7,7 @@ module.exports.run = async (client, message, args) => {
       const embed = new EmbedBuilder()
         .setColor(0xFF4500)
         .setTitle('⚠️ Hava Durumu')
-        .setDescription('Lütfen bir şehir girin. Örn: `!hava İzmir`')
+        .setDescription('Lütfen bir şehir girin. Örn: `g!hava-durumu İzmir`')
         .setTimestamp();
       return message.channel.send({ embeds: [embed] });
     }
@@ -120,4 +120,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'hava', description: 'Girilen şehir için CollectAPI üzerinden hava tahminini gösterir.' };
+module.exports.help = { name: 'hava-durumu', description: 'Girilen şehir için CollectAPI üzerinden hava tahminini gösterir.' };
