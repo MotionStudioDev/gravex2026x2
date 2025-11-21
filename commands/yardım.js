@@ -9,7 +9,7 @@ module.exports.run = async (client, message) => {
       },
       kullanıcı: {
         title: '<:user:1441128594117099664> | Kullanıcı Komutları',
-        value: '`avatar`,`profil`,`emoji-bilgi`,`profil`,`emojiler`'
+        value: '`avatar`,`profil`,`emoji-bilgi`,`emojiler`'
       },
       moderasyon: {
         title: '<:gvenlik:1416529478112383047> | Moderasyon',
@@ -21,27 +21,33 @@ module.exports.run = async (client, message) => {
       }
     };
 
-    const embed = new EmbedBuilder()
+    const anaEmbed = new EmbedBuilder()
       .setColor('Blurple')
-      .setTitle('Grave Yardım Menüsü')
-      .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin prefix g! (Örnek: g!yardım)')
-      .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
+      .setTitle('📖 Grave Yardım Menüsü')
+      .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin.\nPrefix: `g!` (Örnek: `g!yardım`)')
+      .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('kullanıcı').setLabel('Kullanıcı').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('moderasyon').setLabel('Moderasyon').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId('kullanıcı').setLabel('Kullanıcı').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('moderasyon').setLabel('Moderasyon').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('ana').setLabel('Ana Menü').setStyle(ButtonStyle.Secondary)
     );
 
-    const msg = await message.channel.send({ embeds: [embed], components: [row] });
+    const msg = await message.channel.send({ embeds: [anaEmbed], components: [row] });
 
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
-      time: 30000
+      time: 60000
     });
 
     collector.on('collect', async i => {
+      if (i.customId === 'ana') {
+        await i.update({ embeds: [anaEmbed], components: [row] });
+        return;
+      }
+
       const kategori = kategoriler[i.customId];
       if (!kategori) return;
 
@@ -49,7 +55,7 @@ module.exports.run = async (client, message) => {
         .setColor('Blurple')
         .setTitle(`${kategori.title}`)
         .setDescription(kategori.value)
-        .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında Düzelicek.' });
+        .setFooter({ text: '⚠️ | Database sorunu ile ayarlar kaydedilmemektedir. Yakında düzelecek.' });
 
       await i.update({ embeds: [yeniEmbed], components: [row] });
     });
@@ -59,7 +65,7 @@ module.exports.run = async (client, message) => {
     });
   } catch (err) {
     console.error('Yardım komutu hatası:', err);
-    message.channel.send('⚠️| Yardım menüsü oluşturulurken bir hata oluştu.');
+    message.channel.send('⚠️ | Yardım menüsü oluşturulurken bir hata oluştu.');
   }
 };
 
