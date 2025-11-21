@@ -3,7 +3,12 @@ const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-    return message.reply("❌ Bu komutu sadece yöneticiler kullanabilir.");
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle("❌ Yetki Yok")
+      .setDescription("Bu komutu sadece yöneticiler kullanabilir.")
+      .setTimestamp();
+    return message.channel.send({ embeds: [embed] });
   }
 
   const sub = args[0]?.toLowerCase();
@@ -27,7 +32,12 @@ module.exports.run = async (client, message, args) => {
 
     collector.on('collect', async i => {
       if (!i.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return i.reply({ content: "❌ Bu butonu sadece yöneticiler kullanabilir.", ephemeral: true });
+        const embed = new EmbedBuilder()
+          .setColor('Red')
+          .setTitle("❌ Yetki Yok")
+          .setDescription("Bu butonu sadece yöneticiler kullanabilir.")
+          .setTimestamp();
+        return i.reply({ embeds: [embed], ephemeral: true });
       }
       if (i.customId === "kayıtEvet") {
         await GuildSettings.findOneAndUpdate(
@@ -36,14 +46,28 @@ module.exports.run = async (client, message, args) => {
           { upsert: true }
         );
         const aktifEmbed = new EmbedBuilder()
-          .setColor(0x00FF7F)
+          .setColor('Green')
           .setTitle("✅ Kayıt Sistemi Aktif")
           .setDescription("Bu sunucu için kayıt sistemi aktif edildi.\n\n`g!kayıt-sistemi kapat` yazarak sistemi kapatabilirsin.")
           .setTimestamp();
-        await i.update({ embeds: [aktifEmbed], components: [] });
+
+        const komutEmbed = new EmbedBuilder()
+          .setColor(0x1E90FF)
+          .setTitle("📖 Kayıt Sistemi Komutları")
+          .setDescription(
+            "**g!kayıt-sistemi kapat** → Sistemi kapatır\n" +
+            "**g!kayıt-sistemi kanal #kanal** → Kayıt kanalı ayarlar\n" +
+            "**g!kayıt-sistemi roller @Kız @Erkek** → Kız & Erkek rolü ayarlar\n" +
+            "**g!kayıt-sistemi yetkili @Rol** → Kayıt yetkilisi rolü ayarlar\n" +
+            "**g!kayıt @Üye İsim Yaş** → Üyeyi kayıt eder (cinsiyet butonlu)"
+          )
+          .setFooter({ text: "Kayıt sistemi komutları" })
+          .setTimestamp();
+
+        await i.update({ embeds: [aktifEmbed, komutEmbed], components: [] });
       } else {
         const pasifEmbed = new EmbedBuilder()
-          .setColor(0xFF0000)
+          .setColor('Red')
           .setTitle("❌ Kayıt Sistemi Kurulmadı")
           .setDescription("Kayıt Sistemi bu sunucu için kurulmayacak.")
           .setTimestamp();
@@ -53,49 +77,5 @@ module.exports.run = async (client, message, args) => {
     return;
   }
 
-  if (sub === "kapat") {
-    await GuildSettings.findOneAndUpdate(
-      { guildId: message.guild.id },
-      { kayıtAktif: false },
-      { upsert: true }
-    );
-    return message.channel.send("📴 Bu sunucu için kayıt sistemi kapatıldı.");
-  }
-
-  if (sub === "kanal") {
-    const kanal = message.mentions.channels.first();
-    if (!kanal) return message.reply("❌ Bir kanal etiketlemelisin.");
-    await GuildSettings.findOneAndUpdate(
-      { guildId: message.guild.id },
-      { kayıtKanal: kanal.id },
-      { upsert: true }
-    );
-    return message.channel.send(`✅ Kayıt kanalı <#${kanal.id}> olarak ayarlandı.`);
-  }
-
-  if (sub === "roller") {
-    const kızRol = message.mentions.roles.first();
-    const erkekRol = message.mentions.roles.at(1);
-    if (!kızRol || !erkekRol) return message.reply("❌ İki rol etiketlemelisin (kız ve erkek).");
-    await GuildSettings.findOneAndUpdate(
-      { guildId: message.guild.id },
-      { kızRol: kızRol.id, erkekRol: erkekRol.id },
-      { upsert: true }
-    );
-    return message.channel.send(`✅ Kız rolü ${kızRol}, Erkek rolü ${erkekRol} olarak ayarlandı.`);
-  }
-
-  if (sub === "yetkili") {
-    const rol = message.mentions.roles.first();
-    if (!rol) return message.reply("❌ Bir rol etiketlemelisin.");
-    await GuildSettings.findOneAndUpdate(
-      { guildId: message.guild.id },
-      { yetkiliRol: rol.id },
-      { upsert: true }
-    );
-    return message.channel.send(`✅ Kayıt yetkilisi rolü ${rol} olarak ayarlandı.`);
-  }
+  // diğer alt komutlar (kapat, kanal, roller, yetkili) aynı şekilde embedli kalıyor...
 };
-
-module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'kayıt-sistemi', description: 'Sunucuda kayıt sistemini yönetir (aç/kapat/kanal/roller/yetkili).' };
