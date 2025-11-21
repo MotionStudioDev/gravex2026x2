@@ -22,6 +22,7 @@
     "moment-duration-format": "^2.3.2",
     "os": "^0.1.2",
     "chalk": "^5.6.2",
+    "mongodb": "^7.0.0",
     "orio.db": "^3.1.2"
   },
   "engines": {
