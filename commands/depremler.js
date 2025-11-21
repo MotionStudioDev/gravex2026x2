@@ -39,7 +39,7 @@ module.exports.run = async (client, message, args) => {
       return depremler;
     }
 
-    const depremler = await getirDepremler();
+    let depremler = await getirDepremler();
     if (depremler.length === 0) return message.channel.send('Deprem verisi bulunamadı.');
 
     // Sayfalama ayarları
@@ -52,7 +52,9 @@ module.exports.run = async (client, message, args) => {
         .setColor('#ff7300')
         .setTitle(`Son Depremler (Sayfa ${page + 1})`)
         .setTimestamp()
-        .setFooter({ text: 'AFAD Deprem Verisi' })
+        .setFooter({ 
+          text: `AFAD Deprem Verisi • Toplam: ${depremler.length} kayıt • Bu sayfada: ${slice.length} kayıt • Sayfa ${page+1}/${Math.ceil(depremler.length/perPage)} • Son güncelleme: ${new Date().toLocaleString('tr-TR')}` 
+        })
         .setDescription(
           slice.map(d =>
             `**Tarih:** ${d.tarih} ${d.saat}\n` +
@@ -69,6 +71,10 @@ module.exports.run = async (client, message, args) => {
         .setCustomId('prev')
         .setLabel('⬅️ Geri')
         .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('refresh')
+        .setLabel('🔄 Yenile')
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('next')
         .setLabel('İleri ➡️')
@@ -88,6 +94,10 @@ module.exports.run = async (client, message, args) => {
         page = page > 0 ? page - 1 : page;
       } else if (interaction.customId === 'next') {
         if ((page + 1) * perPage < depremler.length) page++;
+      } else if (interaction.customId === 'refresh') {
+        // Yenile → verileri tekrar çek
+        depremler = await getirDepremler();
+        page = 0; // başa dön
       }
 
       await interaction.update({ embeds: [generateEmbed(page)], components: [row] });
