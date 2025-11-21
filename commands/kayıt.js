@@ -1,13 +1,14 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const GuildConfig = require('../models/GuildConfig');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
-  const guildConfig = await GuildConfig.findOne({ guildId: message.guild.id });
-  if (!guildConfig || !guildConfig.kayıtAktif) {
+  const settings = await GuildSettings.findOne({ guildId: message.guild.id });
+  if (!settings || !settings.kayıtAktif) {
     return message.reply("❌ Bu sunucuda kayıt sistemi aktif değil.");
   }
 
-  if (!message.member.roles.cache.has(guildConfig.yetkiliRol)) {
+  // Yetkili kontrolü
+  if (!settings.yetkiliRol || !message.member.roles.cache.has(settings.yetkiliRol)) {
     return message.reply("❌ Bu komutu sadece kayıt yetkilileri kullanabilir.");
   }
 
@@ -21,7 +22,10 @@ module.exports.run = async (client, message, args) => {
     .setColor(0x1E90FF)
     .setTitle("📋 Kayıt İşlemi")
     .setDescription(
-      `Üye: ${uye}\nİsim: ${isim}\nYaş: ${yas}\n\nCinsiyet seçimi için aşağıdaki butonları kullanın.`
+      `👤 Üye: ${uye}\n` +
+      `📛 İsim: ${isim}\n` +
+      `🎂 Yaş: ${yas}\n\n` +
+      "Cinsiyet seçimi için aşağıdaki butonları kullanın."
     )
     .setTimestamp();
 
@@ -34,34 +38,36 @@ module.exports.run = async (client, message, args) => {
   const collector = msg.createMessageComponentCollector({ time: 30000 });
 
   collector.on('collect', async i => {
-    if (!i.member.roles.cache.has(guildConfig.yetkiliRol)) {
+    if (!settings.yetkiliRol || !i.member.roles.cache.has(settings.yetkiliRol)) {
       return i.reply({ content: "❌ Bu butonu sadece kayıt yetkilileri kullanabilir.", ephemeral: true });
     }
 
     if (i.customId === "kızKayit") {
-      await uye.roles.add(guildConfig.kızRol);
+      if (settings.kızRol) await uye.roles.add(settings.kızRol);
       const done = new EmbedBuilder()
         .setColor(0xFF69B4)
         .setTitle("✅ Kayıt Tamamlandı")
         .setDescription(`${uye} başarıyla **Kız** olarak kayıt edildi.\nİsim: ${isim} | Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
-      if (guildConfig.kayıtKanal) {
-        const kanal = message.guild.channels.cache.get(guildConfig.kayıtKanal);
+
+      if (settings.kayıtKanal) {
+        const kanal = message.guild.channels.cache.get(settings.kayıtKanal);
         if (kanal) kanal.send({ embeds: [done] });
       }
     }
 
     if (i.customId === "erkekKayit") {
-      await uye.roles.add(guildConfig.erkekRol);
+      if (settings.erkekRol) await uye.roles.add(settings.erkekRol);
       const done = new EmbedBuilder()
         .setColor(0x1E90FF)
         .setTitle("✅ Kayıt Tamamlandı")
         .setDescription(`${uye} başarıyla **Erkek** olarak kayıt edildi.\nİsim: ${isim} | Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
-      if (guildConfig.kayıtKanal) {
-        const kanal = message.guild.channels.cache.get(guildConfig.kayıtKanal);
+
+      if (settings.kayıtKanal) {
+        const kanal = message.guild.channels.cache.get(settings.kayıtKanal);
         if (kanal) kanal.send({ embeds: [done] });
       }
     }
@@ -69,4 +75,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: [] };
-module.exports.help = { name: 'kayıt', description: 'Üyeyi kayıt eder (isim/yaş iste' };
+module.exports.help = { name: 'kayıt', description: 'Üyeyi kayıt eder (isim/yaş isteğe bağlı, cinsiyet butonlu).' };
