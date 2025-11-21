@@ -7,7 +7,7 @@ client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
   let x = [
-    `Veri bağlantısı sağlanıyor.`
+    `g!yardım - Web Panel yakında!`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
