@@ -1,7 +1,8 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
-  if (!message.member.permissions.has('Administrator')) {
+  if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -21,11 +22,18 @@ module.exports.run = async (client, message, args) => {
         new EmbedBuilder()
           .setColor('Orange')
           .setTitle('ℹ️ Sayaç Komutu')
-          .setDescription('Kullanım:\n`g!sayaç ayarla <sayı>`\n`g!sayaç göster`\n`g!sayaç sıfırla`\n`g!sayaç kanal <#kanal>`')
+          .setDescription(
+            "Kullanım:\n" +
+            "`g!sayaç ayarla <sayı>`\n" +
+            "`g!sayaç göster`\n" +
+            "`g!sayaç sıfırla`\n" +
+            "`g!sayaç kanal <#kanal>`"
+          )
       ]
     });
   }
 
+  // ✅ Ayarla
   if (sub === 'ayarla') {
     const hedef = parseInt(args[1]);
     const mevcut = message.guild.memberCount;
@@ -41,7 +49,11 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    client.sayaçlar.set(guildId, hedef);
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { sayaçHedef: hedef },
+      { upsert: true }
+    );
 
     return message.channel.send({
       embeds: [
@@ -53,8 +65,10 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // ✅ Göster
   if (sub === 'göster') {
-    const hedef = client.sayaçlar.get(guildId);
+    const settings = await GuildSettings.findOne({ guildId });
+    const hedef = settings?.sayaçHedef;
     const mevcut = message.guild.memberCount;
 
     if (!hedef) {
@@ -85,8 +99,10 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // ✅ Sıfırla
   if (sub === 'sıfırla') {
-    if (!client.sayaçlar.has(guildId)) {
+    const settings = await GuildSettings.findOne({ guildId });
+    if (!settings?.sayaçHedef) {
       return message.channel.send({
         embeds: [
           new EmbedBuilder()
@@ -97,8 +113,10 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    client.sayaçlar.delete(guildId);
-    client.sayaçKanalları.delete(guildId);
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { sayaçHedef: null, sayaçKanal: null }
+    );
 
     return message.channel.send({
       embeds: [
@@ -110,6 +128,7 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
+  // ✅ Kanal
   if (sub === 'kanal') {
     const kanal = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
     if (!kanal || kanal.type !== 0) {
@@ -123,7 +142,11 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    client.sayaçKanalları.set(guildId, kanal.id);
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { sayaçKanal: kanal.id },
+      { upsert: true }
+    );
 
     return message.channel.send({
       embeds: [
@@ -136,10 +159,5 @@ module.exports.run = async (client, message, args) => {
   }
 };
 
-module.exports.conf = {
-  aliases: ['sayac']
-};
-
-module.exports.help = {
-  name: 'sayaç'
-};
+module.exports.conf = { aliases: ['sayac'] };
+module.exports.help = { name: 'sayaç', description: 'Sunucuda sayaç sistemini yönetir.' };
