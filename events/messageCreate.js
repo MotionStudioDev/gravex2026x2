@@ -93,3 +93,10 @@ module.exports = async (message) => {
     }
   }
 };
+////// SA-AS
+if (settings.saasAktif) {
+  if (içerik === 'sa' || içerik.includes('sa')) {
+    message.reply('Aleyküm selam, Dostum.');
+  }
+}
+//////
