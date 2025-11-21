@@ -9,7 +9,7 @@ module.exports.run = async (client, message) => {
       embeds: [
         new EmbedBuilder()
           .setColor('Red')
-          .setTitle('🚫 Yetkisiz')
+          .setTitle('<a:uyar1:1416526541030035530> Yetkisiz')
           .setDescription('Bu komutu sadece bot sahibi kullanabilir.')
       ]
     });
@@ -18,7 +18,7 @@ module.exports.run = async (client, message) => {
   // Onay embed'i
   const embed = new EmbedBuilder()
     .setColor('Blurple')
-    .setTitle('⚠️ Reload Onayı')
+    .setTitle('<a:uyar1:1416526541030035530> Reload Onayı')
     .setDescription('Botun komutlarını yeniden yüklemek üzeresin.\nOnay veriyorsan **EVET**, iptal için **HAYIR** bas.');
 
   const row = new ActionRowBuilder().addComponents(
@@ -64,7 +64,7 @@ module.exports.run = async (client, message) => {
           embeds: [
             new EmbedBuilder()
               .setColor('Green')
-              .setTitle('✅ Reload Başarılı')
+              .setTitle('<a:tickgre:1416899456246349854> Reload Başarılı')
               .setDescription(`Tüm komutlar yeniden yüklendi.\nYüklenen komut sayısı: **${count}**`)
           ]
         });
@@ -73,7 +73,7 @@ module.exports.run = async (client, message) => {
           embeds: [
             new EmbedBuilder()
               .setColor('Red')
-              .setTitle('❌ Reload Hatası')
+              .setTitle('<a:uyar1:1416526541030035530> Reload Hatası')
               .setDescription(`${err.message}`)
           ]
         });
@@ -88,7 +88,7 @@ module.exports.run = async (client, message) => {
         embeds: [
           new EmbedBuilder()
             .setColor('Red')
-            .setTitle('❌ Reload İptal')
+            .setTitle('<a:uyar1:1416526541030035530> Reload İptal')
             .setDescription('Komut yenileme iptal edildi!')
         ],
         components: []
