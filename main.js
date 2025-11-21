@@ -14,6 +14,17 @@ const moment = require('moment')
 require('moment-duration-format')
 moment.locale('tr')
 /*=======================================================================================*/
+/////////////////////MONGO 
+  const mongoose = require('mongoose');
+
+mongoose.connect(process.env.MONGO_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => {
+  console.log("✅ MongoDB’ye bağlanıldı!");
+}).catch(err => {
+  console.error("❌ MongoDB bağlantı hatası:", err);
+});
 
 /*=======================================================================================*/
 
