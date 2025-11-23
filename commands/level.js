@@ -1,42 +1,48 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
 const UserXP = require('../models/UserXP');
+const canvacord = require('canvacord');
 
 module.exports.run = async (client, message, args) => {
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
   if (!settings || !settings.levelSystemActive) {
     return message.channel.send({
       embeds: [
-        new EmbedBuilder()
-          .setColor('Red')
-          .setTitle('🚫 Level Sistemi Kapalı')
-          .setDescription('Bu sunucuda level sistemi aktif değil.')
+        {
+          color: 0xFF0000,
+          title: '🚫 Level Sistemi Kapalı',
+          description: 'Bu sunucuda level sistemi aktif değil.'
+        }
       ]
     });
   }
 
   const user = message.author;
-  const userXP = await UserXP.findOne({ guildId: message.guild.id, userId: user.id });
-  const nextLevelXP = userXP ? userXP.level * 100 : 100;
+  const userXP = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
+  const nextLevelXP = userXP.level * 100;
 
-  const embed = new EmbedBuilder()
-    .setColor('Blurple')
-    .setTitle(`📊 ${user.username} Level Bilgisi`)
-    .addFields(
-      { name: 'Level', value: `${userXP ? userXP.level : 1}`, inline: true },
-      { name: 'XP', value: `${userXP ? userXP.xp : 0}/${nextLevelXP}`, inline: true }
-    )
-    .setFooter({ text: 'Bu sunucuda Level Sistemi aktif. XP kazanmak için mesaj atmaya devam et!' })
-    .setTimestamp();
+  // ✅ Rank kartı oluştur
+  const rank = new canvacord.Rank()
+    .setAvatar(user.displayAvatarURL({ extension: "png" }))
+    .setCurrentXP(userXP.xp)
+    .setRequiredXP(nextLevelXP)
+    .setLevel(userXP.level)
+    .setUsername(user.username)
+    .setDiscriminator(user.discriminator)
+    .setProgressBar("#5865F2", "COLOR")
+    .setBackground("COLOR", "#2C2F33");
+
+  const data = await rank.build();
+  const attachment = new AttachmentBuilder(data, { name: "rank.png" });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('level_refresh').setLabel('Yenile').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('level_top').setLabel('Level-Top').setStyle(ButtonStyle.Success)
   );
 
-  const msg = await message.channel.send({ embeds: [embed], components: [row] });
+  const msg = await message.channel.send({ files: [attachment], components: [row] });
 
-  let currentView = 'user'; // başlangıçta kullanıcı bilgisi
+  let currentView = 'user';
 
   const collector = msg.createMessageComponentCollector({ time: 30000 });
 
@@ -47,21 +53,24 @@ module.exports.run = async (client, message, args) => {
 
     if (i.customId === 'level_refresh') {
       if (currentView === 'user') {
-        // Kullanıcı bilgisini yenile
-        const refreshed = await UserXP.findOne({ guildId: message.guild.id, userId: user.id });
-        const refreshedEmbed = new EmbedBuilder()
-          .setColor('Blurple')
-          .setTitle(`📊 ${user.username} Level Bilgisi (Yenilendi)`)
-          .addFields(
-            { name: 'Level', value: `${refreshed ? refreshed.level : 1}`, inline: true },
-            { name: 'XP', value: `${refreshed ? refreshed.xp : 0}/${refreshed ? refreshed.level * 100 : 100}`, inline: true }
-          )
-          .setFooter({ text: 'Bu sunucuda Level Sistemi aktif. XP kazanmak için mesaj atmaya devam et!' })
-          .setTimestamp();
+        const refreshed = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
+        const nextLevelXP = refreshed.level * 100;
 
-        await i.update({ embeds: [refreshedEmbed], components: [row] });
+        const rank = new canvacord.Rank()
+          .setAvatar(user.displayAvatarURL({ extension: "png" }))
+          .setCurrentXP(refreshed.xp)
+          .setRequiredXP(nextLevelXP)
+          .setLevel(refreshed.level)
+          .setUsername(user.username)
+          .setDiscriminator(user.discriminator)
+          .setProgressBar("#5865F2", "COLOR")
+          .setBackground("COLOR", "#2C2F33");
+
+        const data = await rank.build();
+        const attachment = new AttachmentBuilder(data, { name: "rank.png" });
+
+        await i.update({ files: [attachment], components: [row] });
       } else if (currentView === 'top') {
-        // Top listesini yenile
         const topUsers = await UserXP.find({ guildId: message.guild.id })
           .sort({ level: -1, xp: -1 })
           .limit(10);
@@ -77,19 +86,21 @@ module.exports.run = async (client, message, args) => {
           desc += `${medal}**${j + 1}.** ${name} — Level: ${topUsers[j].level}, XP: ${topUsers[j].xp}\n`;
         }
 
-        const topEmbed = new EmbedBuilder()
-          .setColor('Gold')
-          .setTitle('🏆 Sunucu Level Top 10 (Yenilendi)')
-          .setDescription(desc || 'Henüz hiçbir kullanıcı XP kazanmamış.')
-          .setFooter({ text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' })
-          .setTimestamp();
-
-        await i.update({ embeds: [topEmbed], components: [row] });
+        await i.update({
+          embeds: [{
+            color: 0xFFD700,
+            title: '🏆 Sunucu Level Top 10 (Yenilendi)',
+            description: desc || 'Henüz hiçbir kullanıcı XP kazanmamış.',
+            footer: { text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' },
+            timestamp: new Date()
+          }],
+          components: [row]
+        });
       }
     }
 
     if (i.customId === 'level_top') {
-      currentView = 'top'; // state değiştir
+      currentView = 'top';
       const topUsers = await UserXP.find({ guildId: message.guild.id })
         .sort({ level: -1, xp: -1 })
         .limit(10);
@@ -105,29 +116,28 @@ module.exports.run = async (client, message, args) => {
         desc += `${medal}**${j + 1}.** ${name} — Level: ${topUsers[j].level}, XP: ${topUsers[j].xp}\n`;
       }
 
-      const topEmbed = new EmbedBuilder()
-        .setColor('Gold')
-        .setTitle('🏆 Sunucu Level Top 10')
-        .setDescription(desc || 'Henüz hiçbir kullanıcı XP kazanmamış.')
-        .setFooter({ text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' })
-        .setTimestamp();
-
-      await i.update({ embeds: [topEmbed], components: [row] });
+      await i.update({
+        embeds: [{
+          color: 0xFFD700,
+          title: '🏆 Sunucu Level Top 10',
+          description: desc || 'Henüz hiçbir kullanıcı XP kazanmamış.',
+          footer: { text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' },
+          timestamp: new Date()
+        }],
+        components: [row]
+      });
     }
   });
 
   collector.on('end', async () => {
     try {
-      await msg.edit({ components: [] }); // süre dolunca butonları kaldır
-    } catch (err) {
-      // mesaj silinmişse hata yutulur
-    }
+      await msg.edit({ components: [] });
+    } catch (err) {}
   });
 };
 
-// komut ayarları
 module.exports.conf = { aliases: ['rank', 'xp'] };
 module.exports.help = { 
   name: 'level', 
-  description: 'Kendi level bilgini gösterir, Yenile ve Top butonlarıyla etkileşim sağlar.' 
+  description: 'Kendi level bilgini resimli kartla gösterir, Yenile ve Top butonlarıyla etkileşim sağlar.' 
 };
