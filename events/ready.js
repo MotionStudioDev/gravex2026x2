@@ -7,7 +7,7 @@ client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
   let x = [
-    `g!yardım - Web Panel yakında!`
+    `g!yardım - v1.0.1`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
