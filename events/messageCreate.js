@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
+const UserXP = require('../models/UserXP');
 
 const küfürler = ['amk','oç','yarrak','sik','piç','orospu','ananı','göt','salak','aptal'];
 const reklamlar = ['discord.gg/','.gg/','http://','https://','.com','.net','.org'];
@@ -98,5 +99,44 @@ module.exports = async (message) => {
     if (içerik === 'sa' || içerik.startsWith('sa ')) {
       message.reply('Aleyküm selam, Dostum.');
     }
+  }
+
+  // ✅ LEVEL SİSTEMİ
+  if (settings.levelSystemActive) {
+    const guildId = message.guild.id;
+    const userId = message.author.id;
+
+    let userXP = await UserXP.findOne({ guildId, userId });
+    if (!userXP) userXP = new UserXP({ guildId, userId });
+
+    // XP kazanımı (random 5–15)
+    const gainedXP = Math.floor(Math.random() * 11) + 5;
+    userXP.xp += gainedXP;
+
+    const nextLevelXP = userXP.level * 100;
+
+    if (userXP.xp >= nextLevelXP) {
+      userXP.level += 1;
+      userXP.xp = 0;
+
+      const embed = new EmbedBuilder()
+        .setColor('Gold')
+        .setTitle('🎉 Level Atladı!')
+        .setDescription(`${message.author} seviye atladı!\nYeni level: **${userXP.level}**`)
+        .setFooter({ text: 'Tebrikler! Level Sistemi sayesinde seviye atladınız.' })
+        .setTimestamp();
+
+      message.channel.send({ embeds: [embed] });
+
+      // opsiyonel: log kanalına da gönder
+      if (settings.levelLog) {
+        const logKanal = message.guild.channels.cache.get(settings.levelLog);
+        if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+          logKanal.send({ embeds: [embed] });
+        }
+      }
+    }
+
+    await userXP.save();
   }
 };
