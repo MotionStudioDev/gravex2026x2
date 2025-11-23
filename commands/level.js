@@ -2,6 +2,46 @@ const { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = requ
 const GuildSettings = require('../models/GuildSettings');
 const UserXP = require('../models/UserXP');
 const { Rank } = require('canvacord');
+const { createCanvas, loadImage } = require('canvas');
+
+async function generateTopImage(message, topUsers) {
+  const width = 800;
+  const height = 100 + topUsers.length * 70;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  // Arka plan
+  ctx.fillStyle = '#2C2F33';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '30px Sans';
+  ctx.fillText('🏆 Sunucu Level Top 10', 20, 50);
+
+  let y = 100;
+  for (let i = 0; i < topUsers.length; i++) {
+    const entry = topUsers[i];
+    const member = await message.guild.members.fetch(entry.userId).catch(() => null);
+    const username = member ? member.user.username : 'Bilinmeyen';
+    const avatarURL = member ? member.user.displayAvatarURL({ extension: 'png', size: 64 }) : null;
+
+    if (avatarURL) {
+      const avatar = await loadImage(avatarURL);
+      ctx.drawImage(avatar, 20, y - 40, 50, 50);
+    }
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = '24px Sans';
+    ctx.fillText(`${i + 1}. ${username}`, 80, y);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '20px Sans';
+    ctx.fillText(`Level: ${entry.level} | XP: ${entry.xp}`, 300, y);
+
+    y += 70;
+  }
+
+  return new AttachmentBuilder(canvas.toBuffer(), { name: 'top10.png' });
+}
 
 module.exports.run = async (client, message, args) => {
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
@@ -84,28 +124,8 @@ module.exports.run = async (client, message, args) => {
           .sort((a, b) => b.level - a.level || b.xp - a.xp)
           .slice(0, 10);
 
-        for (const entry of topUsers) {
-          const member = await message.guild.members.fetch(entry.userId).catch(() => null);
-          const username = member ? member.user.username : 'Bilinmeyen';
-          const discriminator = member ? member.user.discriminator : '0000';
-          const avatar = member ? member.user.displayAvatarURL({ extension: "png" }) : null;
-
-          const rank = new Rank()
-            .setAvatar(avatar || message.author.displayAvatarURL({ extension: "png" }))
-            .setCurrentXP(entry.xp)
-            .setRequiredXP(entry.level * 100)
-            .setLevel(entry.level)
-            .setUsername(username)
-            .setDiscriminator(discriminator)
-            .setProgressBar("#FFD700", "COLOR")
-            .setBackground("COLOR", "#2C2F33");
-
-          const data = await rank.build();
-          const attachment = new AttachmentBuilder(data, { name: `top_${entry.userId}.png` });
-          await message.channel.send({ files: [attachment] });
-        }
-
-        await i.update({ content: '🏆 Sunucu Level Top 10 listesi resimli olarak gönderildi.', components: [row] });
+        const attachment = await generateTopImage(message, topUsers);
+        await i.update({ files: [attachment], components: [row] });
       }
     }
 
@@ -126,28 +146,8 @@ module.exports.run = async (client, message, args) => {
         .sort((a, b) => b.level - a.level || b.xp - a.xp)
         .slice(0, 10);
 
-      for (const entry of topUsers) {
-        const member = await message.guild.members.fetch(entry.userId).catch(() => null);
-        const username = member ? member.user.username : 'Bilinmeyen';
-        const discriminator = member ? member.user.discriminator : '0000';
-        const avatar = member ? member.user.displayAvatarURL({ extension: "png" }) : null;
-
-        const rank = new Rank()
-          .setAvatar(avatar || message.author.displayAvatarURL({ extension: "png" }))
-          .setCurrentXP(entry.xp)
-          .setRequiredXP(entry.level * 100)
-          .setLevel(entry.level)
-          .setUsername(username)
-          .setDiscriminator(discriminator)
-          .setProgressBar("#FFD700", "COLOR")
-          .setBackground("COLOR", "#2C2F33");
-
-        const data = await rank.build();
-        const attachment = new AttachmentBuilder(data, { name: `top_${entry.userId}.png` });
-        await message.channel.send({ files: [attachment] });
-      }
-
-      await i.update({ content: '🏆 Sunucu Level Top 10 listesi resimli olarak gönderildi.', components: [row] });
+      const attachment = await generateTopImage(message, topUsers);
+      await i.update({ files: [attachment], components: [row] });
     }
   });
 
@@ -161,5 +161,5 @@ module.exports.run = async (client, message, args) => {
 module.exports.conf = { aliases: ['rank', 'xp'] };
 module.exports.help = { 
   name: 'level', 
-  description: 'Kendi level bilgini ve Top listesini resimli kartlarla gösterir.' 
+  description: 'Kendi level bilgini ve Top listesini tek görselde gösterir.' 
 };
