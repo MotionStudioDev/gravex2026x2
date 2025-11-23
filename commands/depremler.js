@@ -53,7 +53,7 @@ module.exports.run = async (client, message, args) => {
         .setTitle(`Son Depremler (Sayfa ${page + 1})`)
         .setTimestamp()
         .setFooter({ 
-          text: `AFAD Deprem Verisi • Toplam: ${depremler.length} kayıt • Bu sayfada: ${slice.length} kayıt • Sayfa ${page+1}/${Math.ceil(depremler.length/perPage)} • Son güncelleme: ${new Date().toLocaleString('tr-TR')}` 
+          text: `MotionAI Deprem Verisi • Toplam: ${depremler.length} kayıt • Bu sayfada: ${slice.length} kayıt • Sayfa ${page+1}/${Math.ceil(depremler.length/perPage)} • Son güncelleme: ${new Date().toLocaleString('tr-TR')}` 
         })
         .setDescription(
           slice.map(d =>
