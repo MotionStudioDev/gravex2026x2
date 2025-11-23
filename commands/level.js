@@ -21,8 +21,8 @@ module.exports.run = async (client, message, args) => {
   const userXP = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
   const nextLevelXP = userXP.level * 100;
 
-  // ✅ Rank kartı oluştur (Canvas.rank)
-  const data = await canvacord.Canvas.rank({
+  // ✅ Rank kartı (v6 → RankCard)
+  const data = await canvacord.RankCard({
     avatar: user.displayAvatarURL({ extension: "png" }),
     currentXP: userXP.xp,
     requiredXP: nextLevelXP,
@@ -57,7 +57,7 @@ module.exports.run = async (client, message, args) => {
         const refreshed = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
         const nextLevelXP = refreshed.level * 100;
 
-        const data = await canvacord.Canvas.rank({
+        const data = await canvacord.RankCard({
           avatar: user.displayAvatarURL({ extension: "png" }),
           currentXP: refreshed.xp,
           requiredXP: nextLevelXP,
@@ -133,7 +133,7 @@ module.exports.run = async (client, message, args) => {
   collector.on('end', async () => {
     try {
       await msg.edit({ components: [] });
-    } catch (err) {}
+    } catch {}
   });
 };
 
