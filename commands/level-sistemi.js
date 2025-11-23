@@ -15,6 +15,7 @@ module.exports.run = async (client, message, args) => {
 
   const sub = args[0]?.toLowerCase();
 
+  // Manuel kapatma argümanı
   if (sub === 'kapat') {
     await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
     return message.channel.send({
@@ -29,35 +30,59 @@ module.exports.run = async (client, message, args) => {
 
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
 
-  // ✅ Sistem zaten açıksa uyarı ver
+  // ✅ Sistem zaten açıksa uyarı + Kapat butonu ve collector
   if (settings && settings.levelSystemActive) {
-    return message.channel.send({
+    const alreadyRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('level_close').setLabel('Sistemi Kapat').setStyle(ButtonStyle.Danger)
+    );
+
+    const alreadyMsg = await message.channel.send({
       embeds: [
         new EmbedBuilder()
           .setColor('Orange')
           .setTitle('ℹ️ Level Sistemi Zaten Açık')
           .setDescription('Bu sunucuda level sistemi zaten aktif durumda.\nKapatmak için `g!level-sistemi kapat` yazabilir veya aşağıdaki butona basabilirsin.')
       ],
-      components: [
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('level_close').setLabel('Sistemi Kapat').setStyle(ButtonStyle.Danger)
-        )
-      ]
+      components: [alreadyRow]
     });
+
+    const alreadyCollector = alreadyMsg.createMessageComponentCollector({ time: 15000 });
+
+    alreadyCollector.on('collect', async i => {
+      if (i.user.id !== message.author.id) {
+        return i.reply({ content: 'Bu butonları sadece komutu kullanan kişi kullanabilir.', ephemeral: true });
+      }
+      if (i.customId === 'level_close') {
+        await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
+        const closeEmbed = new EmbedBuilder()
+          .setColor('Red')
+          .setTitle('❌ Level Sistemi Kapatıldı')
+          .setDescription('Artık sunucuda level sistemi devre dışı.');
+        await i.update({ embeds: [closeEmbed], components: [] });
+      }
+    });
+
+    alreadyCollector.on('end', async () => {
+      try {
+        await alreadyMsg.edit({ components: [] });
+      } catch {}
+    });
+
+    return; // burada bitiriyoruz; alttaki “EVET/HAYIR” akışına girmesin
   }
 
-  const embed = new EmbedBuilder()
+  // ✅ Sistem kapalıysa aç/kapat prompt’u
+  const promptEmbed = new EmbedBuilder()
     .setColor('Blurple')
     .setTitle('📊 Level Sistemi')
     .setDescription('Sistemi açmak istiyor musunuz?');
 
-  const row = new ActionRowBuilder().addComponents(
+  const promptRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('level_yes').setLabel('EVET').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('level_no').setLabel('HAYIR').setStyle(ButtonStyle.Danger)
   );
 
-  const msg = await message.channel.send({ embeds: [embed], components: [row] });
-
+  const msg = await message.channel.send({ embeds: [promptEmbed], components: [promptRow] });
   const collector = msg.createMessageComponentCollector({ time: 15000 });
 
   collector.on('collect', async i => {
@@ -105,6 +130,12 @@ module.exports.run = async (client, message, args) => {
         .setDescription('Artık sunucuda level sistemi devre dışı.');
       await i.update({ embeds: [closeEmbed], components: [] });
     }
+  });
+
+  collector.on('end', async () => {
+    try {
+      await msg.edit({ components: [] });
+    } catch {}
   });
 };
 
