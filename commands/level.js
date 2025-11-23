@@ -1,7 +1,7 @@
 const { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
 const UserXP = require('../models/UserXP');
-const canvacord = require('canvacord');
+const { Rank } = require('canvacord'); // ✅ v5 uyumlu import
 
 module.exports.run = async (client, message, args) => {
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
@@ -21,19 +21,18 @@ module.exports.run = async (client, message, args) => {
   const userXP = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
   const nextLevelXP = userXP.level * 100;
 
-  // ✅ Rank kartı (v6 → RankCard)
-  const data = await canvacord.RankCard({
-    avatar: user.displayAvatarURL({ extension: "png" }),
-    currentXP: userXP.xp,
-    requiredXP: nextLevelXP,
-    level: userXP.level,
-    username: user.username,
-    discriminator: user.discriminator,
-    status: "online",
-    bar: { color: "#5865F2" },
-    background: "COLOR"
-  });
+  // ✅ Rank kartı oluştur
+  const rank = new Rank()
+    .setAvatar(user.displayAvatarURL({ extension: "png" }))
+    .setCurrentXP(userXP.xp)
+    .setRequiredXP(nextLevelXP)
+    .setLevel(userXP.level)
+    .setUsername(user.username)
+    .setDiscriminator(user.discriminator)
+    .setProgressBar("#5865F2", "COLOR")
+    .setBackground("COLOR", "#2C2F33");
 
+  const data = await rank.build();
   const attachment = new AttachmentBuilder(data, { name: "rank.png" });
 
   const row = new ActionRowBuilder().addComponents(
@@ -57,19 +56,19 @@ module.exports.run = async (client, message, args) => {
         const refreshed = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
         const nextLevelXP = refreshed.level * 100;
 
-        const data = await canvacord.RankCard({
-          avatar: user.displayAvatarURL({ extension: "png" }),
-          currentXP: refreshed.xp,
-          requiredXP: nextLevelXP,
-          level: refreshed.level,
-          username: user.username,
-          discriminator: user.discriminator,
-          status: "online",
-          bar: { color: "#5865F2" },
-          background: "COLOR"
-        });
+        const rank = new Rank()
+          .setAvatar(user.displayAvatarURL({ extension: "png" }))
+          .setCurrentXP(refreshed.xp)
+          .setRequiredXP(nextLevelXP)
+          .setLevel(refreshed.level)
+          .setUsername(user.username)
+          .setDiscriminator(user.discriminator)
+          .setProgressBar("#5865F2", "COLOR")
+          .setBackground("COLOR", "#2C2F33");
 
+        const data = await rank.build();
         const attachment = new AttachmentBuilder(data, { name: "rank.png" });
+
         await i.update({ files: [attachment], components: [row] });
       } else if (currentView === 'top') {
         const topUsers = await UserXP.find({ guildId: message.guild.id })
