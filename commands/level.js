@@ -5,7 +5,7 @@ const { Rank } = require('canvacord');
 const { createCanvas, loadImage } = require('canvas');
 
 async function mergeRankCards(message, topUsers) {
-  const cardWidth = 900;
+  const cardWidth = 700;
   const cardHeight = 150;
   const spacing = 10;
   const canvasHeight = topUsers.length * (cardHeight + spacing);
