@@ -5,10 +5,11 @@ const { Rank } = require('canvacord');
 const { createCanvas, loadImage } = require('canvas');
 
 async function mergeRankCards(message, topUsers) {
+  const cardWidth = 900;
   const cardHeight = 150;
   const spacing = 10;
   const canvasHeight = topUsers.length * (cardHeight + spacing);
-  const canvas = createCanvas(934, canvasHeight);
+  const canvas = createCanvas(cardWidth, canvasHeight);
   const ctx = canvas.getContext('2d');
 
   ctx.fillStyle = '#2C2F33';
@@ -34,7 +35,7 @@ async function mergeRankCards(message, topUsers) {
     const buffer = await rank.build();
     const img = await loadImage(buffer);
     const y = i * (cardHeight + spacing);
-    ctx.drawImage(img, 0, y, 934, cardHeight);
+    ctx.drawImage(img, 0, y, cardWidth, cardHeight);
   }
 
   return canvas.toBuffer();
