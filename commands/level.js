@@ -52,42 +52,45 @@ module.exports.run = async (client, message, args) => {
 
       await i.update({ embeds: [refreshedEmbed], components: [row] });
     }
-if (i.customId === 'level_top') {
-  const topUsers = await UserXP.find({ guildId: message.guild.id })
-    .sort({ level: -1, xp: -1 })
-    .limit(10);
 
-  let desc = '';
-  for (let j = 0; j < topUsers.length; j++) {
-    const u = await message.guild.members.fetch(topUsers[j].userId).catch(() => null);
-    const name = u ? u.user.tag : topUsers[j].userId;
+    if (i.customId === 'level_top') {
+      const topUsers = await UserXP.find({ guildId: message.guild.id })
+        .sort({ level: -1, xp: -1 })
+        .limit(10);
 
-    // 🥇🥈🥉 ikonları ilk 3 için
-    let medal = '';
-    if (j === 0) medal = '🥇 ';
-    else if (j === 1) medal = '🥈 ';
-    else if (j === 2) medal = '🥉 ';
+      let desc = '';
+      for (let j = 0; j < topUsers.length; j++) {
+        const u = await message.guild.members.fetch(topUsers[j].userId).catch(() => null);
+        const name = u ? u.user.tag : topUsers[j].userId;
 
-    desc += `${medal}**${j + 1}.** ${name} — Level: ${topUsers[j].level}, XP: ${topUsers[j].xp}\n`;
-  }
+        // 🥇🥈🥉 ikonları ilk 3 için
+        let medal = '';
+        if (j === 0) medal = '🥇 ';
+        else if (j === 1) medal = '🥈 ';
+        else if (j === 2) medal = '🥉 ';
 
-  const topEmbed = new EmbedBuilder()
-    .setColor('Gold')
-    .setTitle('🏆 Sunucu Level Top 10')
-    .setDescription(desc || 'Henüz hiçbir kullanıcı XP kazanmamış.')
-    .setFooter({ text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' })
-    .setTimestamp();
+        desc += `${medal}**${j + 1}.** ${name} — Level: ${topUsers[j].level}, XP: ${topUsers[j].xp}\n`;
+      }
 
-  await i.update({ embeds: [topEmbed], components: [row] });
-}
-// collector bitişi
-collector.on('end', async () => {
-  try {
-    await msg.edit({ components: [] }); // süre dolunca butonları kaldır
-  } catch (err) {
-    // mesaj silinmişse hata yutulur
-  }
-});
+      const topEmbed = new EmbedBuilder()
+        .setColor('Gold')
+        .setTitle('🏆 Sunucu Level Top 10')
+        .setDescription(desc || 'Henüz hiçbir kullanıcı XP kazanmamış.')
+        .setFooter({ text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' })
+        .setTimestamp();
+
+      await i.update({ embeds: [topEmbed], components: [row] });
+    }
+  });
+
+  // collector bitişi
+  collector.on('end', async () => {
+    try {
+      await msg.edit({ components: [] }); // süre dolunca butonları kaldır
+    } catch (err) {
+      // mesaj silinmişse hata yutulur
+    }
+  });
 };
 
 // komut ayarları
