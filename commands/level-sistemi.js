@@ -15,7 +15,38 @@ module.exports.run = async (client, message, args) => {
 
   const sub = args[0]?.toLowerCase();
 
-  // Manuel kapatma argümanı
+  // ✅ Log ayarı
+  if (sub === 'log') {
+    const second = args[1]?.toLowerCase();
+    if (second === 'kapat') {
+      await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { logChannelId: null });
+      return message.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('📛 Level Log Kanalı Kapatıldı')
+            .setDescription('Artık XP ve level logları gönderilmeyecek.')
+        ]
+      });
+    }
+
+    await GuildSettings.findOneAndUpdate(
+      { guildId: message.guild.id },
+      { logChannelId: message.channel.id },
+      { upsert: true }
+    );
+
+    return message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor('Green')
+          .setTitle('📥 Level Log Kanalı Ayarlandı')
+          .setDescription(`XP ve level logları artık bu kanala gönderilecek.`)
+      ]
+    });
+  }
+
+  // ✅ Manuel kapatma
   if (sub === 'kapat') {
     await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
     return message.channel.send({
@@ -30,8 +61,8 @@ module.exports.run = async (client, message, args) => {
 
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
 
-  // ✅ Sistem zaten açıksa uyarı + Kapat butonu ve collector
-  if (settings && settings.levelSystemActive) {
+  // ✅ Zaten açıksa uyarı
+  if (settings?.levelSystemActive) {
     const alreadyRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('level_close').setLabel('Sistemi Kapat').setStyle(ButtonStyle.Danger)
     );
@@ -68,10 +99,10 @@ module.exports.run = async (client, message, args) => {
       } catch {}
     });
 
-    return; // burada bitiriyoruz; alttaki “EVET/HAYIR” akışına girmesin
+    return;
   }
 
-  // ✅ Sistem kapalıysa aç/kapat prompt’u
+  // ✅ Sistem kapalıysa açma prompt'u
   const promptEmbed = new EmbedBuilder()
     .setColor('Blurple')
     .setTitle('📊 Level Sistemi')
@@ -104,7 +135,8 @@ module.exports.run = async (client, message, args) => {
           'Level sistemi başarıyla açıldı.\n\n**Kullanılabilir Komutlar:**\n' +
           '📊 `g!level` → Kendi level bilgini gösterir\n' +
           '🏆 `g!level top` → Sunucudaki en yüksek level kullanıcılarını gösterir\n' +
-          '⚙️ `g!level-sistemi kapat` → Sistemi kapatır'
+          '⚙️ `g!level-sistemi kapat` → Sistemi kapatır\n' +
+          '📥 `g!level-sistemi log` → Bu kanalı log olarak ayarlar'
         );
 
       const closeRow = new ActionRowBuilder().addComponents(
@@ -140,4 +172,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: ['levelsistemi'] };
-module.exports.help = { name: 'level-sistemi', description: 'Sunucuda level sistemini aç/kapat.' };
+module.exports.help = { name: 'level-sistemi', description: 'Sunucuda level sistemini aç/kapat veya log kanalını ayarla.' };
