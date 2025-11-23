@@ -14,10 +14,10 @@ module.exports.run = async (client, message, args) => {
   }
 
   const sub = args[0]?.toLowerCase();
+  const second = args[1]?.toLowerCase();
 
-  // ✅ Log ayarı
+  // ✅ LOG AYARI
   if (sub === 'log') {
-    const second = args[1]?.toLowerCase();
     if (second === 'kapat') {
       await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { logChannelId: null });
       return message.channel.send({
@@ -41,12 +41,12 @@ module.exports.run = async (client, message, args) => {
         new EmbedBuilder()
           .setColor('Green')
           .setTitle('📥 Level Log Kanalı Ayarlandı')
-          .setDescription(`XP ve level logları artık bu kanala gönderilecek.`)
+          .setDescription('XP ve level logları artık bu kanala gönderilecek.')
       ]
     });
   }
 
-  // ✅ Manuel kapatma
+  // ✅ MANUEL KAPATMA
   if (sub === 'kapat') {
     await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
     return message.channel.send({
@@ -61,7 +61,7 @@ module.exports.run = async (client, message, args) => {
 
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
 
-  // ✅ Zaten açıksa uyarı
+  // ✅ SİSTEM ZATEN AÇIKSA UYARI (log komutu hariç)
   if (settings?.levelSystemActive) {
     const alreadyRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('level_close').setLabel('Sistemi Kapat').setStyle(ButtonStyle.Danger)
@@ -102,7 +102,7 @@ module.exports.run = async (client, message, args) => {
     return;
   }
 
-  // ✅ Sistem kapalıysa açma prompt'u
+  // ✅ SİSTEM KAPALIYSA AÇMA PROMPT'U
   const promptEmbed = new EmbedBuilder()
     .setColor('Blurple')
     .setTitle('📊 Level Sistemi')
