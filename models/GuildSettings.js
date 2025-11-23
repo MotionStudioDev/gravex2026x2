@@ -39,7 +39,12 @@ const guildSettingsSchema = new mongoose.Schema({
   antiRaidLog: { type: String, default: null },
 
   // ✅ SA-AS sistemi
-  saasAktif: { type: Boolean, default: false }
+  saasAktif: { type: Boolean, default: false },
+
+  // ✅ Level Sistemi
+  levelSystemActive: { type: Boolean, default: false },
+  levelLog: { type: String, default: null }, // level atlama log kanalı
+  levelRewardRoles: { type: Map, of: String, default: {} } // örn: { "5":"rolId", "10":"rolId" }
 });
 
 module.exports = mongoose.model('GuildSettings', guildSettingsSchema);
