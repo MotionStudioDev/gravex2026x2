@@ -1,7 +1,7 @@
 const { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
 const UserXP = require('../models/UserXP');
-const { Rank } = require('canvacord'); // ✅ v5 uyumlu import
+const { Rank } = require('canvacord');
 
 module.exports.run = async (client, message, args) => {
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
@@ -21,7 +21,6 @@ module.exports.run = async (client, message, args) => {
   const userXP = await UserXP.findOne({ guildId: message.guild.id, userId: user.id }) || { xp: 0, level: 1 };
   const nextLevelXP = userXP.level * 100;
 
-  // ✅ Rank kartı oluştur
   const rank = new Rank()
     .setAvatar(user.displayAvatarURL({ extension: "png" }))
     .setCurrentXP(userXP.xp)
@@ -71,61 +70,84 @@ module.exports.run = async (client, message, args) => {
 
         await i.update({ files: [attachment], components: [row] });
       } else if (currentView === 'top') {
-        const topUsers = await UserXP.find({ guildId: message.guild.id })
-          .sort({ level: -1, xp: -1 })
-          .limit(10);
+        const rawTop = await UserXP.find({ guildId: message.guild.id });
+        const uniqueMap = new Map();
 
-        let desc = '';
-        for (let j = 0; j < topUsers.length; j++) {
-          const u = await message.guild.members.fetch(topUsers[j].userId).catch(() => null);
-          const name = u ? u.user.tag : topUsers[j].userId;
-          let medal = '';
-          if (j === 0) medal = '🥇 ';
-          else if (j === 1) medal = '🥈 ';
-          else if (j === 2) medal = '🥉 ';
-          desc += `${medal}**${j + 1}.** ${name} — Level: ${topUsers[j].level}, XP: ${topUsers[j].xp}\n`;
+        for (const entry of rawTop) {
+          const existing = uniqueMap.get(entry.userId);
+          if (!existing || entry.level > existing.level || entry.xp > existing.xp) {
+            uniqueMap.set(entry.userId, entry);
+          }
         }
 
-        await i.update({
-          embeds: [{
-            color: 0xFFD700,
-            title: '🏆 Sunucu Level Top 10 (Yenilendi)',
-            description: desc || 'Henüz hiçbir kullanıcı XP kazanmamış.',
-            footer: { text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' },
-            timestamp: new Date()
-          }],
-          components: [row]
-        });
+        const topUsers = [...uniqueMap.values()]
+          .sort((a, b) => b.level - a.level || b.xp - a.xp)
+          .slice(0, 10);
+
+        for (const entry of topUsers) {
+          const member = await message.guild.members.fetch(entry.userId).catch(() => null);
+          const username = member ? member.user.username : 'Bilinmeyen';
+          const discriminator = member ? member.user.discriminator : '0000';
+          const avatar = member ? member.user.displayAvatarURL({ extension: "png" }) : null;
+
+          const rank = new Rank()
+            .setAvatar(avatar || message.author.displayAvatarURL({ extension: "png" }))
+            .setCurrentXP(entry.xp)
+            .setRequiredXP(entry.level * 100)
+            .setLevel(entry.level)
+            .setUsername(username)
+            .setDiscriminator(discriminator)
+            .setProgressBar("#FFD700", "COLOR")
+            .setBackground("COLOR", "#2C2F33");
+
+          const data = await rank.build();
+          const attachment = new AttachmentBuilder(data, { name: `top_${entry.userId}.png` });
+          await message.channel.send({ files: [attachment] });
+        }
+
+        await i.update({ content: '🏆 Sunucu Level Top 10 listesi resimli olarak gönderildi.', components: [row] });
       }
     }
 
     if (i.customId === 'level_top') {
       currentView = 'top';
-      const topUsers = await UserXP.find({ guildId: message.guild.id })
-        .sort({ level: -1, xp: -1 })
-        .limit(10);
 
-      let desc = '';
-      for (let j = 0; j < topUsers.length; j++) {
-        const u = await message.guild.members.fetch(topUsers[j].userId).catch(() => null);
-        const name = u ? u.user.tag : topUsers[j].userId;
-        let medal = '';
-        if (j === 0) medal = '🥇 ';
-        else if (j === 1) medal = '🥈 ';
-        else if (j === 2) medal = '🥉 ';
-        desc += `${medal}**${j + 1}.** ${name} — Level: ${topUsers[j].level}, XP: ${topUsers[j].xp}\n`;
+      const rawTop = await UserXP.find({ guildId: message.guild.id });
+      const uniqueMap = new Map();
+
+      for (const entry of rawTop) {
+        const existing = uniqueMap.get(entry.userId);
+        if (!existing || entry.level > existing.level || entry.xp > existing.xp) {
+          uniqueMap.set(entry.userId, entry);
+        }
       }
 
-      await i.update({
-        embeds: [{
-          color: 0xFFD700,
-          title: '🏆 Sunucu Level Top 10',
-          description: desc || 'Henüz hiçbir kullanıcı XP kazanmamış.',
-          footer: { text: 'Sunucudaki en yüksek level kullanıcıları listeleniyor.' },
-          timestamp: new Date()
-        }],
-        components: [row]
-      });
+      const topUsers = [...uniqueMap.values()]
+        .sort((a, b) => b.level - a.level || b.xp - a.xp)
+        .slice(0, 10);
+
+      for (const entry of topUsers) {
+        const member = await message.guild.members.fetch(entry.userId).catch(() => null);
+        const username = member ? member.user.username : 'Bilinmeyen';
+        const discriminator = member ? member.user.discriminator : '0000';
+        const avatar = member ? member.user.displayAvatarURL({ extension: "png" }) : null;
+
+        const rank = new Rank()
+          .setAvatar(avatar || message.author.displayAvatarURL({ extension: "png" }))
+          .setCurrentXP(entry.xp)
+          .setRequiredXP(entry.level * 100)
+          .setLevel(entry.level)
+          .setUsername(username)
+          .setDiscriminator(discriminator)
+          .setProgressBar("#FFD700", "COLOR")
+          .setBackground("COLOR", "#2C2F33");
+
+        const data = await rank.build();
+        const attachment = new AttachmentBuilder(data, { name: `top_${entry.userId}.png` });
+        await message.channel.send({ files: [attachment] });
+      }
+
+      await i.update({ content: '🏆 Sunucu Level Top 10 listesi resimli olarak gönderildi.', components: [row] });
     }
   });
 
@@ -139,5 +161,5 @@ module.exports.run = async (client, message, args) => {
 module.exports.conf = { aliases: ['rank', 'xp'] };
 module.exports.help = { 
   name: 'level', 
-  description: 'Kendi level bilgini resimli kartla gösterir, Yenile ve Top butonlarıyla etkileşim sağlar.' 
+  description: 'Kendi level bilgini ve Top listesini resimli kartlarla gösterir.' 
 };
