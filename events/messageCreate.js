@@ -103,9 +103,7 @@ module.exports = async (message) => {
 
   // ✅ LEVEL SİSTEMİ
   if (settings.levelSystemActive) {
-    const guildId = message.guild.id;
     const userId = message.author.id;
-
     let userXP = await UserXP.findOne({ guildId, userId });
     if (!userXP) userXP = new UserXP({ guildId, userId });
 
