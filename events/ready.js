@@ -1,7 +1,8 @@
 const client = require("../main");
-const { Collection } = require("discord.js");
+const { Collection, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
-const db = require('orio.db');
+const db = require("orio.db"); // senin kullandığın orio.db
+const Reminder = require("../models/Reminder"); // bizim hatırlatma modeli
 
 client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
@@ -12,7 +13,7 @@ client.on("ready", () => {
   let q = x[Math.floor(Math.random() * x.length)];
 
   client.user.setActivity(q);
-  client.user.setStatus('dnd'); // 🔴 Durum: Rahatsız Etmeyin
+  client.user.setStatus("dnd"); // 🔴 Durum: Rahatsız Etmeyin
 
   client.commands = new Collection();
   client.aliases = new Collection();
@@ -30,4 +31,28 @@ client.on("ready", () => {
       });
     });
   });
+
+  // 🔔 Hatırlatma cron job
+  setInterval(async () => {
+    const now = new Date();
+    const reminders = await Reminder.find({ status: "active", remindAt: { $lte: now } });
+
+    for (const r of reminders) {
+      try {
+        const user = await client.users.fetch(r.userId);
+        await user.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0x00FF00)
+              .setTitle("⏰ Hatırlatma Zamanı!")
+              .setDescription(`Hatırlatma: **${r.message}**`)
+          ]
+        });
+        r.status = "done";
+        await r.save();
+      } catch (e) {
+        console.error("DM gönderilemedi:", e);
+      }
+    }
+  }, 60 * 1000); // her dakika kontrol
 });
