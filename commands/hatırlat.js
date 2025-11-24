@@ -1,21 +1,61 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Reminder = require('../models/Reminder');
 
+function parseDuration(str) {
+  const match = str.match(/^(\d+)(s|m|h|d)$/);
+  if (!match) return null;
+  const num = parseInt(match[1]);
+  const unit = match[2];
+  switch (unit) {
+    case 's': return num * 1000;
+    case 'm': return num * 60 * 1000;
+    case 'h': return num * 60 * 60 * 1000;
+    case 'd': return num * 24 * 60 * 60 * 1000;
+    default: return null;
+  }
+}
+
+function formatDuration(ms) {
+  const sec = Math.floor(ms / 1000) % 60;
+  const min = Math.floor(ms / (60 * 1000)) % 60;
+  const hr = Math.floor(ms / (60 * 60 * 1000)) % 24;
+  const day = Math.floor(ms / (24 * 60 * 60 * 1000));
+
+  let parts = [];
+  if (day) parts.push(`${day} gün`);
+  if (hr) parts.push(`${hr} saat`);
+  if (min) parts.push(`${min} dakika`);
+  if (sec) parts.push(`${sec} saniye`);
+  return parts.join(', ');
+}
+
 module.exports.run = async (client, message, args) => {
-  const reminderText = args.join(" ");
-  if (!reminderText) {
+  if (args.length < 2) {
     return message.channel.send({
       embeds: [new EmbedBuilder()
         .setColor(0xFF0000)
         .setTitle("🚫 Hata")
-        .setDescription("Hatırlatma mesajı yazmalısın! Örn: `g!hatırlat toplantı 20:00`")]
+        .setDescription("Doğru kullanım: `g!hatırlat <süre> <mesaj>`\nÖrn: `g!hatırlat 10m toplantı 20:00`")]
     });
   }
+
+  const duration = parseDuration(args[0]);
+  if (!duration) {
+    return message.channel.send({
+      embeds: [new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle("🚫 Hata")
+        .setDescription("Süre formatı yanlış! Örn: `10s`, `5m`, `2h`, `1d`")]
+    });
+  }
+
+  const reminderText = args.slice(1).join(" ");
+  const remindAt = new Date(Date.now() + duration);
 
   const embed = new EmbedBuilder()
     .setColor(0xFFD700)
     .setTitle("📌 Hatırlatma Onayı")
-    .setDescription(`**Dikkat:** Mesajınız hatırlatmak üzere kaydedilecektir.\n\n**Mesaj:** ${reminderText}\n\n✅ Onay vermek için **HATIRLATMA** tuşuna basınız.\n❌ İstemiyorsanız **HATIRLATMA İSTEMİYORUM** tuşuna tıklayınız.`);
+    .setDescription(`**Dikkat:** Mesajınız hatırlatmak üzere kaydedilecektir.\n\n⏰ Süre: ${args[0]} (${formatDuration(duration)})\n📝 Mesaj: ${reminderText}\n\n✅ Onay vermek için **HATIRLATMA** tuşuna basınız.\n❌ İstemiyorsanız **HATIRLATMA İSTEMİYORUM** tuşuna tıklayınız.`);
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('remind_confirm').setLabel('HATIRLATMA').setStyle(ButtonStyle.Success),
@@ -45,7 +85,7 @@ module.exports.run = async (client, message, args) => {
         guildId: message.guild.id,
         userId: message.author.id,
         message: reminderText,
-        remindAt: null, // zamanlı değil, sadece içerik
+        remindAt,
         status: 'active'
       });
 
@@ -58,7 +98,7 @@ module.exports.run = async (client, message, args) => {
       const dmEmbed = new EmbedBuilder()
         .setColor(0x5865F2)
         .setTitle("📩 Hatırlatma Mesajınız")
-        .setDescription(`**${reminderText}**`);
+        .setDescription(`**${reminderText}**\n⏰ Süre: ${args[0]} (${formatDuration(duration)})`);
 
       const dmRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('dm_delete').setLabel('Hatırlatma İptal').setStyle(ButtonStyle.Danger)
@@ -67,7 +107,7 @@ module.exports.run = async (client, message, args) => {
       const dmMsg = await i.user.send({ embeds: [dmEmbed], components: [dmRow] }).catch(() => null);
 
       if (dmMsg) {
-        const dmCollector = dmMsg.createMessageComponentCollector({ time: 60000 });
+        const dmCollector = dmMsg.createMessageComponentCollector({ time: duration });
         dmCollector.on('collect', async btn => {
           if (btn.customId === 'dm_delete') {
             reminder.status = 'deleted';
@@ -93,5 +133,5 @@ module.exports.run = async (client, message, args) => {
 module.exports.conf = { aliases: ['hatirlat'] };
 module.exports.help = { 
   name: 'hatırlat', 
-  description: 'Üyenin yazdığı hatırlatma mesajını onaylı şekilde kaydeder ve DM ile gönderir.' 
+  description: 'Zamanlamalı ve onaylı hatırlatma mesajı gönderir, DM ile iletir ve iptal edilebilir.' 
 };
