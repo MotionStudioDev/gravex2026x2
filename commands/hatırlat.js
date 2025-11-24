@@ -17,11 +17,23 @@ function parseDuration(str) {
 
 module.exports.run = async (client, message, args) => {
   if (args.length < 2) {
-    return message.channel.send({ embeds: [new EmbedBuilder().setColor(0xFF0000).setTitle("🚫 Hata").setDescription("Doğru kullanım: `g!hatırlat <süre> <mesaj>`")] });
+    return message.channel.send({
+      embeds: [new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle("🚫 Hata")
+        .setDescription("Doğru kullanım: `g!hatırlat <süre> <mesaj>`\nÖrn: `g!hatırlat 10m toplantı 20:00`")]
+    });
   }
 
   const duration = parseDuration(args[0]);
-  if (!duration) return message.channel.send({ embeds: [new EmbedBuilder().setColor(0xFF0000).setTitle("🚫 Hata").setDescription("Süre formatı yanlış! Örn: `10m`, `2h`, `30s`, `1d`")] });
+  if (!duration) {
+    return message.channel.send({
+      embeds: [new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle("🚫 Hata")
+        .setDescription("Süre formatı yanlış! Örn: `10m`, `2h`, `30s`, `1d`")]
+    });
+  }
 
   const reminderText = args.slice(1).join(" ");
   const remindAt = new Date(Date.now() + duration);
@@ -46,13 +58,24 @@ module.exports.run = async (client, message, args) => {
 
   const collector = msg.createMessageComponentCollector({ time: 60000 });
   collector.on('collect', async i => {
-    if (i.user.id !== message.author.id) return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
+    if (i.user.id !== message.author.id) {
+      return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
+    }
 
     if (i.customId === 'remind_delete') {
       reminder.status = 'deleted';
       await reminder.save();
-      const deletedEmbed = new EmbedBuilder().setColor(0xFF0000).setTitle("❌ Hatırlatma Silindi").setDescription("Hatırlatma mesajınız silindi.");
+      const deletedEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle("❌ Hatırlatma Silindi")
+        .setDescription("Hatırlatma mesajınız silindi.");
       await i.update({ embeds: [deletedEmbed], components: [] });
     }
   });
+};
+
+module.exports.conf = { aliases: ['hatirlat'] };
+module.exports.help = { 
+  name: 'hatırlat', 
+  description: 'Üyenin yazdığı hatırlatma mesajını kaydeder ve zamanı gelince DM ile gönderir.' 
 };
