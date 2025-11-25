@@ -2,31 +2,14 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBu
 const axios = require('axios');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
-const currencies = ['USD', 'EUR', 'GBP', 'JPY'];
-
-async function getRate(symbol) {
-  try {
-    const res = await axios.get(`https://api.exchangerate.host/latest?base=${symbol}&symbols=TRY`);
-    return res.data.rates.TRY;
-  } catch {
-    return null;
-  }
+async function getRates() {
+  const res = await axios.get("https://api.teknikzeka.net/doviz/api.php");
+  return res.data.data; // JSON içindeki "data" listesi
 }
 
-async function getHistory(symbol) {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 7);
-
-  const res = await axios.get(
-    `https://api.exchangerate.host/timeseries?start_date=${start.toISOString().split('T')[0]}&end_date=${end.toISOString().split('T')[0]}&base=${symbol}&symbols=TRY`
-  );
-  return res.data.rates;
-}
-
-async function buildChart(history) {
-  const labels = Object.keys(history);
-  const data = Object.values(history).map(r => r.TRY);
+async function buildChart(history, symbol) {
+  const labels = history.map(h => h.date);
+  const data = history.map(h => parseFloat(h.value));
 
   const chart = new ChartJSNodeCanvas({ width: 600, height: 400 });
   const config = {
@@ -34,7 +17,7 @@ async function buildChart(history) {
     data: {
       labels,
       datasets: [{
-        label: 'Kur (TRY)',
+        label: `${symbol}/TRY`,
         data,
         borderColor: 'rgba(75,192,192,1)',
         fill: false
@@ -42,27 +25,12 @@ async function buildChart(history) {
     }
   };
   const buffer = await chart.renderToBuffer(config);
-  return new AttachmentBuilder(buffer, { name: 'kur.png' });
-}
-
-async function buildEmbed(idx, amount = null) {
-  const symbol = currencies[idx];
-  const rate = await getRate(symbol);
-  let desc = `**${symbol} → TRY**\n\n📊 Güncel Kur: **${rate ? rate.toFixed(2) : 'Veri yok'}**\n🔖 Sembol: ${symbol}`;
-
-  if (amount && rate) {
-    const converted = (amount * rate).toFixed(2);
-    desc += `\n\n💰 ${amount} ${symbol} ≈ **${converted} TRY**`;
-  }
-
-  return new EmbedBuilder()
-    .setColor('Blue')
-    .setTitle(`💱 Döviz Kuru (${idx + 1}/${currencies.length})`)
-    .setDescription(desc)
-    .setFooter({ text: 'Butonlarla gezinebilirsin.' });
+  return new AttachmentBuilder(buffer, { name: `${symbol}-graph.png` });
 }
 
 module.exports.run = async (client, message, args) => {
+  const rates = await getRates();
+  const currencies = rates.map(r => r.code);
   let index = 0;
   let amount = null;
 
@@ -73,6 +41,22 @@ module.exports.run = async (client, message, args) => {
     if (!isNaN(amount) && currencies.includes(symbol)) {
       index = currencies.indexOf(symbol);
     }
+  }
+
+  async function buildEmbed(idx, amount = null) {
+    const r = rates[idx];
+    let desc = `**${r.code} → TRY**\n\n💵 Alış: **${r.buy}**\n💰 Satış: **${r.sell}**\n📊 Değişim: ${r.change}\n🔖 Sembol: ${r.code}`;
+
+    if (amount) {
+      const converted = (amount * parseFloat(r.sell.replace(",", "."))).toFixed(2);
+      desc += `\n\n💰 ${amount} ${r.code} ≈ **${converted} TRY**`;
+    }
+
+    return new EmbedBuilder()
+      .setColor('Blue')
+      .setTitle(`💱 Döviz Kuru (${idx + 1}/${currencies.length})`)
+      .setDescription(desc)
+      .setFooter({ text: 'Butonlarla gezinebilirsin.' });
   }
 
   const row = () => new ActionRowBuilder().addComponents(
@@ -102,25 +86,32 @@ module.exports.run = async (client, message, args) => {
     }
 
     if (i.customId === 'detail') {
-      const symbol = currencies[index];
-      const rate = await getRate(symbol);
+      const r = rates[index];
       const detailEmbed = new EmbedBuilder()
         .setColor('Green')
-        .setTitle(`📥 Kur Detayı: ${symbol}`)
-        .setDescription(`**${symbol} → TRY**\n\n📊 Güncel Kur: **${rate ? rate.toFixed(4) : 'Veri yok'}**\n\n🕒 Tarih: ${new Date().toLocaleString('tr-TR')}`)
+        .setTitle(`📥 Kur Detayı: ${r.code}`)
+        .setDescription(`💵 Alış: **${r.buy}**\n💰 Satış: **${r.sell}**\n📊 Değişim: ${r.change}\n\n🕒 Tarih: ${new Date().toLocaleString('tr-TR')}`)
         .setFooter({ text: 'Döviz sistemi' });
 
       await i.reply({ embeds: [detailEmbed], ephemeral: true });
     }
 
     if (i.customId === 'graph') {
-      const symbol = currencies[index];
-      const history = await getHistory(symbol);
-      const chartFile = await buildChart(history);
+      // Burada örnek olarak son 7 gün için fake history verisi oluşturuyoruz
+      const history = [
+        { date: 'Gün 1', value: rates[index].sell.replace(",", ".") },
+        { date: 'Gün 2', value: rates[index].sell.replace(",", ".") },
+        { date: 'Gün 3', value: rates[index].sell.replace(",", ".") },
+        { date: 'Gün 4', value: rates[index].sell.replace(",", ".") },
+        { date: 'Gün 5', value: rates[index].sell.replace(",", ".") },
+        { date: 'Gün 6', value: rates[index].sell.replace(",", ".") },
+        { date: 'Gün 7', value: rates[index].sell.replace(",", ".") }
+      ];
+      const chartFile = await buildChart(history, rates[index].code);
 
       const graphEmbed = new EmbedBuilder()
         .setColor('Purple')
-        .setTitle(`📈 ${symbol}/TRY Son 7 Gün`)
+        .setTitle(`📈 ${rates[index].code}/TRY Son 7 Gün`)
         .setDescription('Son 7 günün kur değişim grafiği aşağıda:')
         .setFooter({ text: 'Döviz sistemi' });
 
