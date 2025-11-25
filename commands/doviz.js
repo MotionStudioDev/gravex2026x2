@@ -4,7 +4,7 @@ const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
 async function getRates() {
   const res = await axios.get("https://api.teknikzeka.net/doviz/api.php");
-  return res.data.data; // JSON içindeki "data" listesi
+  return res.data.data; // Döviz + Altın birlikte geliyor
 }
 
 async function buildChart(history, symbol) {
@@ -19,7 +19,7 @@ async function buildChart(history, symbol) {
       datasets: [{
         label: `${symbol}/TRY`,
         data,
-        borderColor: 'rgba(75,192,192,1)',
+        borderColor: 'rgba(255,215,0,1)', // altın için sarı
         fill: false
       }]
     }
@@ -29,12 +29,11 @@ async function buildChart(history, symbol) {
 }
 
 module.exports.run = async (client, message, args) => {
-  const rates = await getRates();
-  const currencies = rates.map(r => r.code);
+  let rates = await getRates();
+  const currencies = rates.map(r => r.code); // USD, EUR, GBP, JPY + ALTIN türleri
   let index = 0;
   let amount = null;
 
-  // Kullanıcı miktar + sembol girdiyse
   if (args.length === 2) {
     amount = parseFloat(args[0]);
     const symbol = args[1].toUpperCase();
@@ -53,17 +52,18 @@ module.exports.run = async (client, message, args) => {
     }
 
     return new EmbedBuilder()
-      .setColor('Blue')
-      .setTitle(`💱 Döviz Kuru (${idx + 1}/${currencies.length})`)
+      .setColor(r.name.includes("Altın") ? 'Gold' : 'Blue')
+      .setTitle(`💱 ${r.name} (${idx + 1}/${currencies.length})`)
       .setDescription(desc)
       .setFooter({ text: 'Butonlarla gezinebilirsin.' });
   }
 
   const row = () => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('prev').setLabel('⬅️ Önceki Kur').setStyle(ButtonStyle.Primary).setDisabled(index === 0),
-    new ButtonBuilder().setCustomId('detail').setLabel('📥 Kur Detayı').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('prev').setLabel('⬅️ Önceki').setStyle(ButtonStyle.Primary).setDisabled(index === 0),
+    new ButtonBuilder().setCustomId('detail').setLabel('📥 Detay').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('graph').setLabel('📈 Grafik').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('next').setLabel('Sonraki Kur ➡️').setStyle(ButtonStyle.Primary).setDisabled(index === currencies.length - 1)
+    new ButtonBuilder().setCustomId('refresh').setLabel('🔄 Yenile').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('next').setLabel('Sonraki ➡️').setStyle(ButtonStyle.Primary).setDisabled(index === currencies.length - 1)
   );
 
   const msg = await message.channel.send({ embeds: [await buildEmbed(index, amount)], components: [row()] });
@@ -88,16 +88,15 @@ module.exports.run = async (client, message, args) => {
     if (i.customId === 'detail') {
       const r = rates[index];
       const detailEmbed = new EmbedBuilder()
-        .setColor('Green')
-        .setTitle(`📥 Kur Detayı: ${r.code}`)
+        .setColor(r.name.includes("Altın") ? 'Gold' : 'Green')
+        .setTitle(`📥 Detay: ${r.name}`)
         .setDescription(`💵 Alış: **${r.buy}**\n💰 Satış: **${r.sell}**\n📊 Değişim: ${r.change}\n\n🕒 Tarih: ${new Date().toLocaleString('tr-TR')}`)
-        .setFooter({ text: 'Döviz sistemi' });
+        .setFooter({ text: 'Grave Döviz & Altın sistemi' });
 
       await i.reply({ embeds: [detailEmbed], ephemeral: true });
     }
 
     if (i.customId === 'graph') {
-      // Burada örnek olarak son 7 gün için fake history verisi oluşturuyoruz
       const history = [
         { date: 'Gün 1', value: rates[index].sell.replace(",", ".") },
         { date: 'Gün 2', value: rates[index].sell.replace(",", ".") },
@@ -110,12 +109,17 @@ module.exports.run = async (client, message, args) => {
       const chartFile = await buildChart(history, rates[index].code);
 
       const graphEmbed = new EmbedBuilder()
-        .setColor('Purple')
-        .setTitle(`📈 ${rates[index].code}/TRY Son 7 Gün`)
-        .setDescription('Son 7 günün kur değişim grafiği aşağıda:')
-        .setFooter({ text: 'Döviz sistemi' });
+        .setColor(rates[index].name.includes("Altın") ? 'Gold' : 'Purple')
+        .setTitle(`📈 ${rates[index].name}/TRY Son 7 Gün`)
+        .setDescription('Son 7 günün fiyat değişim grafiği aşağıda:')
+        .setFooter({ text: 'Grave Döviz & Altın sistemi' });
 
       await i.reply({ embeds: [graphEmbed], files: [chartFile], ephemeral: true });
+    }
+
+    if (i.customId === 'refresh') {
+      rates = await getRates();
+      await i.update({ embeds: [await buildEmbed(index, amount)], components: [row()] });
     }
   });
 
@@ -127,10 +131,10 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = {
-  aliases: ['doviz', 'kur']
+  aliases: ['doviz', 'kur', 'altin']
 };
 
 module.exports.help = {
   name: 'döviz',
-  description: 'Butonlu, profesyonel döviz kuru sistemi. Miktar girilirse TL karşılığını hesaplar ve grafik gösterir.'
+  description: 'Butonlu, profesyonel döviz ve altın sistemi. Miktar girilirse TL karşılığını hesaplar, grafik ve yenileme desteği sağlar.'
 };
