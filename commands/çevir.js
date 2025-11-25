@@ -1,24 +1,31 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const axios = require('axios');
 
-// Örnek dil listesi
 const languages = [
-  { code: 'en', name: 'İngilizce' },
-  { code: 'de', name: 'Almanca' },
-  { code: 'fr', name: 'Fransızca' },
-  { code: 'es', name: 'İspanyolca' },
-  { code: 'ru', name: 'Rusça' }
+  { code: 'en', name: 'İngilizce', flag: '🇬🇧' },
+  { code: 'de', name: 'Almanca', flag: '🇩🇪' },
+  { code: 'fr', name: 'Fransızca', flag: '🇫🇷' },
+  { code: 'es', name: 'İspanyolca', flag: '🇪🇸' },
+  { code: 'ru', name: 'Rusça', flag: '🇷🇺' },
+  { code: 'tr', name: 'Türkçe', flag: '🇹🇷' }
 ];
 
-async function translate(text, target) {
-  // LibreTranslate API örneği
-  const res = await axios.post("https://libretranslate.de/translate", {
-    q: text,
-    source: "auto",
-    target: target,
-    format: "text"
-  }, { headers: { "Content-Type": "application/json" } });
-  return res.data.translatedText;
+async function translate(text, targetLang, sourceLang = "auto") {
+  try {
+    const res = await axios.post("https://api.collectapi.com/translate/text", {
+      text,
+      to: targetLang,
+      from: sourceLang
+    }, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "apikey 5N2IS9Jof6T2WaGqUB1sm4:37TKTpiYwfSImq4zq31om9" // kendi CollectAPI anahtarını buraya koy
+      }
+    });
+    return res.data.result.text || "⚠️ Çeviri alınamadı.";
+  } catch {
+    return "⚠️ API hatası oluştu.";
+  }
 }
 
 module.exports.run = async (client, message, args) => {
@@ -43,7 +50,11 @@ module.exports.run = async (client, message, args) => {
     return new EmbedBuilder()
       .setColor('Blue')
       .setTitle(`🌐 Çeviri Sistemi (${idx + 1}/${languages.length})`)
-      .setDescription(`📝 Orijinal: **${text}**\n\n🎯 Dil: ${lang.name} (${lang.code})\n\n📖 Çeviri: **${translated}**`)
+      .setDescription(
+        `📝 Orijinal: **${text}**\n\n` +
+        `🎯 Dil: ${lang.flag} ${lang.name} (${lang.code})\n\n` +
+        `📖 Çeviri: **${translated}**`
+      )
       .setFooter({ text: 'Butonlarla dil değiştirebilirsin.' });
   }
 
@@ -78,7 +89,7 @@ module.exports.run = async (client, message, args) => {
       const detailEmbed = new EmbedBuilder()
         .setColor('Green')
         .setTitle(`📥 Çeviri Detayı`)
-        .setDescription(`Dil: ${lang.name} (${lang.code})\n🕒 Tarih: ${new Date().toLocaleString('tr-TR')}`)
+        .setDescription(`Dil: ${lang.flag} ${lang.name} (${lang.code})\n🕒 Tarih: ${new Date().toLocaleString('tr-TR')}`)
         .setFooter({ text: 'Çeviri sistemi' });
 
       await i.reply({ embeds: [detailEmbed], ephemeral: true });
@@ -102,5 +113,5 @@ module.exports.conf = {
 
 module.exports.help = {
   name: 'çeviri',
-  description: 'Butonlu, profesyonel çeviri sistemi. Metni farklı dillere çevirir.'
+  description: 'CollectAPI tabanlı, bayraklı, butonlu profesyonel çeviri sistemi.'
 };
