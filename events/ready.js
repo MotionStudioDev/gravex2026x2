@@ -1,20 +1,23 @@
-const client = require("../main");
 const { Collection, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
-const db = require("orio.db"); // senin kullandığın orio.db
-const Reminder = require("../models/Reminder"); // bizim hatırlatma modeli
+const db = require("orio.db");
+const Reminder = require("../models/Reminder");
+const moment = require("moment");
+require("moment-duration-format");
 
-client.on("ready", () => {
+module.exports = async (client) => {
   console.log(`${client.user.tag} Aktif!`);
 
+  // Aktivite ve durum
   let x = [
     `g!yardım - v1.0.2 - Jail Sistemi Eklendi!`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
   client.user.setActivity(q);
-  client.user.setStatus("dnd"); // 🔴 Durum: Rahatsız Etmeyin
+  client.user.setStatus("dnd");
 
+  // Komutlar ve aliaslar yükleme
   client.commands = new Collection();
   client.aliases = new Collection();
 
@@ -54,5 +57,30 @@ client.on("ready", () => {
         console.error("DM gönderilemedi:", e);
       }
     }
-  }, 60 * 1000); // her dakika kontrol
-});
+  }, 60 * 1000);
+
+  // 🎭 Dram replikleri + uptime embed
+  const dramlar = [
+    'Yine mi ben? Neyse, geldik işte.',
+    'Sustum, ama dönmek zorunda kaldım.',
+    'Kodlar ağladı, ben geldim.',
+    'Sistem çöktü, ruhumla geldim.',
+    'Ben yokken ne yaptınız acaba...',
+    'Yalnızlıktan sıkıldım, geri döndüm.',
+    'Yeniden başlamak mı? Alıştım artık.',
+    'Gittim, düşündüm, döndüm.',
+    'Yükleniyorum... ama içim hâlâ boş.',
+    'Ben gelince her şey düzelir sanıyorsunuz ya...'
+  ];
+
+  const uptime = moment.duration(process.uptime(), "seconds").format("H [Saat], m [Dakika], s [Saniye]");
+  const secilen = dramlar[Math.floor(Math.random() * dramlar.length)];
+
+  const embed = new EmbedBuilder()
+    .setColor("Blurple")
+    .setTitle(`🟢 ${secilen}`)
+    .setDescription(`Başlama sürem: **${uptime}**`);
+
+  const kanal = client.channels.cache.get("1416144862050259168"); // buraya log/genel kanal ID'sini yaz
+  if (kanal) kanal.send({ embeds: [embed] });
+};
