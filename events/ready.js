@@ -81,6 +81,14 @@ module.exports = async (client) => {
     .setTitle(`🟢 ${secilen}`)
     .setDescription(`Başlama sürem: **${uptime}**`);
 
-  const kanal = client.channels.cache.get("1416144862050259168"); // buraya log/genel kanal ID'sini yaz
-  if (kanal) kanal.send({ embeds: [embed] });
+  try {
+    const kanal = await client.channels.fetch("1416144862050259168"); // senin kanal ID
+    if (kanal) {
+      kanal.send({ embeds: [embed] });
+    } else {
+      console.error("Kanal bulunamadı veya erişim yok!");
+    }
+  } catch (err) {
+    console.error("Kanal fetch hatası:", err);
+  }
 };
