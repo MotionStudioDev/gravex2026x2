@@ -2,17 +2,23 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 
 module.exports.run = async (client, message) => {
   try {
+    // Ping durumu
+    const ping = client.ws.ping;
+    let pingEmoji = '🟢';
+    if (ping > 200) pingEmoji = '🔴';
+    else if (ping > 100) pingEmoji = '🟡';
+
     const pages = [
       new EmbedBuilder()
         .setColor('Blurple')
         .setTitle('Grave Yardım Menüsü')
-        .setDescription('Prefix: `g!`\n\nButonlarla sayfalar arasında gezebilirsin.')
+        .setDescription(`Prefix: \`g!\`\n\nButonlarla sayfalar arasında gezebilirsin.\n\n📡 Anlık Ping: ${pingEmoji} **${ping}ms**`)
         .setFooter({ text: 'GraveBOT 2026' }),
 
       new EmbedBuilder()
         .setColor(0x5865F2)
         .setTitle('<a:discord:1441131310717599886> | Genel Komutlar')
-        .setDescription('`ping`,`istatistik`,`uptime`,`hatırlat`,`hata-bildir`,`yardım`'),
+        .setDescription('`ping`,`istatistik`,`uptime`,`hatırlat`,`hata-bildir`,`yardım`\n\n📡 Şu anki ping: ' + pingEmoji + ` **${ping}ms**`),
 
       new EmbedBuilder()
         .setColor(0x57F287)
