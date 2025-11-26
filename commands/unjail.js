@@ -52,6 +52,20 @@ module.exports.run = async (client, message, args) => {
         await msg.edit({
           embeds: [new EmbedBuilder().setColor('Green').setTitle('✅ Jail kaldırıldı')]
         });
+
+        // Log kanalına gönder
+        const logCh = message.guild.channels.cache.get(data.settings.logChannelId);
+        if (logCh) {
+          const logEmbed = new EmbedBuilder()
+            .setColor('Green')
+            .setTitle('🔓 Jail Kaldırıldı')
+            .addFields(
+              { name: 'Kullanıcı', value: `${member.user.tag} (${member.id})`, inline: true },
+              { name: 'Yetkili', value: message.author.tag, inline: true }
+            )
+            .setTimestamp();
+          logCh.send({ embeds: [logEmbed] });
+        }
       }, 2000);
       collector.stop();
     }
@@ -65,5 +79,5 @@ module.exports.run = async (client, message, args) => {
   });
 };
 
-module.exports.conf = { aliases: ['unjail'] };
+module.exports.conf = { aliases: [] };
 module.exports.help = { name: 'unjail' };
