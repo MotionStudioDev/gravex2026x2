@@ -38,7 +38,13 @@ module.exports.run = async (client, message) => {
       new EmbedBuilder()
         .setColor(0x99AAB5)
         .setTitle('<:owner:1441129983153147975> | Sahip Komutları')
-        .setDescription('`reload`,`mesaj-gönder`')
+        .setDescription('`reload`,`mesaj-gönder`'),
+
+      // 🎉 Eğlence kategorisi
+      new EmbedBuilder()
+        .setColor(0xE91E63)
+        .setTitle('🎉 Eğlence Komutları')
+        .setDescription('`ship`')
     ];
 
     let page = 0;
