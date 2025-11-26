@@ -36,7 +36,7 @@ module.exports.run = async (client, message, args) => {
 
     return new EmbedBuilder()
       .setColor('#FF69B4')
-      .setTitle('💖 Ultra Mega Ship!')
+      .setTitle('💖 Grave Ship!')
       .setDescription(`${author} ❤️ ${target}\n\n${emoji} Uyum: **%${uyum}**\n${bar}\n\n_${romantik}_`)
       .setImage('attachment://ship.jpg');
   }
