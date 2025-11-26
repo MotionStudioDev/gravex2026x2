@@ -10,7 +10,6 @@ module.exports.run = async (client, message, args) => {
 
   const sub = (args[0] || '').toLowerCase();
 
-  // Ayarlar
   if (sub === 'log') {
     const ch = message.mentions.channels.first();
     if (!ch || ch.type !== ChannelType.GuildText) return message.channel.send({ embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Kanal etiketle')] });
@@ -63,5 +62,5 @@ module.exports.run = async (client, message, args) => {
   });
 };
 
-module.exports.conf = { aliases: ['jailsistemi'] };
+module.exports.conf = { aliases: [] };
 module.exports.help = { name: 'jail-sistemi' };
