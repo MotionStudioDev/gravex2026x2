@@ -22,10 +22,25 @@ module.exports.run = async (client, message, args) => {
     if (m.content.toLowerCase() === 'evet') {
       await msg.edit({ embeds: [new EmbedBuilder().setColor('Yellow').setTitle('⏳ Jail atılıyor, lütfen bekle..')] });
       setTimeout(async () => {
-        await member.roles.add(data.settings.jailRoleId);
+        await member.roles.add(data.settings.jailRoleId).catch(() => {});
         data.jailed.push({ userId: member.id });
         await data.save();
+
         await msg.edit({ embeds: [new EmbedBuilder().setColor('Green').setTitle('✅ Jail atıldı')] });
+
+        // Log kanalına gönder
+        const logCh = message.guild.channels.cache.get(data.settings.logChannelId);
+        if (logCh) {
+          const logEmbed = new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('🔒 Jail Atıldı')
+            .addFields(
+              { name: 'Kullanıcı', value: `${member.user.tag} (${member.id})`, inline: true },
+              { name: 'Yetkili', value: message.author.tag, inline: true }
+            )
+            .setTimestamp();
+          logCh.send({ embeds: [logEmbed] });
+        }
       }, 2000);
       collector.stop();
     }
@@ -36,5 +51,5 @@ module.exports.run = async (client, message, args) => {
   });
 };
 
-module.exports.conf = { aliases: ['jail'] };
+module.exports.conf = { aliases: [] };
 module.exports.help = { name: 'jail' };
