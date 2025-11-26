@@ -23,7 +23,7 @@ module.exports.run = async (client, message) => {
       new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('<:user:1441128594117099664> | Kullanıcı Komutları')
-        .setDescription('`avatar`,`profil`,`deprem`,`döviz`,`emoji-bilgi`,`emojiler`'),
+        .setDescription('`avatar`,`profil`,`deprem`,`döviz`,`çeviri`,`emoji-bilgi`,`emojiler`'),
 
       new EmbedBuilder()
         .setColor(0xED4245)
