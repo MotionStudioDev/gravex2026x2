@@ -1,12 +1,12 @@
+const client = require("../main");
 const { Collection, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
 const db = require("orio.db"); // senin kullandığın orio.db
-const Reminder = require("../models/Reminder"); // hatırlatma modeli
+const Reminder = require("../models/Reminder"); // bizim hatırlatma modeli
 
-module.exports = async (client) => {
+client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
-  // Aktivite ve durum
   let x = [
     `g!yardım - v1.0.2 - Jail Sistemi Eklendi!`
   ];
@@ -15,7 +15,6 @@ module.exports = async (client) => {
   client.user.setActivity(q);
   client.user.setStatus("dnd"); // 🔴 Durum: Rahatsız Etmeyin
 
-  // Komutlar ve aliaslar yükleme
   client.commands = new Collection();
   client.aliases = new Collection();
 
@@ -56,4 +55,4 @@ module.exports = async (client) => {
       }
     }
   }, 60 * 1000); // her dakika kontrol
-};
+});
