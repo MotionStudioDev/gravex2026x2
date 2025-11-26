@@ -2,50 +2,48 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 
 module.exports.run = async (client, message) => {
   try {
-    const kategoriler = {
-      genel: {
-        title: '<a:discord:1441131310717599886> | Genel Komutlar',
-        value: '`ping`,`istatistik`,`uptime`,`hatırlat`,`hata-bildir`,`yardım`'
-      },
-      kullanıcı: {
-        title: '<:user:1441128594117099664> | Kullanıcı Komutları',
-        value: '`avatar`,`profil`,`deprem`,`döviz`,`emoji-bilgi`,`emojiler`'
-      },
-      moderasyon: {
-        title: '<:gvenlik:1416529478112383047> | Moderasyon',
-        value: '`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`temizle`,`uyar`'
-      },
-      sistem: {
-        title: '<a:sistemx:1441130022340399124> | Sistem',
-        value: '`sayaç`,`reklam-engel`,`level-sistemi`,`küfür-engel`,`anti-raid`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`'
-      },
-      sahip: {
-        title: '<:owner:1441129983153147975> | Sahip Komutları',
-        value: '`reload`,`mesaj-gönder`'
-      }
-    };
+    const pages = [
+      new EmbedBuilder()
+        .setColor('Blurple')
+        .setTitle('Grave Yardım Menüsü')
+        .setDescription('Prefix: `g!`\n\nButonlarla sayfalar arasında gezebilirsin.')
+        .setFooter({ text: 'GraveBOT 2026' }),
 
-    const anaEmbed = new EmbedBuilder()
-      .setColor('Blurple')
-      .setTitle('Grave Yardım Menüsü')
-      .setDescription('Merhaba, Grave Yardım Menüsündesin. Butonlara basarak komutlar arasında gezebilirsin.\nPrefix: `g!` (Örnek: `g!yardım`)')
-      .setFooter({ text: 'GraveBOT 2026' });
+      new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle('<a:discord:1441131310717599886> | Genel Komutlar')
+        .setDescription('`ping`,`istatistik`,`uptime`,`hatırlat`,`hata-bildir`,`yardım`'),
 
-    // Satır 1: 4 kategori
-    const row1 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('genel').setLabel('Genel').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('kullanıcı').setLabel('Kullanıcı').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('moderasyon').setLabel('Moderasyon').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('sistem').setLabel('Sistem').setStyle(ButtonStyle.Secondary)
+      new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('<:user:1441128594117099664> | Kullanıcı Komutları')
+        .setDescription('`avatar`,`profil`,`deprem`,`döviz`,`emoji-bilgi`,`emojiler`'),
+
+      new EmbedBuilder()
+        .setColor(0xED4245)
+        .setTitle('<:gvenlik:1416529478112383047> | Moderasyon')
+        .setDescription('`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`temizle`,`uyar`'),
+
+      new EmbedBuilder()
+        .setColor(0xFEE75C)
+        .setTitle('<a:sistemx:1441130022340399124> | Sistem')
+        .setDescription('`sayaç`,`reklam-engel`,`level-sistemi`,`küfür-engel`,`anti-raid`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`'),
+
+      new EmbedBuilder()
+        .setColor(0x99AAB5)
+        .setTitle('<:owner:1441129983153147975> | Sahip Komutları')
+        .setDescription('`reload`,`mesaj-gönder`')
+    ];
+
+    let page = 0;
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('prev').setLabel('◀').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('home').setLabel('🏠').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('next').setLabel('▶').setStyle(ButtonStyle.Secondary)
     );
 
-    // Satır 2: Sahip + Ana Menü
-    const row2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('sahip').setLabel('Sahip').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('ana').setLabel('Ana Menü').setStyle(ButtonStyle.Primary)
-    );
-
-    const msg = await message.channel.send({ embeds: [anaEmbed], components: [row1, row2] });
+    const msg = await message.channel.send({ embeds: [pages[page]], components: [row] });
 
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
@@ -53,25 +51,20 @@ module.exports.run = async (client, message) => {
     });
 
     collector.on('collect', async i => {
-      if (i.customId === 'ana') {
-        await i.update({ embeds: [anaEmbed], components: [row1, row2] });
-        return;
-      }
+      if (i.customId === 'prev') page = page > 0 ? page - 1 : pages.length - 1;
+      if (i.customId === 'next') page = page < pages.length - 1 ? page + 1 : 0;
+      if (i.customId === 'home') page = 0;
 
-      const kategori = kategoriler[i.customId];
-      if (!kategori) return;
-
-      const yeniEmbed = new EmbedBuilder()
-        .setColor('Blurple')
-        .setTitle(`${kategori.title}`)
-        .setDescription(kategori.value)
-        .setFooter({ text: 'Grave 2026' });
-
-      await i.update({ embeds: [yeniEmbed], components: [row1, row2] });
+      await i.update({ embeds: [pages[page]], components: [row] });
     });
 
-    collector.on('end', () => {
-      msg.edit({ components: [] }).catch(() => {});
+    collector.on('end', async () => {
+      try {
+        const disabledRow = new ActionRowBuilder().addComponents(
+          row.components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
+        );
+        await msg.edit({ components: [disabledRow] });
+      } catch {}
     });
   } catch (err) {
     console.error('Yardım komutu hatası:', err);
@@ -79,10 +72,5 @@ module.exports.run = async (client, message) => {
   }
 };
 
-module.exports.conf = {
-  aliases: ['help', 'yardim']
-};
-
-module.exports.help = {
-  name: 'yardım'
-};
+module.exports.conf = { aliases: ['help', 'yardim'] };
+module.exports.help = { name: 'yardım' };
