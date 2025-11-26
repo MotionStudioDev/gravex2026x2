@@ -1,0 +1,69 @@
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const JailSystem = require('../models/JailSystem');
+
+module.exports.run = async (client, message, args) => {
+  const data = await JailSystem.findOne({ guildId: message.guild.id });
+  if (!data || !data.active) {
+    return message.channel.send({
+      embeds: [new EmbedBuilder().setColor('Yellow').setTitle('⚠️ Jail sistemi kapalı')]
+    });
+  }
+
+  // Yetki kontrolü
+  const isAdmin = message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+  const isStaff = data.settings.staffRoleId && message.member.roles.cache.has(data.settings.staffRoleId);
+  if (!isAdmin && !isStaff) {
+    return message.channel.send({
+      embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Yetki yok')]
+    });
+  }
+
+  const member = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
+  if (!member) {
+    return message.channel.send({
+      embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Kullanım: g!unjail <id/@üye>')]
+    });
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor('Blue')
+    .setTitle('🔓 Jail Kaldırma')
+    .setDescription(`Bu kişinin jaili kaldırılsın mı?\nEVET/HAYIR yaz.`);
+
+  const msg = await message.channel.send({ embeds: [embed] });
+
+  const filter = m => m.author.id === message.author.id;
+  const collector = message.channel.createMessageCollector({ filter, time: 30000 });
+
+  collector.on('collect', async m => {
+    if (m.content.toLowerCase() === 'evet') {
+      await msg.edit({
+        embeds: [new EmbedBuilder().setColor('Yellow').setTitle('⏳ Jail kaldırılıyor, lütfen bekle..')]
+      });
+      setTimeout(async () => {
+        // Jail rolünü kaldır
+        if (data.settings.jailRoleId) {
+          await member.roles.remove(data.settings.jailRoleId).catch(() => {});
+        }
+        // DB'den çıkar
+        data.jailed = data.jailed.filter(j => j.userId !== member.id);
+        await data.save();
+
+        await msg.edit({
+          embeds: [new EmbedBuilder().setColor('Green').setTitle('✅ Jail kaldırıldı')]
+        });
+      }, 2000);
+      collector.stop();
+    }
+
+    if (m.content.toLowerCase() === 'hayir') {
+      await msg.edit({
+        embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Bu kişi jailde kalmaya devam edecek')]
+      });
+      collector.stop();
+    }
+  });
+};
+
+module.exports.conf = { aliases: ['unjail'] };
+module.exports.help = { name: 'unjail' };
