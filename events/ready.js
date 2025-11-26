@@ -1,9 +1,7 @@
 const { Collection, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
-const db = require("orio.db");
-const Reminder = require("../models/Reminder");
-const moment = require("moment");
-require("moment-duration-format");
+const db = require("orio.db"); // senin kullandığın orio.db
+const Reminder = require("../models/Reminder"); // hatırlatma modeli
 
 module.exports = async (client) => {
   console.log(`${client.user.tag} Aktif!`);
@@ -15,7 +13,7 @@ module.exports = async (client) => {
   let q = x[Math.floor(Math.random() * x.length)];
 
   client.user.setActivity(q);
-  client.user.setStatus("dnd");
+  client.user.setStatus("dnd"); // 🔴 Durum: Rahatsız Etmeyin
 
   // Komutlar ve aliaslar yükleme
   client.commands = new Collection();
@@ -57,38 +55,5 @@ module.exports = async (client) => {
         console.error("DM gönderilemedi:", e);
       }
     }
-  }, 60 * 1000);
-
-  // 🎭 Dram replikleri + uptime embed
-  const dramlar = [
-    'Yine mi ben? Neyse, geldik işte.',
-    'Sustum, ama dönmek zorunda kaldım.',
-    'Kodlar ağladı, ben geldim.',
-    'Sistem çöktü, ruhumla geldim.',
-    'Ben yokken ne yaptınız acaba...',
-    'Yalnızlıktan sıkıldım, geri döndüm.',
-    'Yeniden başlamak mı? Alıştım artık.',
-    'Gittim, düşündüm, döndüm.',
-    'Yükleniyorum... ama içim hâlâ boş.',
-    'Ben gelince her şey düzelir sanıyorsunuz ya...'
-  ];
-
-  const uptime = moment.duration(process.uptime(), "seconds").format("H [Saat], m [Dakika], s [Saniye]");
-  const secilen = dramlar[Math.floor(Math.random() * dramlar.length)];
-
-  const embed = new EmbedBuilder()
-    .setColor("Blurple")
-    .setTitle(`🟢 ${secilen}`)
-    .setDescription(`Başlama sürem: **${uptime}**`);
-
-  try {
-    const kanal = await client.channels.fetch("1416144862050259168"); // senin kanal ID
-    if (kanal) {
-      kanal.send({ embeds: [embed] });
-    } else {
-      console.error("Kanal bulunamadı veya erişim yok!");
-    }
-  } catch (err) {
-    console.error("Kanal fetch hatası:", err);
-  }
+  }, 60 * 1000); // her dakika kontrol
 };
