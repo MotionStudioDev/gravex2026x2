@@ -12,7 +12,7 @@ module.exports.run = async (client, message) => {
       new EmbedBuilder()
         .setColor('Blurple')
         .setTitle('Grave Yardım Menüsü')
-        .setDescription(`Prefix: \`g!\`\n\nButonlarla sayfalar arasında gezebilirsin.\n\n📡 Anlık Ping: ${pingEmoji} **${ping}ms**`)
+        .setDescription(`Prefix: \`g!\`\n\nButonlarla sayfalar arasında gezebilirsin.\n\n **Anlık Ping:** ${pingEmoji} **${ping}ms**`)
         .setFooter({ text: 'GraveBOT 2026' }),
 
       new EmbedBuilder()
@@ -33,7 +33,7 @@ module.exports.run = async (client, message) => {
       new EmbedBuilder()
         .setColor(0xFEE75C)
         .setTitle('<a:sistemx:1441130022340399124> | Sistem')
-        .setDescription('`sayaç`,`reklam-engel`,`level-sistemi`,`küfür-engel`,`anti-raid`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`'),
+        .setDescription('`sayaç`,`reklam-engel`,`level-sistemi`,`küfür-engel`,`anti-raid`,`jail-sistemi`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`'),
 
       new EmbedBuilder()
         .setColor(0x99AAB5)
