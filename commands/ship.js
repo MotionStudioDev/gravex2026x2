@@ -5,7 +5,7 @@ module.exports.run = async (client, message, args) => {
   const member = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
   if (!member) {
     return message.channel.send({
-      embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Kullanım: g!ship <id/@üye>')]
+      embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Kullanım: g!ship <id/@üye>')]
     });
   }
 
@@ -37,7 +37,7 @@ module.exports.run = async (client, message, args) => {
     const romantik = romantikCumleler[Math.floor(Math.random() * romantikCumleler.length)](author, member);
 
     return new EmbedBuilder()
-      .setColor('Pink')
+      .setColor('#FF69B4') // Pink hex kodu
       .setTitle('💖 Ultra Mega Ship!')
       .setDescription(`${author} ❤️ ${member}\n\n${emoji} Uyum: **%${uyum}**\n${bar}\n\n_${romantik}_`)
       .setImage('attachment://ship.png');
