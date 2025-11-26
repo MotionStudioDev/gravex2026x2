@@ -28,7 +28,6 @@ module.exports.run = async (client, message, args) => {
 
         await msg.edit({ embeds: [new EmbedBuilder().setColor('Green').setTitle('✅ Jail atıldı')] });
 
-        // Log kanalına gönder
         const logCh = message.guild.channels.cache.get(data.settings.logChannelId);
         if (logCh) {
           const logEmbed = new EmbedBuilder()
