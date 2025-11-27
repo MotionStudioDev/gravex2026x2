@@ -44,7 +44,7 @@ module.exports.run = async (client, message) => {
       new EmbedBuilder()
         .setColor(0xE91E63)
         .setTitle('🎉 Eğlence Komutları')
-        .setDescription('`ship`')
+        .setDescription('`ship`,`espiri`')
     ];
 
     let page = 0;
