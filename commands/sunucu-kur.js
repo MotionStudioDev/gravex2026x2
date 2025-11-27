@@ -58,77 +58,128 @@ module.exports.run = async (client, message) => {
 
           // 🔧 Roller
           try {
-            await message.guild.roles.create({
-              name: '👑 Yönetici',
-              permissions: [PermissionsBitField.Flags.Administrator],
-              color: '#FF0000'
-            });
-            await message.guild.roles.create({
-              name: '🛡️ Mod',
-              permissions: [
-                PermissionsBitField.Flags.KickMembers,
-                PermissionsBitField.Flags.BanMembers,
-                PermissionsBitField.Flags.ManageMessages
-              ],
-              color: '#00FF00'
-            });
-            await message.guild.roles.create({
-              name: '👥 Üye',
-              permissions: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ViewChannel],
-              color: '#5865F2'
-            });
-            await message.guild.roles.create({
-              name: '👤 Misafir',
-              permissions: [PermissionsBitField.Flags.ViewChannel],
-              color: '#99AAB5'
-            });
+            await message.guild.roles.create({ name: '👑 Yönetici', permissions: [PermissionsBitField.Flags.Administrator], color: '#FF0000' });
+            await message.guild.roles.create({ name: '🛡️ Mod', permissions: [PermissionsBitField.Flags.KickMembers, PermissionsBitField.Flags.BanMembers, PermissionsBitField.Flags.ManageMessages], color: '#00FF00' });
+            await message.guild.roles.create({ name: '👥 Üye', permissions: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ViewChannel], color: '#5865F2' });
+            await message.guild.roles.create({ name: '👤 Misafir', permissions: [PermissionsBitField.Flags.ViewChannel], color: '#99AAB5' });
 
-            // Tipine özel roller
-            if (type === 'Public Sunucusu') {
-              await message.guild.roles.create({ name: '⭐ VIP', color: '#FFD700' });
-            }
-            if (type === 'Oyun Sunucusu') {
-              await message.guild.roles.create({ name: '🎮 Oyuncu', color: '#00FFFF' });
-            }
-            if (type === 'Tasarım Sunucusu') {
-              await message.guild.roles.create({ name: '🎨 Designer', color: '#E91E63' });
-            }
-            if (type === '+18 Sunucu') {
-              await message.guild.roles.create({ name: '🔞 Adult', color: '#8B0000' });
-            }
-          } catch (err) {
-            console.error('Rol oluşturma hatası:', err);
-          }
+            if (type === 'Public Sunucusu') await message.guild.roles.create({ name: '⭐ VIP', color: '#FFD700' });
+            if (type === 'Oyun Sunucusu') await message.guild.roles.create({ name: '🎮 Oyuncu', color: '#00FFFF' });
+            if (type === 'Tasarım Sunucusu') await message.guild.roles.create({ name: '🎨 Designer', color: '#E91E63' });
+            if (type === '+18 Sunucu') await message.guild.roles.create({ name: '🔞 Adult', color: '#8B0000' });
+          } catch (err) { console.error('Rol oluşturma hatası:', err); }
 
-          // 🔧 Kanallar kategori bazlı
+          // 🔧 Kanallar (her tip için ayrı setup)
           try {
-            const infoCat = await message.guild.channels.create({ name: '📌 Bilgilendirme', type: 4 });
-            await message.guild.channels.create({ name: '📢 Duyurular', type: 0, parent: infoCat.id });
-            await message.guild.channels.create({ name: '📜 Kurallar', type: 0, parent: infoCat.id });
+            // Normal Sunucu
+            if (type === 'Normal Sunucu') {
+              const normalCat = await message.guild.channels.create({ name: '📂 Genel', type: 4 });
+              await message.guild.channels.create({ name: 'genel-sohbet', type: 0, parent: normalCat.id });
+              await message.guild.channels.create({ name: 'sohbet-2', type: 0, parent: normalCat.id });
+              await message.guild.channels.create({ name: 'medya', type: 0, parent: normalCat.id });
+              await message.guild.channels.create({ name: 'bot-komut', type: 0, parent: normalCat.id });
+              await message.guild.channels.create({ name: 'linkler', type: 0, parent: normalCat.id });
+              await message.guild.channels.create({ name: 'anketler', type: 0, parent: normalCat.id });
 
-            const chatCat = await message.guild.channels.create({ name: '💬 Sohbet', type: 4 });
-            await message.guild.channels.create({ name: 'genel-sohbet', type: 0, parent: chatCat.id });
-            await message.guild.channels.create({ name: 'bot-komut', type: 0, parent: chatCat.id });
+              const voiceCat = await message.guild.channels.create({ name: '🔊 Ses Kanalları', type: 4 });
+              await message.guild.channels.create({ name: 'Genel Ses', type: 2, parent: voiceCat.id });
+              await message.guild.channels.create({ name: 'Müzik Odası', type: 2, parent: voiceCat.id });
+              await message.guild.channels.create({ name: 'Oyun Ses', type: 2, parent: voiceCat.id });
+              await message.guild.channels.create({ name: 'AFK', type: 2, parent: voiceCat.id });
+              await message.guild.channels.create({ name: 'Sohbet Ses', type: 2, parent: voiceCat.id });
+              await message.guild.channels.create({ name: 'Toplantı', type: 2, parent: voiceCat.id });
 
-            const voiceCat = await message.guild.channels.create({ name: '🔊 Ses Kanalları', type: 4 });
-            await message.guild.channels.create({ name: 'Genel Ses', type: 2, parent: voiceCat.id });
+              const infoCat = await message.guild.channels.create({ name: '📌 Bilgilendirme', type: 4 });
+              await message.guild.channels.create({ name: '📢 Duyurular', type: 0, parent: infoCat.id });
+              await message.guild.channels.create({ name: '📜 Kurallar', type: 0, parent: infoCat.id });
+              await message.guild.channels.create({ name: '📊 İstatistikler', type: 0, parent: infoCat.id });
+              await message.guild.channels.create({ name: '📅 Etkinlikler', type: 0, parent: infoCat.id });
+              await message.guild.channels.create({ name: '📌 Önemli Bilgiler', type: 0, parent: infoCat.id });
 
-            // Tipine özel kanallar
-            if (type === 'Oyun Sunucusu') {
-              const gameCat = await message.guild.channels.create({ name: '🎮 Oyun', type: 4 });
-              await message.guild.channels.create({ name: 'oyun-sohbet', type: 0, parent: gameCat.id });
-              await message.guild.channels.create({ name: 'oyun-ses', type: 2, parent: gameCat.id });
+              const funCat = await message.guild.channels.create({ name: '🎉 Eğlence', type: 4 });
+              await message.guild.channels.create({ name: 'meme', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'gif', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'ship', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'oyun-komut', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'espri', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'mini-oyunlar', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'şarkı-söz', type: 0, parent: funCat.id });
+              await message.guild.channels.create({ name: 'anime-manga', type: 0, parent: funCat.id });
+
+              const supportCat = await message.guild.channels.create({ name: '🛠️ Destek', type: 4 });
+              await message.guild.channels.create({ name: 'yardım', type: 0, parent: supportCat.id });
+              await message.guild.channels.create({ name: 'şikayet', type: 0, parent: supportCat.id });
+              await message.guild.channels.create({ name: 'öneri', type: 0, parent: supportCat.id });
+              await message.guild.channels.create({ name: 'destek-talep', type: 0, parent: supportCat.id });
+              await message.guild.channels.create({ name: 'mod-log', type: 0,
+                            await message.guild.channels.create({ name: 'ticket-log', type: 0, parent: supportCat.id });
+
+              const staffCat = await message.guild.channels.create({ name: '👑 Yönetim', type: 4 });
+              await message.guild.channels.create({ name: 'admin-chat', type: 0, parent: staffCat.id });
+              await message.guild.channels.create({ name: 'mod-chat', type: 0, parent: staffCat.id });
+              await message.guild.channels.create({ name: 'staff-ses', type: 2, parent: staffCat.id });
+              await message.guild.channels.create({ name: 'yönetim-duyuru', type: 0, parent: staffCat.id });
+              await message.guild.channels.create({ name: 'loglar', type: 0, parent: staffCat.id });
+
+              const archiveCat = await message.guild.channels.create({ name: '📦 Arşiv', type: 4 });
+              await message.guild.channels.create({ name: 'eski-duyurular', type: 0, parent: archiveCat.id });
+              await message.guild.channels.create({ name: 'eski-etkinlikler', type: 0, parent: archiveCat.id });
+              await message.guild.channels.create({ name: 'arşiv-ses', type: 2, parent: archiveCat.id });
             }
-            if (type === 'Tasarım Sunucusu') {
-              const designCat = await message.guild.channels.create({ name: '🎨 Tasarım', type: 4 });
-              await message.guild.channels.create({ name: 'tasarım-paylaşım', type: 0, parent: designCat.id });
-              await message.guild.channels.create({ name: 'feedback', type: 0, parent: designCat.id });
-              await message.guild.channels.create({ name: 'tasarım-ses', type: 2, parent: designCat.id });
+
+            // Public Sunucusu
+            if (type === 'Public Sunucusu') {
+              const pubCat = await message.guild.channels.create({ name: '🌍 Public', type: 4 });
+              await message.guild.channels.create({ name: 'tanışma', type: 0, parent: pubCat.id });
+              await message.guild.channels.create({ name: 'selfie', type: 0, parent: pubCat.id });
+              await message.guild.channels.create({ name: 'medya', type: 0, parent: pubCat.id });
+              await message.guild.channels.create({ name: 'public-sohbet', type: 0, parent: pubCat.id });
+              await message.guild.channels.create({ name: 'etkinlik-duyuru', type: 0, parent: pubCat.id });
+
+              const pubVoice = await message.guild.channels.create({ name: '🔊 Public Ses', type: 4 });
+              await message.guild.channels.create({ name: 'public-ses-1', type: 2, parent: pubVoice.id });
+              await message.guild.channels.create({ name: 'public-ses-2', type: 2, parent: pubVoice.id });
+              await message.guild.channels.create({ name: 'public-ses-3', type: 2, parent: pubVoice.id });
             }
+
+            // +18 Sunucu
             if (type === '+18 Sunucu') {
               const adultCat = await message.guild.channels.create({ name: '🔞 Adult', type: 4 });
               await message.guild.channels.create({ name: 'adult-chat', type: 0, parent: adultCat.id });
-              await message.guild.channels.create({ name: 'adult-ses', type: 2, parent: adultCat.id });
+              await message.guild.channels.create({ name: 'adult-media', type: 0, parent: adultCat.id });
+              await message.guild.channels.create({ name: 'adult-meme', type: 0, parent: adultCat.id });
+
+              const adultVoice = await message.guild.channels.create({ name: '🔊 Adult Ses', type: 4 });
+              await message.guild.channels.create({ name: 'adult-ses-1', type: 2, parent: adultVoice.id });
+              await message.guild.channels.create({ name: 'adult-ses-2', type: 2, parent: adultVoice.id });
+            }
+
+            // Oyun Sunucusu
+            if (type === 'Oyun Sunucusu') {
+              const gameCat = await message.guild.channels.create({ name: '🎮 Oyun', type: 4 });
+              await message.guild.channels.create({ name: 'fps-oyunları', type: 0, parent: gameCat.id });
+              await message.guild.channels.create({ name: 'moba-oyunları', type: 0, parent: gameCat.id });
+              await message.guild.channels.create({ name: 'oyun-turnuvaları', type: 0, parent: gameCat.id });
+              await message.guild.channels.create({ name: 'oyun-rehberleri', type: 0, parent: gameCat.id });
+
+              const gameVoice = await message.guild.channels.create({ name: '🔊 Oyun Ses', type: 4 });
+              await message.guild.channels.create({ name: 'oyun-ses-1', type: 2, parent: gameVoice.id });
+              await message.guild.channels.create({ name: 'oyun-ses-2', type: 2, parent: gameVoice.id });
+              await message.guild.channels.create({ name: 'oyun-ses-3', type: 2, parent: gameVoice.id });
+            }
+
+            // Tasarım Sunucusu
+            if (type === 'Tasarım Sunucusu') {
+              const designCat = await message.guild.channels.create({ name: '🎨 Tasarım', type: 4 });
+              await message.guild.channels.create({ name: 'tasarım-paylaşım', type: 0, parent: designCat.id });
+              await message.guild.channels.create({ name: 'renderler', type: 0, parent: designCat.id });
+              await message.guild.channels.create({ name: 'stock-paylaşım', type: 0, parent: designCat.id });
+              await message.guild.channels.create({ name: 'feedback', type: 0, parent: designCat.id });
+              await message.guild.channels.create({ name: 'tasarım-sohbet', type: 0, parent: designCat.id });
+
+              const designVoice = await message.guild.channels.create({ name: '🔊 Tasarım Ses', type: 4 });
+              await message.guild.channels.create({ name: 'tasarım-ses-1', type: 2, parent: designVoice.id });
+              await message.guild.channels.create({ name: 'tasarım-ses-2', type: 2, parent: designVoice.id });
             }
           } catch (err) {
             console.error('Kanal oluşturma hatası:', err);
@@ -136,6 +187,7 @@ module.exports.run = async (client, message) => {
 
           confirmCollector.stop();
         }
+
         if (x.customId === 'cancel') {
           const cancelEmbed = new EmbedBuilder()
             .setColor('#FF0000')
@@ -164,3 +216,4 @@ module.exports.run = async (client, message) => {
 
 module.exports.conf = { aliases: ['sunucukur'] };
 module.exports.help = { name: 'sunucu-kur' };
+                                                   
