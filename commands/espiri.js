@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const espiriler = require('./espiriler.json'); // JSON dosyasını çağırıyoruz
+const espiriler = require('../espiriler.json'); // JSON dosyasını çağırıyoruz
 
 module.exports.run = async (client, message) => {
   try {
