@@ -124,15 +124,16 @@ client.login(x).catch(e => {
 /*=======================================================================================*/
 ////// 7/24 
 // Express sunucusu (Render gibi platformlarda botu canlı tutmak için)
-const express = require('express');
-const app = express();
-const port = 3000;
+if (!client.shard || client.shard.ids[0] === 0) {
+  const express = require('express');
+  const app = express();
+  const port = process.env.PORT || 3000; // Render portu
 
-// Web sunucu
-app.get('/', (req, res) => {
-  res.sendStatus(200);
-});
+  app.get('/', (req, res) => {
+    res.sendStatus(200);
+  });
 
-app.listen(port, () => {
-  console.log(`Sunucu ${port} numaralı bağlantı noktasında yürütülüyor.`);
-});
+  app.listen(port, () => {
+    console.log(`🌐 Web sunucu ${port} portunda çalışıyor (sadece Shard 0).`);
+  });
+}
