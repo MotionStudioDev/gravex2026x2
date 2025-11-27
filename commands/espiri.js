@@ -29,7 +29,7 @@ module.exports.run = async (client, message) => {
         espiri = espiriler[Math.floor(Math.random() * espiriler.length)];
         const newEmbed = new EmbedBuilder()
           .setColor('#5865F2')
-          .setTitle('😂 Espiri Zamanı')
+          .setTitle('Grave ile Espiri Zamanı')
           .setDescription(espiri);
 
         await i.update({ embeds: [newEmbed], components: [row] });
