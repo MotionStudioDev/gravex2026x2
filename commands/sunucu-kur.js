@@ -106,13 +106,12 @@ module.exports.run = async (client, message) => {
               await message.guild.channels.create({ name: 'şarkı-söz', type: 0, parent: funCat.id });
               await message.guild.channels.create({ name: 'anime-manga', type: 0, parent: funCat.id });
 
-              const supportCat = await message.guild.channels.create({ name: '🛠️ Destek', type: 4 });
-              await message.guild.channels.create({ name: 'yardım', type: 0, parent: supportCat.id });
-              await message.guild.channels.create({ name: 'şikayet', type: 0, parent: supportCat.id });
-              await message.guild.channels.create({ name: 'öneri', type: 0, parent: supportCat.id });
-              await message.guild.channels.create({ name: 'destek-talep', type: 0, parent: supportCat.id });
-              await message.guild.channels.create({ name: 'mod-log', type: 0,
-                            await message.guild.channels.create({ name: 'ticket-log', type: 0, parent: supportCat.id });
+             const supportCat = await message.guild.channels.create({ name: '🛠️ Destek', type: 4 });
+             await message.guild.channels.create({ name: 'yardım', type: 0, parent: supportCat.id });
+             await message.guild.channels.create({ name: 'şikayet', type: 0, parent: supportCat.id });
+             await message.guild.channels.create({ name: 'öneri', type: 0, parent: supportCat.id });
+             await message.guild.channels.create({ name: 'destek-talep', type: 0, parent: supportCat.id });
+             await message.guild.channels.create({ name: 'ticket-log', type: 0, parent: supportCat.id });} // ← burayı unutma
 
               const staffCat = await message.guild.channels.create({ name: '👑 Yönetim', type: 4 });
               await message.guild.channels.create({ name: 'admin-chat', type: 0, parent: staffCat.id });
