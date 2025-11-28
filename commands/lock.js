@@ -10,6 +10,22 @@ module.exports.run = async (client, message, args) => {
   const channel = message.channel;
   const commandName = message.content.split(" ")[0].replace(/^g!/, "").toLowerCase();
 
+  // ✅ Yetki kontrolü: sadece Yönetici veya Mesajları Yönet
+  if (
+    !message.member.permissions.has(PermissionsBitField.Flags.ManageMessages) &&
+    !message.member.permissions.has(PermissionsBitField.Flags.Administrator)
+  ) {
+    return message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor("Red")
+          .setTitle("❌ Yetkin Yok!")
+          .setDescription("Bu komutu sadece **Mesajları Yönet** veya **Yönetici** yetkisi olanlar kullanabilir.")
+          .setTimestamp()
+      ]
+    });
+  }
+
   if (commandName === "unlock") {
     const perms = channel.permissionOverwrites.cache.get(message.guild.roles.everyone.id);
     const isLocked = perms?.deny?.has(PermissionsBitField.Flags.SendMessages);
@@ -69,12 +85,12 @@ module.exports.run = async (client, message, args) => {
 
   await msg.edit({ embeds: [lockedEmbed], components: [row] });
 
-  // 🔑 Collector
+  // Collector
   const collector = msg.createMessageComponentCollector({ time: 60000 });
 
   collector.on("collect", async (interaction) => {
     if (interaction.customId === "unlock") {
-      // Yetki kontrolü
+      // ✅ Buton için de yetki kontrolü
       if (
         !interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages) &&
         !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)
@@ -86,12 +102,10 @@ module.exports.run = async (client, message, args) => {
               .setTitle("❌ Yetkin Yok!")
               .setDescription("Bu butonu sadece **Mesajları Yönet** veya **Yönetici** yetkisi olanlar kullanabilir.")
               .setTimestamp()
-          ],
-          ephemeral: false
+          ]
         });
       }
 
-      // Kanalı aç
       await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
         SendMessages: true
       });
