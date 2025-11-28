@@ -1,15 +1,10 @@
-const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
-} = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const os = require("os");
 const moment = require("moment");
 require("moment-duration-format");
 
 module.exports.run = async (client, message) => {
-  const generateEmbed = () => {
+  const generateEmbed = async () => {
     const uptime = moment
       .duration(client.uptime)
       .format("D [gün], H [saat], m [dakika], s [saniye]");
@@ -18,11 +13,25 @@ module.exports.run = async (client, message) => {
     const apiPing = Math.round(client.ws.ping);
 
     const totalGuilds = client.guilds.cache.size;
-    const totalUsers = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
+
+    // 🔑 Shardlı gerçek kullanıcı sayısı
+    let totalUsers;
+    if (client.shard) {
+      try {
+        const results = await client.shard.broadcastEval(c =>
+          c.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0)
+        );
+        totalUsers = results.reduce((acc, val) => acc + val, 0);
+      } catch {
+        totalUsers = "Shard bilgisi alınamadı";
+      }
+    } else {
+      totalUsers = client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0);
+    }
 
     return new EmbedBuilder()
       .setColor("Blurple")
-      .setTitle("Grave İstatistikleri")
+      .setTitle("📊 Grave İstatistikleri")
       .addFields(
         { name: "Ping", value: `${apiPing}ms`, inline: true },
         { name: "Uptime", value: uptime, inline: true },
@@ -42,7 +51,7 @@ module.exports.run = async (client, message) => {
       .setStyle(ButtonStyle.Primary)
   );
 
-  const msg = await message.channel.send({ embeds: [generateEmbed()], components: [row] });
+  const msg = await message.channel.send({ embeds: [await generateEmbed()], components: [row] });
 
   const collector = msg.createMessageComponentCollector({
     filter: i => i.user.id === message.author.id,
@@ -51,7 +60,7 @@ module.exports.run = async (client, message) => {
 
   collector.on("collect", async i => {
     if (i.customId === "yenile") {
-      await i.update({ embeds: [generateEmbed()], components: [row] });
+      await i.update({ embeds: [await generateEmbed()], components: [row] });
     }
   });
 
@@ -65,10 +74,5 @@ module.exports.run = async (client, message) => {
   });
 };
 
-module.exports.conf = {
-  aliases: ["botbilgi", "bilgi"]
-};
-
-module.exports.help = {
-  name: "istatistik"
-};
+module.exports.conf = { aliases: ["botbilgi", "bilgi"] };
+module.exports.help = { name: "istatistik" };
