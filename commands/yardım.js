@@ -28,7 +28,7 @@ module.exports.run = async (client, message) => {
       new EmbedBuilder()
         .setColor(0xED4245)
         .setTitle('<:gvenlik:1416529478112383047> | Moderasyon')
-        .setDescription('`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`temizle`,`kanalsil`,`kanalekle`,`uyar`'),
+        .setDescription('`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`temizle`,`lock`,`kanalsil`,`kanalekle`,`uyar`'),
 
       new EmbedBuilder()
         .setColor(0xFEE75C)
