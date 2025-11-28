@@ -21,6 +21,7 @@ module.exports.run = async (client, message, args) => {
             .setColor("Red")
             .setTitle("❌ Kanal zaten açık!")
             .setDescription("Bu kanal kilitli değil, kilidi kaldırmaya gerek yok.")
+            .setTimestamp()
         ]
       });
     }
@@ -68,7 +69,7 @@ module.exports.run = async (client, message, args) => {
 
   await msg.edit({ embeds: [lockedEmbed], components: [row] });
 
-  // 🔑 Collector ekleniyor
+  // 🔑 Collector
   const collector = msg.createMessageComponentCollector({ time: 60000 });
 
   collector.on("collect", async (interaction) => {
@@ -79,8 +80,14 @@ module.exports.run = async (client, message, args) => {
         !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)
       ) {
         return interaction.reply({
-          content: "Bu butonu sadece **Mesajları Yönet** veya **Yönetici** yetkisi olanlar kullanabilir!",
-          ephemeral: true
+          embeds: [
+            new EmbedBuilder()
+              .setColor("Red")
+              .setTitle("❌ Yetkin Yok!")
+              .setDescription("Bu butonu sadece **Mesajları Yönet** veya **Yönetici** yetkisi olanlar kullanabilir.")
+              .setTimestamp()
+          ],
+          ephemeral: false
         });
       }
 
