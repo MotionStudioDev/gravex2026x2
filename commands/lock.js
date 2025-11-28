@@ -1,9 +1,48 @@
-const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = require("discord.js");
+const {
+  EmbedBuilder,
+  ButtonBuilder,
+  ActionRowBuilder,
+  ButtonStyle,
+  PermissionsBitField
+} = require("discord.js");
 
 module.exports.run = async (client, message, args) => {
   const channel = message.channel;
+  const commandName = message.content.split(" ")[0].replace(/^g!/, "").toLowerCase();
 
-  // İlk embed: kilitleniyor
+  if (commandName === "unlock") {
+    // Kanal zaten açık mı kontrol et
+    const perms = channel.permissionOverwrites.cache.get(message.guild.roles.everyone.id);
+    const isLocked = perms?.deny?.has(PermissionsBitField.Flags.SendMessages);
+
+    if (!isLocked) {
+      return message.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor("Red")
+            .setTitle("❌ Kanal zaten açık!")
+            .setDescription("Bu kanal kilitli değil, kilidi kaldırmaya gerek yok.")
+        ]
+      });
+    }
+
+    // Kilidi kaldır
+    await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
+      SendMessages: true
+    });
+
+    return message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor("#3498DB")
+          .setTitle("🔓 Kanal Kilidi Kaldırıldı!")
+          .setDescription("Kanal artık mesajlara açık.")
+          .setTimestamp()
+      ]
+    });
+  }
+
+  // g!lock komutu → kilitleme işlemi
   const embed = new EmbedBuilder()
     .setColor("#FFA500")
     .setTitle("🔒 Kanal Kilitleniyor...")
@@ -12,12 +51,10 @@ module.exports.run = async (client, message, args) => {
 
   const msg = await message.reply({ embeds: [embed] });
 
-  // Kanalı kilitle (herkese mesaj gönderme kapalı)
   await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
     SendMessages: false
   });
 
-  // Kilidi kaldır butonu
   const button = new ButtonBuilder()
     .setCustomId("unlock")
     .setLabel("Kilidi Kaldır")
@@ -25,7 +62,6 @@ module.exports.run = async (client, message, args) => {
 
   const row = new ActionRowBuilder().addComponents(button);
 
-  // Embed güncelle
   const lockedEmbed = new EmbedBuilder()
     .setColor("#00FF00")
     .setTitle("✅ Kanal Kilitlendi!")
@@ -33,26 +69,6 @@ module.exports.run = async (client, message, args) => {
     .setTimestamp();
 
   await msg.edit({ embeds: [lockedEmbed], components: [row] });
-
-  // Buton interaction
-  const collector = msg.createMessageComponentCollector({ time: 60000 });
-
-  collector.on("collect", async (interaction) => {
-    if (interaction.customId === "unlock") {
-      // Kanalı aç
-      await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
-        SendMessages: true
-      });
-
-      const unlockedEmbed = new EmbedBuilder()
-        .setColor("#3498DB")
-        .setTitle("🔓 Kanal Kilidi Kaldırıldı!")
-        .setDescription("Kanal artık mesajlara açık.")
-        .setTimestamp();
-
-      await interaction.update({ embeds: [unlockedEmbed], components: [] });
-    }
-  });
 };
 
 module.exports.conf = {
