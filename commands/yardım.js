@@ -17,7 +17,7 @@ module.exports.run = async (client, message) => {
         .setColor("Blurple")
         .setTitle("Grave Yardım Menüsü")
         .setDescription(
-          `Prefix: \`g!\`\n\nDropdown menüden kategori seçebilirsin.\n\n **Anlık Ping:** ${pingEmoji} **${ping}ms**`
+          `Prefix: \`g!\`\n\n**Merhaba, Lütfen kategoriden menü seçiniz.**\n\n **Anlık Ping:** ${pingEmoji} **${ping}ms**`
         )
         .setFooter({ text: "GraveBOT 2026" }),
 
@@ -65,9 +65,9 @@ module.exports.run = async (client, message) => {
     // Dropdown menü
     const menu = new StringSelectMenuBuilder()
       .setCustomId("helpMenu")
-      .setPlaceholder("Komut kategorileri için tıklayın")
+      .setPlaceholder("Lütfen kategori seçiniz!")
       .addOptions([
-        { label: "🏠 Ana Sayfa", value: "0" },
+        { label: "Ana Sayfa", value: "0" },
         { label: "Genel Komutlar", value: "1" },
         { label: "Kullanıcı Komutları", value: "2" },
         { label: "Moderasyon", value: "3" },
