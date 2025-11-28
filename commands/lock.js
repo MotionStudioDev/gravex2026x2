@@ -11,7 +11,6 @@ module.exports.run = async (client, message, args) => {
   const commandName = message.content.split(" ")[0].replace(/^g!/, "").toLowerCase();
 
   if (commandName === "unlock") {
-    // Kanal zaten açık mı kontrol et
     const perms = channel.permissionOverwrites.cache.get(message.guild.roles.everyone.id);
     const isLocked = perms?.deny?.has(PermissionsBitField.Flags.SendMessages);
 
@@ -26,7 +25,6 @@ module.exports.run = async (client, message, args) => {
       });
     }
 
-    // Kilidi kaldır
     await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
       SendMessages: true
     });
@@ -69,6 +67,37 @@ module.exports.run = async (client, message, args) => {
     .setTimestamp();
 
   await msg.edit({ embeds: [lockedEmbed], components: [row] });
+
+  // 🔑 Collector ekleniyor
+  const collector = msg.createMessageComponentCollector({ time: 60000 });
+
+  collector.on("collect", async (interaction) => {
+    if (interaction.customId === "unlock") {
+      // Yetki kontrolü
+      if (
+        !interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages) &&
+        !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)
+      ) {
+        return interaction.reply({
+          content: "Bu butonu sadece **Mesajları Yönet** veya **Yönetici** yetkisi olanlar kullanabilir!",
+          ephemeral: true
+        });
+      }
+
+      // Kanalı aç
+      await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
+        SendMessages: true
+      });
+
+      const unlockedEmbed = new EmbedBuilder()
+        .setColor("#3498DB")
+        .setTitle("🔓 Kanal Kilidi Kaldırıldı!")
+        .setDescription("Kanal artık mesajlara açık.")
+        .setTimestamp();
+
+      await interaction.update({ embeds: [unlockedEmbed], components: [] });
+    }
+  });
 };
 
 module.exports.conf = {
