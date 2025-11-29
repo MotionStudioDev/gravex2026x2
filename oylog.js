@@ -3,8 +3,8 @@ const bodyParser = require("body-parser");
 const { EmbedBuilder } = require("discord.js");
 const Vote = require("./models/Vote"); // MongoDB modeli
 
-// Senin verdiğin API key
-const API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfdCI6Ijc4MjY0ODgwMjkyMzQ3MDg0OCIsImlkIjoiNTM5NzU2MzExOTU3ODc2NzM2IiwiaWF0IjoxNzY0NDM0ODE1fQ.sjAOkc8MvAvETuKpQPhL3n-5R3jLDJuG-GEN9CdNtZM";
+// Senin webhook tokenin
+const API_KEY = "F271wd8MaDhk9nWYhIp8Ec6IDD0HcsgAKFMGP2_9nyu2YvQqtvnZsdZKOZT0SGGADozd";
 
 module.exports = (client) => {
   const app = express();
