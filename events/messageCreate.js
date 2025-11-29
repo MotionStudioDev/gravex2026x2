@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const GuildSettings = require("../models/GuildSettings");
-const UserXP = require("../models/UserXP");
+
 
 const küfürler = ["amk","oç","yarrak","sik","piç","orospu","ananı","göt","salak","aptal"];
 const reklamlar = ["discord.gg/",".gg/","http://","https://",".com",".net",".org"];
