@@ -89,7 +89,8 @@ require("./events/message.js")
 require("./events/ready.js")
 require("./logger.js")(client);
 
-
+const guildLogs = require("./guildLogs");
+guildLogs(client);
 /*=======================================================================================*/
 
 /*=======================================================================================*/
