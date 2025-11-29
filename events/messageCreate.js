@@ -102,39 +102,4 @@ module.exports = async (message) => {
   }
 
   // ✅ LEVEL SİSTEMİ
-// ✅ LEVEL SİSTEMİ
-if (settings.levelSystemActive) {
-  const userId = message.author.id;
-  let userXP = await UserXP.findOne({ guildId, userId });
-  if (!userXP) userXP = new UserXP({ guildId, userId, level: 1, xp: 0 });
 
-  // XP kazanımı (random 5–15)
-  const gainedXP = Math.floor(Math.random() * 11) + 5;
-  userXP.xp += gainedXP;
-
-  const nextLevelXP = userXP.level * 100;
-
-  if (userXP.xp >= nextLevelXP) {
-    userXP.level += 1;
-    userXP.xp -= nextLevelXP; // fazla XP boşa gitmesin
-
-    const embed = new EmbedBuilder()
-      .setColor("Gold")
-      .setTitle("🎉 Level Atladı!")
-      .setDescription(`${message.author} seviye atladı!\nYeni level: **${userXP.level}**`)
-      .setFooter({ text: "Tebrikler! Level Sistemi sayesinde seviye atladınız." })
-      .setTimestamp();
-
-    await message.channel.send({ embeds: [embed] });
-
-    // opsiyonel: log kanalına da gönder
-    if (settings.levelLog) {
-      const logKanal = message.guild.channels.cache.get(settings.levelLog);
-      if (logKanal && logKanal.permissionsFor(client.user).has("SendMessages")) {
-        await logKanal.send({ embeds: [embed] });
-      }
-    }
-  }
-
-  await userXP.save();
-}
