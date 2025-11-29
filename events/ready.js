@@ -8,7 +8,7 @@ client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
   let x = [
-    `g!yardım - v1.0.2 - Jail Sistemi Eklendi!`
+    `g!yardım - v1.0.3 - Ekonomi Sistemi Eklendi!`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
