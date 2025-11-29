@@ -1,14 +1,14 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
-const GuildSettings = require('../models/GuildSettings');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require("discord.js");
+const GuildSettings = require("../models/GuildSettings");
 
 module.exports.run = async (client, message, args) => {
   if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
-          .setColor('Red')
-          .setTitle('🚫 Yetki Yok')
-          .setDescription('Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısın.')
+          .setColor("Red")
+          .setTitle("🚫 Yetki Yok")
+          .setDescription("Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısın.")
       ]
     });
   }
@@ -17,15 +17,15 @@ module.exports.run = async (client, message, args) => {
   const second = args[1]?.toLowerCase();
 
   // ✅ LOG AYARI
-  if (sub === 'log') {
-    if (second === 'kapat') {
+  if (sub === "log") {
+    if (second === "kapat") {
       await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { logChannelId: null });
       return message.channel.send({
         embeds: [
           new EmbedBuilder()
-            .setColor('Red')
-            .setTitle('📛 Level Log Kanalı Kapatıldı')
-            .setDescription('Artık XP ve level logları gönderilmeyecek.')
+            .setColor("Red")
+            .setTitle("📛 Level Log Kanalı Kapatıldı")
+            .setDescription("Artık XP ve level logları gönderilmeyecek.")
         ]
       });
     }
@@ -39,63 +39,65 @@ module.exports.run = async (client, message, args) => {
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
-          .setColor('Green')
-          .setTitle('📥 Level Log Kanalı Ayarlandı')
-          .setDescription('XP ve level logları artık bu kanala gönderilecek.')
+          .setColor("Green")
+          .setTitle("📥 Level Log Kanalı Ayarlandı")
+          .setDescription("XP ve level logları artık bu kanala gönderilecek.")
       ]
     });
   }
 
   // ✅ MANUEL KAPATMA
-  if (sub === 'kapat') {
+  if (sub === "kapat") {
     await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
     return message.channel.send({
       embeds: [
         new EmbedBuilder()
-          .setColor('Red')
-          .setTitle('❌ Level Sistemi Kapatıldı')
-          .setDescription('Artık sunucuda level sistemi devre dışı.')
+          .setColor("Red")
+          .setTitle("❌ Level Sistemi Kapatıldı")
+          .setDescription("Artık sunucuda level sistemi devre dışı.")
       ]
     });
   }
 
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
 
-  // ✅ SİSTEM ZATEN AÇIKSA UYARI (log komutu hariç)
+  // ✅ SİSTEM ZATEN AÇIKSA UYARI
   if (settings?.levelSystemActive) {
     const alreadyRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('level_close').setLabel('Sistemi Kapat').setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId("level_close").setLabel("Sistemi Kapat").setStyle(ButtonStyle.Danger)
     );
 
     const alreadyMsg = await message.channel.send({
       embeds: [
         new EmbedBuilder()
-          .setColor('Orange')
-          .setTitle('ℹ️ Level Sistemi Zaten Açık')
-          .setDescription('Bu sunucuda level sistemi zaten aktif durumda.\nKapatmak için `g!level-sistemi kapat` yazabilir veya aşağıdaki butona basabilirsin.')
+          .setColor("Orange")
+          .setTitle("ℹ️ Level Sistemi Zaten Açık")
+          .setDescription(
+            "Bu sunucuda level sistemi zaten aktif durumda.\nKapatmak için `g!level-sistemi kapat` yazabilir veya aşağıdaki butona basabilirsin."
+          )
       ],
       components: [alreadyRow]
     });
 
     const alreadyCollector = alreadyMsg.createMessageComponentCollector({ time: 15000 });
 
-    alreadyCollector.on('collect', async i => {
+    alreadyCollector.on("collect", async i => {
       if (i.user.id !== message.author.id) {
-        return i.reply({ content: 'Bu butonları sadece komutu kullanan kişi kullanabilir.', ephemeral: true });
+        return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
       }
-      if (i.customId === 'level_close') {
+      if (i.customId === "level_close") {
         await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
         const closeEmbed = new EmbedBuilder()
-          .setColor('Red')
-          .setTitle('❌ Level Sistemi Kapatıldı')
-          .setDescription('Artık sunucuda level sistemi devre dışı.');
+          .setColor("Red")
+          .setTitle("❌ Level Sistemi Kapatıldı")
+          .setDescription("Artık sunucuda level sistemi devre dışı.");
         await i.update({ embeds: [closeEmbed], components: [] });
       }
     });
 
-    alreadyCollector.on('end', async () => {
+    alreadyCollector.on("end", async () => {
       try {
-        await alreadyMsg.edit({ components: [] });
+        if (!alreadyMsg.deleted) await alreadyMsg.edit({ components: [] });
       } catch {}
     });
 
@@ -104,24 +106,24 @@ module.exports.run = async (client, message, args) => {
 
   // ✅ SİSTEM KAPALIYSA AÇMA PROMPT'U
   const promptEmbed = new EmbedBuilder()
-    .setColor('Blurple')
-    .setTitle('📊 Level Sistemi')
-    .setDescription('Sistemi açmak istiyor musunuz?');
+    .setColor("Blurple")
+    .setTitle("📊 Level Sistemi")
+    .setDescription("Sistemi açmak istiyor musunuz?");
 
   const promptRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('level_yes').setLabel('EVET').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('level_no').setLabel('HAYIR').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId("level_yes").setLabel("EVET").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("level_no").setLabel("HAYIR").setStyle(ButtonStyle.Danger)
   );
 
   const msg = await message.channel.send({ embeds: [promptEmbed], components: [promptRow] });
   const collector = msg.createMessageComponentCollector({ time: 15000 });
 
-  collector.on('collect', async i => {
+  collector.on("collect", async i => {
     if (i.user.id !== message.author.id) {
-      return i.reply({ content: 'Bu butonları sadece komutu kullanan kişi kullanabilir.', ephemeral: true });
+      return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
     }
 
-    if (i.customId === 'level_yes') {
+    if (i.customId === "level_yes") {
       await GuildSettings.findOneAndUpdate(
         { guildId: message.guild.id },
         { levelSystemActive: true },
@@ -129,47 +131,50 @@ module.exports.run = async (client, message, args) => {
       );
 
       const yesEmbed = new EmbedBuilder()
-        .setColor('Green')
-        .setTitle('✅ Level Sistemi Aktif')
+        .setColor("Green")
+        .setTitle("✅ Level Sistemi Aktif")
         .setDescription(
-          'Level sistemi başarıyla açıldı.\n\n**Kullanılabilir Komutlar:**\n' +
-          '📊 `g!level` → Kendi level bilgini gösterir\n' +
-          '🏆 `g!level top` → Sunucudaki en yüksek level kullanıcılarını gösterir\n' +
-          '⚙️ `g!level-sistemi kapat` → Sistemi kapatır\n' +
-          '📥 `g!level-sistemi log` → Bu kanalı log olarak ayarlar'
+          "Level sistemi başarıyla açıldı.\n\n**Kullanılabilir Komutlar:**\n" +
+            "📊 `g!level` → Kendi level bilgini gösterir\n" +
+            "🏆 `g!level top` → Sunucudaki en yüksek level kullanıcılarını gösterir\n" +
+            "⚙️ `g!level-sistemi kapat` → Sistemi kapatır\n" +
+            "📥 `g!level-sistemi log` → Bu kanalı log olarak ayarlar"
         );
 
       const closeRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('level_close').setLabel('Sistemi Kapat').setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId("level_close").setLabel("Sistemi Kapat").setStyle(ButtonStyle.Danger)
       );
 
       await i.update({ embeds: [yesEmbed], components: [closeRow] });
     }
 
-    if (i.customId === 'level_no') {
+    if (i.customId === "level_no") {
       const noEmbed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('❌ Level Sistemi İptal Edildi')
-        .setDescription('Level sistemi açılmadı.');
+        .setColor("Red")
+        .setTitle("❌ Level Sistemi İptal Edildi")
+        .setDescription("Level sistemi açılmadı.");
       await i.update({ embeds: [noEmbed], components: [] });
     }
 
-    if (i.customId === 'level_close') {
+    if (i.customId === "level_close") {
       await GuildSettings.findOneAndUpdate({ guildId: message.guild.id }, { levelSystemActive: false });
       const closeEmbed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('❌ Level Sistemi Kapatıldı')
-        .setDescription('Artık sunucuda level sistemi devre dışı.');
+        .setColor("Red")
+        .setTitle("❌ Level Sistemi Kapatıldı")
+        .setDescription("Artık sunucuda level sistemi devre dışı.");
       await i.update({ embeds: [closeEmbed], components: [] });
     }
   });
 
-  collector.on('end', async () => {
+  collector.on("end", async () => {
     try {
-      await msg.edit({ components: [] });
+      if (!msg.deleted) await msg.edit({ components: [] });
     } catch {}
   });
 };
 
-module.exports.conf = { aliases: ['levelsistemi'] };
-module.exports.help = { name: 'level-sistemi', description: 'Sunucuda level sistemini aç/kapat veya log kanalını ayarla.' };
+module.exports.conf = { aliases: ["levelsistemi"] };
+module.exports.help = {
+  name: "level-sistemi",
+  description: "Sunucuda level sistemini aç/kapat veya log kanalını ayarla."
+};
