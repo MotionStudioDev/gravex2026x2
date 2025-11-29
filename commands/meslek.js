@@ -15,7 +15,10 @@ module.exports.run = async (client, message, args) => {
   }
 
   let user = await User.findOne({ id: message.author.id });
-  if (!user) user = new User({ id: message.author.id });
+  if (!user) {
+    user = new User({ id: message.author.id, wallet: 0, bank: 0, job: null });
+    await user.save();
+  }
 
   if (user.job) {
     return message.channel.send({
