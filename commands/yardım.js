@@ -60,6 +60,13 @@ module.exports.run = async (client, message) => {
         .setColor(0xe91e63)
         .setTitle("🎉 Eğlence Komutları")
         .setDescription("`ship`,`espiri`"),
+
+      new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setTitle("💰 Ekonomi Komutları")
+        .setDescription(
+          "`bal`,`cf`,`günlük`,`çal`,`banka-oluştur`,`banka-yatır`,`banka-çek`,`banka-transfer`,`meslek`,`meslek-ayrıl`,`çalış`,`para-sıralama`,`apara`"
+        ),
     ];
 
     // Dropdown menü
@@ -74,6 +81,7 @@ module.exports.run = async (client, message) => {
         { label: "Sistem", value: "4" },
         { label: "Sahip Komutları", value: "5" },
         { label: "Eğlence", value: "6" },
+        { label: "Ekonomi", value: "7" }, // yeni kategori
       ]);
 
     const row = new ActionRowBuilder().addComponents(menu);
