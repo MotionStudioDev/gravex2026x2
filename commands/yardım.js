@@ -65,7 +65,7 @@ module.exports.run = async (client, message) => {
         .setColor(0x2ecc71)
         .setTitle("💰 Ekonomi Komutları")
         .setDescription(
-          "`bal`,`cf`,`günlük`,`çal`,`banka-oluştur`,`banka-yatır`,`banka-çek`,`banka-transfer`,`meslek`,`meslek-ayrıl`,`çalış`,`para-sıralama`,`apara`"
+          "`param`,`cf`,`günlük`,`çal`,`banka-oluştur`,`banka-yatır`,`banka-çek`,`banka-transfer`,`meslek`,`meslek-ayrıl`,`çalış`,`para-sıralama`,`apara`"
         ),
     ];
 
