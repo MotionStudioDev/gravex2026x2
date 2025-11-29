@@ -1,14 +1,22 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const { EmbedBuilder } = require("discord.js");
-const Vote = require("./models/Vote"); // yukarıdaki model
+const Vote = require("./models/Vote"); // MongoDB modeli
+
+// Senin verdiğin API key
+const API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfdCI6Ijc4MjY0ODgwMjkyMzQ3MDg0OCIsImlkIjoiNTM5NzU2MzExOTU3ODc2NzM2IiwiaWF0IjoxNzY0NDM0ODE1fQ.sjAOkc8MvAvETuKpQPhL3n-5R3jLDJuG-GEN9CdNtZM";
 
 module.exports = (client) => {
   const app = express();
   app.use(bodyParser.json());
 
-  // Webhook endpoint
   app.post("/dblwebhook", async (req, res) => {
+    // Authorization kontrolü
+    const authHeader = req.headers.authorization;
+    if (!authHeader || authHeader !== API_KEY) {
+      return res.sendStatus(403); // yetkisiz erişim
+    }
+
     const { user } = req.body; // top.gg gönderdiği user ID
     const guild = client.guilds.cache.get("1408511083232362547");
     const member = await guild.members.fetch(user).catch(() => null);
@@ -48,6 +56,5 @@ module.exports = (client) => {
     res.sendStatus(200);
   });
 
-  // Listener başlat
   app.listen(3000, () => console.log("Oy log sistemi aktif!"));
 };
