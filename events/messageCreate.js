@@ -99,7 +99,5 @@ module.exports = async (message) => {
     if (içerik === 'sa' || içerik.startsWith('sa ')) {
       message.reply('Aleyküm selam, Dostum.');
     }
-  }
-
-  // ✅ LEVEL SİSTEMİ
+  };
 
