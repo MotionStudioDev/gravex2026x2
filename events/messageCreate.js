@@ -1,9 +1,9 @@
-const { EmbedBuilder } = require('discord.js');
-const GuildSettings = require('../models/GuildSettings');
-const UserXP = require('../models/UserXP');
+const { EmbedBuilder } = require("discord.js");
+const GuildSettings = require("../models/GuildSettings");
+const UserXP = require("../models/UserXP");
 
-const küfürler = ['amk','oç','yarrak','sik','piç','orospu','ananı','göt','salak','aptal'];
-const reklamlar = ['discord.gg/','.gg/','http://','https://','.com','.net','.org'];
+const küfürler = ["amk","oç","yarrak","sik","piç","orospu","ananı","göt","salak","aptal"];
+const reklamlar = ["discord.gg/",".gg/","http://","https://",".com",".net",".org"];
 
 module.exports = async (message) => {
   if (!message.guild || message.author.bot) return;
@@ -15,10 +15,10 @@ module.exports = async (message) => {
   // ✅ BOT ETİKET KONTROLÜ
   if (message.mentions.has(client.user) && message.content.trim() === `<@${client.user.id}>`) {
     const embed = new EmbedBuilder()
-      .setColor('Blurple')
-      .setTitle('👋 Merhaba!')
-      .setDescription('Beni etiketlemişsin.\nKomutlar için `g!yardım` yazabilirsin!')
-      .setFooter({ text: 'GraveBOT 2026' });
+      .setColor("Blurple")
+      .setTitle("👋 Merhaba!")
+      .setDescription("Beni etiketlemişsin.\nKomutlar için `g!yardım` yazabilirsin!")
+      .setFooter({ text: "GraveBOT 2026" });
 
     return message.channel.send({ embeds: [embed] });
   }
@@ -37,8 +37,8 @@ module.exports = async (message) => {
         const uyarı = await message.channel.send({
           embeds: [
             new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('🚫 Küfür Tespit Edildi')
+              .setColor("Red")
+              .setTitle("🚫 Küfür Tespit Edildi")
               .setDescription(`${message.author}, lütfen küfürlü mesajlar göndermeyin.`)
           ]
         });
@@ -47,22 +47,22 @@ module.exports = async (message) => {
         const logKanalId = settings.kufurLog;
         const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : null;
 
-        if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+        if (logKanal && logKanal.permissionsFor(client.user).has("SendMessages")) {
           const logEmbed = new EmbedBuilder()
-            .setColor('DarkRed')
-            .setTitle('🛑 Küfür Logu')
+            .setColor("DarkRed")
+            .setTitle("🛑 Küfür Logu")
             .addFields(
-              { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})` },
-              { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-              { name: 'Küfür', value: `**${küfür}**`, inline: true },
-              { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\`` },
-              { name: 'Zaman', value: `<t:${Math.floor(Date.now()/1000)}:F>` }
+              { name: "Kullanıcı", value: `${message.author.tag} (${message.author.id})` },
+              { name: "Kanal", value: `<#${message.channel.id}>`, inline: true },
+              { name: "Küfür", value: `**${küfür}**`, inline: true },
+              { name: "Mesaj İçeriği", value: `\`\`\`${message.content}\`\`\`` },
+              { name: "Zaman", value: `<t:${Math.floor(Date.now()/1000)}:F>` }
             )
-            .setFooter({ text: 'Küfür engel sistemi' });
+            .setFooter({ text: "Küfür engel sistemi" });
           logKanal.send({ embeds: [logEmbed] });
         }
       } catch (err) {
-        console.error('Küfür mesajı silinemedi veya log gönderilemedi:', err);
+        console.error("Küfür mesajı silinemedi veya log gönderilemedi:", err);
       }
     }
   }
@@ -76,28 +76,28 @@ module.exports = async (message) => {
       const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : message.channel;
 
       const embed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('🚫 Reklam Mesajı Silindi')
+        .setColor("Red")
+        .setTitle("🚫 Reklam Mesajı Silindi")
         .addFields(
-          { name: 'Kullanıcı', value: `${message.author.tag} (${message.author.id})` },
-          { name: 'Kanal', value: `<#${message.channel.id}>`, inline: true },
-          { name: 'Mesaj İçeriği', value: `\`\`\`${message.content}\`\`\`` },
-          { name: 'Zaman', value: `<t:${Math.floor(Date.now()/1000)}:F>` }
+          { name: "Kullanıcı", value: `${message.author.tag} (${message.author.id})` },
+          { name: "Kanal", value: `<#${message.channel.id}>`, inline: true },
+          { name: "Mesaj İçeriği", value: `\`\`\`${message.content}\`\`\`` },
+          { name: "Zaman", value: `<t:${Math.floor(Date.now()/1000)}:F>` }
         )
-        .setFooter({ text: 'Reklam engel sistemi' });
+        .setFooter({ text: "Reklam engel sistemi" });
 
-      if (logKanal && logKanal.permissionsFor(client.user).has('SendMessages')) {
+      if (logKanal && logKanal.permissionsFor(client.user).has("SendMessages")) {
         logKanal.send({ embeds: [embed] });
       }
     } catch (err) {
-      console.error('Reklam mesajı silinemedi veya log gönderilemedi:', err);
+      console.error("Reklam mesajı silinemedi veya log gönderilemedi:", err);
     }
   }
 
   // ✅ SA-AS SİSTEMİ
   if (settings.saasAktif) {
-    if (içerik === 'sa' || içerik.startsWith('sa ')) {
-      message.reply('Aleyküm selam, Dostum.');
+    if (içerik === "sa" || içerik.startsWith("sa ")) {
+      message.reply("Aleyküm selam, Dostum.");
     }
-  };
-
+  }
+};
