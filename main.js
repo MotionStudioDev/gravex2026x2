@@ -88,7 +88,7 @@ client.on('messageCreate', require('./events/messageCreate'));
 require("./events/message.js")
 require("./events/ready.js")
 require("./logger.js")(client);
-
+require("./oylog")(client);
 
 /*=======================================================================================*/
 
