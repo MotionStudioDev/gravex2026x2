@@ -5,9 +5,23 @@ module.exports.run = async (client, message) => {
   let user = await User.findOne({ id: message.author.id });
   if (!user) user = new User({ id: message.author.id, wallet: 0, bank: 0 });
 
-  if (user.lastDaily && Date.now() - user.lastDaily.getTime() < 86400000) {
+  // ✅ 8 saat = 28800000 ms
+  const cooldown = 8 * 60 * 60 * 1000;
+
+  if (user.lastDaily && Date.now() - user.lastDaily.getTime() < cooldown) {
+    const remaining = cooldown - (Date.now() - user.lastDaily.getTime());
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+
     return message.channel.send({
-      embeds: [new EmbedBuilder().setColor("Yellow").setDescription("⏳ Günlük ödülünü zaten aldın, yarın tekrar dene.")]
+      embeds: [
+        new EmbedBuilder()
+          .setColor("Yellow")
+          .setTitle("⏳ Günlük Ödül Beklemede")
+          .setDescription(
+            `Günlük ödülünü zaten aldın.\nTekrar alabilmek için **${hours} saat ${minutes} dakika** beklemelisin.`
+          )
+      ]
     });
   }
 
@@ -19,7 +33,9 @@ module.exports.run = async (client, message) => {
   const embed = new EmbedBuilder()
     .setColor("Blue")
     .setTitle("🎁 Günlük Ödül")
-    .setDescription(`Bugünkü ödülünü aldın: **${reward} coin**\nYeni cüzdan: **${user.wallet}**`);
+    .setDescription(
+      `Bugünkü ödülünü aldın: **${reward} coin**\nYeni cüzdan: **${user.wallet}**`
+    );
   message.channel.send({ embeds: [embed] });
 };
 
