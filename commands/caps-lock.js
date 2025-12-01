@@ -13,7 +13,7 @@ module.exports.run = async (client, message) => {
       embeds: [
         new EmbedBuilder()
           .setColor("Red")
-          .setTitle("🚫 Yetki Yok")
+          .setTitle("<a:uyar1:1416526541030035530> Yetki Yok")
           .setDescription("Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısın.")
       ]
     });
@@ -25,7 +25,7 @@ module.exports.run = async (client, message) => {
   if (settings?.capsLockEngel) {
     const activeEmbed = new EmbedBuilder()
       .setColor("Green")
-      .setTitle("✅ Caps-Lock Sistemi Aktif")
+      .setTitle("<:tik1:1416526332803809401> Caps-Lock Sistemi Aktif")
       .setDescription("Büyük harf kullanımı bu sunucuda yasaklanmış durumda.");
 
     const closeRow = new ActionRowBuilder().addComponents(
@@ -47,7 +47,7 @@ module.exports.run = async (client, message) => {
           embeds: [
             new EmbedBuilder()
               .setColor("Orange")
-              .setTitle("⚙️ Sistem kapatılıyor...")
+              .setTitle("<a:yukle:1440677432976867448> Sistem kapatılıyor...")
               .setDescription("Lütfen bekle!")
           ],
           components: []
@@ -62,7 +62,7 @@ module.exports.run = async (client, message) => {
           embeds: [
             new EmbedBuilder()
               .setColor("Red")
-              .setTitle("❌ Caps-Lock Sistemi Kapatıldı")
+              .setTitle("<:x_:1416529392955555871> Caps-Lock Sistemi Kapatıldı")
               .setDescription("Artık bu sunucuda büyük harf kullanımı serbest.")
           ]
         });
@@ -81,7 +81,7 @@ module.exports.run = async (client, message) => {
   // Sistem kapalıysa → açma prompt'u
   const promptEmbed = new EmbedBuilder()
     .setColor("Blurple")
-    .setTitle("⚠️ Dikkat")
+    .setTitle("<a:uyar1:1416526541030035530> Dikkat")
     .setDescription("Caps-Lock sistemini aktif etmek üzeresin. Onaylıyor musun?");
 
   const promptRow = new ActionRowBuilder().addComponents(
@@ -102,7 +102,7 @@ module.exports.run = async (client, message) => {
         embeds: [
           new EmbedBuilder()
             .setColor("Orange")
-            .setTitle("⚙️ Caps-Lock Açılıyor...")
+            .setTitle("<a:yukle:1440677432976867448> Caps-Lock Açılıyor...")
             .setDescription("Lütfen bekle!")
         ],
         components: []
@@ -116,7 +116,7 @@ module.exports.run = async (client, message) => {
 
       const activeEmbed = new EmbedBuilder()
         .setColor("Green")
-        .setTitle("✅ Sistem Aktif Edildi")
+        .setTitle("<:tik1:1416526332803809401> Sistem Aktif Edildi")
         .setDescription("Büyük harf kullanımı bu sunucuda yasaklandı.");
 
       const closeRow = new ActionRowBuilder().addComponents(
@@ -134,7 +134,7 @@ module.exports.run = async (client, message) => {
         embeds: [
           new EmbedBuilder()
             .setColor("Red")
-            .setTitle("❌ İşleminiz İptal Edildi")
+            .setTitle("<:x_:1416529392955555871> İşleminiz İptal Edildi")
             .setDescription("Caps-Lock sistemi açılmadı.")
         ],
         components: []
@@ -146,7 +146,7 @@ module.exports.run = async (client, message) => {
         embeds: [
           new EmbedBuilder()
             .setColor("Orange")
-            .setTitle("⚙️ Sistem kapatılıyor...")
+            .setTitle("<a:yukle:1440677432976867448> Sistem kapatılıyor...")
             .setDescription("Lütfen bekle!")
         ],
         components: []
@@ -161,7 +161,7 @@ module.exports.run = async (client, message) => {
         embeds: [
           new EmbedBuilder()
             .setColor("Red")
-            .setTitle("❌ Caps-Lock Sistemi Kapatıldı")
+            .setTitle("<:x_:1416529392955555871> Caps-Lock Sistemi Kapatıldı")
             .setDescription("Artık bu sunucuda büyük harf kullanımı serbest.")
         ]
       });
