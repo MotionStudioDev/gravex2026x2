@@ -21,7 +21,7 @@ module.exports.run = async (client, message) => {
 
   const settings = await GuildSettings.findOne({ guildId: message.guild.id });
 
-  // Eğer sistem zaten aktifse → kapatma butonu göster
+  // ✅ Sistem zaten aktifse → kapatma butonu göster
   if (settings?.capsLockEngel) {
     const activeEmbed = new EmbedBuilder()
       .setColor("Green")
@@ -40,7 +40,10 @@ module.exports.run = async (client, message) => {
 
     collector.on("collect", async i => {
       if (i.user.id !== message.author.id) {
-        return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
+        return i.reply({
+          content: "Bu butonları sadece komutu kullanan kişi kullanabilir.",
+          ephemeral: true
+        });
       }
       if (i.customId === "caps_close") {
         await i.update({
@@ -78,7 +81,7 @@ module.exports.run = async (client, message) => {
     return;
   }
 
-  // Sistem kapalıysa → açma prompt'u
+  // ✅ Sistem kapalıysa → açma prompt'u
   const promptEmbed = new EmbedBuilder()
     .setColor("Blurple")
     .setTitle("<a:uyar1:1416526541030035530> Dikkat")
@@ -94,7 +97,10 @@ module.exports.run = async (client, message) => {
 
   collector.on("collect", async i => {
     if (i.user.id !== message.author.id) {
-      return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
+      return i.reply({
+        content: "Bu butonları sadece komutu kullanan kişi kullanabilir.",
+        ephemeral: true
+      });
     }
 
     if (i.customId === "caps_yes") {
