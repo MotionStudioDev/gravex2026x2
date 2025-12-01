@@ -44,7 +44,11 @@ const guildSettingsSchema = new mongoose.Schema({
   // ✅ Level Sistemi
   levelSystemActive: { type: Boolean, default: false },
   levelLog: { type: String, default: null }, // level atlama log kanalı
-  levelRewardRoles: { type: Map, of: String, default: {} } // örn: { "5":"rolId", "10":"rolId" }
+  levelRewardRoles: { type: Map, of: String, default: {} }, // örn: { "5":"rolId", "10":"rolId" }
+
+  // ✅ Caps-Lock Sistemi
+  capsLockEngel: { type: Boolean, default: false },
+  capsLockLog: { type: String, default: null }
 });
 
 module.exports = mongoose.model('GuildSettings', guildSettingsSchema);
