@@ -72,7 +72,7 @@ module.exports.run = async (client, message, args) => {
       const done = new EmbedBuilder()
         .setColor(0xFF69B4)
         .setTitle("✅ Kayıt Tamamlandı")
-        .setDescription(`${uye} başarıyla **Kız** olarak kayıt edildi.\n🆔 ID: ${uye.id}\nİsim: ${isim} | Yaş: ${yas}`)
+        .setDescription(`${uye} başarıyla **Kız** olarak kayıt edildi.\n🆔 ID: ${uye.id}\nİsim: ${isim}  '  Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
     }
@@ -84,7 +84,7 @@ module.exports.run = async (client, message, args) => {
       const done = new EmbedBuilder()
         .setColor(0x1E90FF)
         .setTitle("✅ Kayıt Tamamlandı")
-        .setDescription(`${uye} başarıyla **Erkek** olarak kayıt edildi.\n🆔 ID: ${uye.id}\nİsim: ${isim} | Yaş: ${yas}`)
+        .setDescription(`${uye} başarıyla **Erkek** olarak kayıt edildi.\n🆔 ID: ${uye.id}\nİsim: ${isim}  '  Yaş: ${yas}`)
         .setTimestamp();
       await i.update({ embeds: [done], components: [] });
     }
