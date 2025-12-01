@@ -161,7 +161,7 @@ client.on("messageCreate", async (message) => {
       // Kullanıcıya uyarı embed
       const warnEmbed = new EmbedBuilder()
         .setColor("Red")
-        .setTitle("🚫 CAPS-LOCK Tespit Edildi")
+        .setTitle("<a:uyar1:1416526541030035530> CAPS-LOCK Tespit Edildi")
         .setDescription(`${message.author}, lütfen tüm mesajı büyük harflerle yazmayın.`);
 
       const warnMsg = await message.channel.send({ embeds: [warnEmbed] });
