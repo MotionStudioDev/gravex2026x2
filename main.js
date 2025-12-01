@@ -138,3 +138,56 @@ if (!client.shard || client.shard.ids[0] === 0) {
     console.log(`🌐 Web sunucu ${port} portunda çalışıyor (sadece Shard 0).`);
   });
 }
+/////////////////////////////CAPS ENGELLL
+const GuildSettings = require("./models/GuildSettings");
+
+client.on("messageCreate", async (message) => {
+  if (!message.guild || message.author.bot) return;
+
+  const settings = await GuildSettings.findOne({ guildId: message.guild.id });
+  if (!settings || !settings.capsLockEngel) return;
+
+  const content = message.content;
+  const letters = content.replace(/[^a-zA-ZĞÜŞİÖÇğüşiöç]/g, "");
+  if (letters.length < 5) return; // kısa mesajları engelleme
+
+  const upperCount = letters.split("").filter(ch => ch === ch.toUpperCase()).length;
+  const ratio = upperCount / letters.length;
+
+  if (ratio >= 0.7) { // %70+ büyük harf
+    try {
+      await message.delete();
+
+      // Kullanıcıya uyarı embed
+      const warnEmbed = new EmbedBuilder()
+        .setColor("Red")
+        .setTitle("🚫 CAPS-LOCK Tespit Edildi")
+        .setDescription(`${message.author}, lütfen tüm mesajı büyük harflerle yazmayın.`);
+
+      const warnMsg = await message.channel.send({ embeds: [warnEmbed] });
+      setTimeout(() => warnMsg.delete().catch(() => {}), 3000);
+
+      // Log kanalına gönder
+      const logKanalId = settings.capsLockLog;
+      const logKanal = logKanalId ? message.guild.channels.cache.get(logKanalId) : null;
+
+      if (logKanal && logKanal.permissionsFor(message.client.user).has("SendMessages")) {
+        const logEmbed = new EmbedBuilder()
+          .setColor("DarkBlue")
+          .setTitle("🛑 CAPS-LOCK Logu")
+          .addFields(
+            { name: "Kullanıcı", value: `${message.author.tag} (${message.author.id})` },
+            { name: "Kanal", value: `<#${message.channel.id}>`, inline: true },
+            { name: "Mesaj İçeriği", value: `\`\`\`${message.content}\`\`\`` },
+            { name: "Büyük Harf Oranı", value: `%${Math.round(ratio * 100)}`, inline: true },
+            { name: "Zaman", value: `<t:${Math.floor(Date.now()/1000)}:F>` }
+          )
+          .setFooter({ text: "Grave Caps-lock engel sistemi" });
+        logKanal.send({ embeds: [logEmbed] });
+      }
+    } catch (err) {
+      console.error("Caps-lock mesajı silinemedi veya log gönderilemedi:", err);
+    }
+  }
+});
+////////////////////////// CAPS ENGEL
