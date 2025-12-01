@@ -16,15 +16,15 @@ module.exports = async (member) => {
     if (kanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
       const embed = new EmbedBuilder()
         .setColor(0x1E90FF)
-        .setTitle("📥 Yeni Üye Katıldı")
+        .setTitle("<a:giris:1416530113989705959> Yeni Üye Katıldı")
         .setDescription(
-          `👤 Üye: ${member}\n` +
-          `🆔 ID: ${member.id}\n` +
-          `📅 Hesap Açılış: <t:${Math.floor(user.createdTimestamp / 1000)}:R>\n\n` +
-          "Kayıt için `g!kayıt @üye İsim Yaş` komutunu kullanın."
+          `<:userx:1441379546929561650> Üye: ${member}\n` +
+          `<:ID:1416530654006349967> ID: ${member.id}\n` +
+          `<a:takvm:1445125311850090618> Hesap Açılış: <t:${Math.floor(user.createdTimestamp / 1000)}:R>\n\n` +
+          "<:ok1:1445126670687404143> Kayıt için `g!kayıt @üye İsim Yaş` komutunu kullanın."
         )
         .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-        .setFooter({ text: 'Kayıt sistemi' })
+        .setFooter({ text: 'Grave Kayıt sistemi' })
         .setTimestamp();
 
       kanal.send({ embeds: [embed] });
@@ -45,9 +45,9 @@ module.exports = async (member) => {
             embeds: [
               new EmbedBuilder()
                 .setColor('Green')
-                .setTitle('✅ Otorol Verildi')
+                .setTitle('<:tik33:1445123298139574353> Otorol Verildi')
                 .setDescription(`${member} kullanıcısına <@&${rol.id}> rolü verildi.`)
-                .setFooter({ text: 'Otorol sistemi' })
+                .setFooter({ text: 'Grave Otorol sistemi' })
             ]
           });
         }
@@ -57,9 +57,9 @@ module.exports = async (member) => {
             embeds: [
               new EmbedBuilder()
                 .setColor('Red')
-                .setTitle('❌ Otorol Verilemedi')
+                .setTitle('<a:uyar1:1416526541030035530> Otorol Verilemedi')
                 .setDescription(`**${user.tag}** için <@&${rol.id}> rolü verilemedi.\nHata: \`Missing Permissions\``)
-                .setFooter({ text: 'Otorol sistemi' })
+                .setFooter({ text: 'Grave Otorol sistemi' })
             ]
           });
         }
@@ -75,10 +75,10 @@ module.exports = async (member) => {
 
     const embed = new EmbedBuilder()
       .setColor('Green')
-      .setTitle('👤 Yeni Üye Katıldı')
+      .setTitle('<:userx:1441379546929561650> Yeni Üye Katıldı')
       .setDescription(`**${user.tag}** aramıza katıldı!\nHedefe ulaşmak için **${kalan}** kişi kaldı.`)
       .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-      .setFooter({ text: 'Sayaç sistemi' });
+      .setFooter({ text: 'Grave Sayaç sistemi' });
 
     const kanal = settings.sayaçKanal
       ? member.guild.channels.cache.get(settings.sayaçKanal)
@@ -91,7 +91,7 @@ module.exports = async (member) => {
     if (kalan <= 0) {
       const kutlama = new EmbedBuilder()
         .setColor('Gold')
-        .setTitle('🎉 Sayaç Tamamlandı!')
+        .setTitle('<:tik33:1445123298139574353> Sayaç Tamamlandı!')
         .setDescription(`Sunucumuz **${settings.sayaçHedef}** üyeye ulaştı!\nHoş geldin ${user}, seni aramızda görmek harika!`);
 
       kanal?.send({ embeds: [kutlama] });
@@ -118,10 +118,10 @@ module.exports = async (member) => {
 
       const raidEmbed = new EmbedBuilder()
         .setColor('DarkRed')
-        .setTitle('🚨 Raid Algılandı')
+        .setTitle('<a:uyar2:1416526724182835282> Raid Algılandı')
         .setDescription(`**${settings.antiRaidSüre} saniye** içinde **${yeniGirişler.length}** kişi sunucuya katıldı.`)
         .addFields({ name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false })
-        .setFooter({ text: 'Anti-Raid sistemi' });
+        .setFooter({ text: 'Grave Anti-Raid sistemi' });
 
       if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
         logKanal.send({ embeds: [raidEmbed] });
