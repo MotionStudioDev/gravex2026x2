@@ -48,7 +48,7 @@ module.exports.run = async (client, message) => {
         .setColor(0xfee75c)
         .setTitle("<a:sistemx:1441130022340399124> | Sistem")
         .setDescription(
-          "`sayaç`,`reklam-engel`,`level-sistemi`,`küfür-engel`,`anti-raid`,`jail-sistemi`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`"
+          "`sayaç`,`reklam-engel`,`caps-lock`,`küfür-engel`,`anti-raid`,`jail-sistemi`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`"
         ),
 
       new EmbedBuilder()
