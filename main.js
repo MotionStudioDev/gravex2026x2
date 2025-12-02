@@ -78,7 +78,6 @@ client.otoroller = new Map();           // guildId → rolId
 client.otorolLogKanalları = new Map();  // guildId → kanalId
 client.reklamLogKanalları = new Map(); // guildId → kanalId
 
-client.on("messageCreate", require("./events/dmmesaj"));
 
 client.on('emojiCreate', require('./events/emojiCreate'));
 client.on('emojiDelete', require('./events/emojiDelete'));
