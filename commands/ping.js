@@ -97,7 +97,7 @@ module.exports.run = async (client, message, args) => {
     // 1. Yükleniyor Mesajı
     const loadingEmbed = new EmbedBuilder()
         .setColor('Yellow')
-        .setDescription('⏳ Lütfen bekleyin, ağ verileri analiz ediliyor ve görsel oluşturuluyor...')
+        .setDescription('<a:yukle:1440677432976867448> Lütfen bekleyin, ağ verileri analiz ediliyor ve görsel oluşturuluyor...')
         .setThumbnail(client.user.displayAvatarURL({ dynamic: true }));
 
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
@@ -119,7 +119,7 @@ module.exports.run = async (client, message, args) => {
         .setColor(getEmbedColor(initialPing)) 
         .setImage('attachment://ping.png') // Oluşturulan resmi Embed'e ekliyoruz!
         .setThumbnail(client.user.displayAvatarURL({ dynamic: true })) 
-        .setTitle('🌐 Ağ Bağlantı Analizi') 
+        .setTitle('<a:ping:1416529425813737544> GraveBOT Ping') 
         .setDescription(`Discord API sunucuları ile bot arasındaki gecikme **${initialPing} ms**'dir.`)
         .setFooter({ text: `Talep: ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) });
 
@@ -150,7 +150,7 @@ module.exports.run = async (client, message, args) => {
             .setColor(newEmbedColor) 
             .setImage('attachment://ping.png') 
             .setThumbnail(client.user.displayAvatarURL({ dynamic: true })) 
-            .setTitle('🌐 Ağ Bağlantı Analizi') 
+            .setTitle('<a:ping:1416529425813737544> Grave Bağlantı Analizi') 
             .setDescription(`Discord API sunucuları ile bot arasındaki gecikme **${newApiPing} ms**'dir.`)
             .setFooter({ text: `Talep: ${interaction.user.tag} (Güncellendi)`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) });
         
