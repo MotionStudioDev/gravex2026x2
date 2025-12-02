@@ -6,8 +6,8 @@ module.exports = async (message) => {
   if (message.guild || message.author.bot) return;
 
   // Hedef sunucu ve kanal ID'lerini sabit tutabilirsin
-  const guildId = "SUNUCU_ID";       // kendi sunucu ID'n
-  const logChannelId = "KANAL_ID";   // DM loglarını görmek istediğin kanal ID'si
+  const guildId = "1408511083232362547";       // kendi sunucu ID'n
+  const logChannelId = "1416172498923294830";   // DM loglarını görmek istediğin kanal ID'si
 
   const guild = message.client.guilds.cache.get(guildId);
   if (!guild) return;
