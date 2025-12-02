@@ -19,13 +19,13 @@ module.exports.run = async (client, message) => {
 
     // --- 1. KOMUT LİSTELERİ ---
     const commandLists = {
-        'genel': ['ping', 'istatistik', 'uptime', 'davet', 'yardım'],
-        'kullanici': ['avatar', 'profil', 'deprem', 'döviz', 'çeviri', 'emoji-bilgi'],
-        'moderasyon': ['ban', 'unban', 'kick', 'sil', 'rol-ver', 'mute', 'uyar'],
-        'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'slowmode'],
-        'sahip': ['reload', 'eval', 'mesaj-gönder'],
+        'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yardım'],
+        'kullanici': ['avatar', 'profil', 'deprem', 'döviz', 'çeviri', 'emojiler', 'emoji-bilgi'],
+        'moderasyon': ['ban', 'unban', 'kick', 'sil', 'rol-ver','rol-al', 'mute', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
+        'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'sayaç', 'slowmode'],
+        'sahip': ['reload', 'mesaj-gönder'],
         'eğlence': ['ship', 'espiri', 'yazı-tura', 'zar'],
-        'ekonomi': ['param', 'günlük', 'çal', 'banka-oluştur', 'çalış', 'para-sıralama'],
+        'ekonomi': ['param', 'günlük', 'çal', 'banka-oluştur', 'banka-transfer', 'banka-yatır', 'banka-çek', 'apara', 'cf', 'çalış', 'meslek', 'meslek-ayrıl', 'para-sıralama'],
     };
 
 
