@@ -1,120 +1,148 @@
 const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  StringSelectMenuBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder
 } = require("discord.js");
 
 module.exports.run = async (client, message) => {
-  try {
-    // Ping durumu
-    const ping = client.ws.ping;
-    let pingEmoji = "🟢";
-    if (ping > 200) pingEmoji = "🔴";
-    else if (ping > 100) pingEmoji = "🟡";
+  try {
+    // Ping durumu (Daha önce yaptığınız gibi)
+    const ping = client.ws.ping;
+    let pingEmoji = "🟢";
+    if (ping > 200) pingEmoji = "🔴";
+    else if (ping > 100) pingEmoji = "🟡";
+    
+    // Yardımcı fonksiyon: Komut listesini formatlar
+    const formatCommands = (commandList, emoji) => {
+        return commandList.map(cmd => `\`${cmd}\``).join(', ');
+    }
 
-    const pages = [
-      new EmbedBuilder()
-        .setColor("Blurple")
-        .setTitle("Grave Yardım Menüsü")
-        .setDescription(
-          `Prefix: \`g!\`\n\n**Merhaba, Lütfen kategoriden menü seçiniz.**\n\n **Anlık Ping:** ${pingEmoji} **${ping}ms**`
-        )
-        .setFooter({ text: "GraveBOT 2026" }),
+    // --- 1. KOMUT LİSTELERİ ---
+    const commandLists = {
+        'genel': ['ping', 'istatistik', 'uptime', 'davet', 'yardım'],
+        'kullanici': ['avatar', 'profil', 'deprem', 'döviz', 'çeviri', 'emoji-bilgi'],
+        'moderasyon': ['ban', 'unban', 'kick', 'sil', 'rol-ver', 'mute', 'uyar'],
+        'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'slowmode'],
+        'sahip': ['reload', 'eval', 'mesaj-gönder'],
+        'eğlence': ['ship', 'espiri', 'yazı-tura', 'zar'],
+        'ekonomi': ['param', 'günlük', 'çal', 'banka-oluştur', 'çalış', 'para-sıralama'],
+    };
 
-      new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle("<a:discord:1441131310717599886> | Genel Komutlar")
-        .setDescription(
-          "`ping`,`istatistik`,`uptime`,`hatırlat`,`hata-bildir`,`yardım`\n\n📡 Şu anki ping: " +
-            pingEmoji +
-            ` **${ping}ms**`
-        ),
 
-      new EmbedBuilder()
-        .setColor(0x57f287)
-        .setTitle("<:user:1441128594117099664> | Kullanıcı Komutları")
-        .setDescription(
-          "`avatar`,`profil`,`deprem`,`döviz`,`çeviri`,`emoji-bilgi`,`emojiler`"
-        ),
+    // --- 2. EMBED SAYFALARI (Daha düzenli hale getirildi) ---
+    const pages = {
+        // Ana Sayfa
+        'ana_sayfa': new EmbedBuilder()
+            .setColor("Blurple")
+            .setTitle("📚 GraveBOT Yardım Merkezi")
+            .setDescription(
+                `Prefix: \`g!\`\n\n**Merhaba ${message.author.username}, aşağıdaki menüden kategori seçiniz.**\n\n` +
+                `**Anlık Ping:** ${pingEmoji} **${ping}ms**\n` +
+                `**Destek Sunucusu:** [Buraya Tıklayın](https://discord.gg/desteksunucun)` // Varsayımsal destek linki
+            )
+            .setThumbnail(client.user.displayAvatarURL({ dynamic: true })) // Bot avatarı eklendi
+            .setFooter({ text: `Komutu kullanan: ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
 
-      new EmbedBuilder()
-        .setColor(0xed4245)
-        .setTitle("<:gvenlik:1416529478112383047> | Moderasyon")
-        .setDescription(
-          "`ban`,`kick`,`sil`,`rol-ver`,`rol-al`,`temizle`,`lock`,`kanalsil`,`kanalekle`,`uyar`"
-        ),
+        // Genel
+        'genel': new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle("⚙️ Genel Komutlar")
+            .setDescription(formatCommands(commandLists.genel))
+            .setFooter({ text: `Anlık Ping: ${ping}ms` }),
 
-      new EmbedBuilder()
-        .setColor(0xfee75c)
-        .setTitle("<a:sistemx:1441130022340399124> | Sistem")
-        .setDescription(
-          "`sayaç`,`reklam-engel`,`caps-lock`,`küfür-engel`,`anti-raid`,`jail-sistemi`,`kayıt-sistemi`,`otorol`,`sa-as`,`ses-sistemi`,`slowmode`,`emoji-log`"
-        ),
+        // Kullanıcı
+        'kullanici': new EmbedBuilder()
+            .setColor(0x57f287)
+            .setTitle("👤 Kullanıcı Komutları")
+            .setDescription(formatCommands(commandLists.kullanici)),
 
-      new EmbedBuilder()
-        .setColor(0x99aab5)
-        .setTitle("<:owner:1441129983153147975> | Sahip Komutları")
-        .setDescription("`reload`,`mesaj-gönder`"),
+        // Moderasyon
+        'moderasyon': new EmbedBuilder()
+            .setColor(0xed4245)
+            .setTitle("🛡️ Moderasyon Komutları")
+            .setDescription(formatCommands(commandLists.moderasyon)),
 
-      new EmbedBuilder()
-        .setColor(0xe91e63)
-        .setTitle("🎉 Eğlence Komutları")
-        .setDescription("`ship`,`espiri`"),
+        // Sistem
+        'sistem': new EmbedBuilder()
+            .setColor(0xfee75c)
+            .setTitle("🚨 Sistem Komutları")
+            .setDescription(formatCommands(commandLists.sistem)),
 
-      new EmbedBuilder()
-        .setColor(0x2ecc71)
-        .setTitle("💰 Ekonomi Komutları")
-        .setDescription(
-          "`param`,`cf`,`günlük`,`çal`,`banka-oluştur`,`banka-yatır`,`banka-çek`,`banka-transfer`,`meslek`,`meslek-ayrıl`,`çalış`,`para-sıralama`,`apara`"
-        ),
-    ];
+        // Sahip
+        'sahip': new EmbedBuilder()
+            .setColor(0x99aab5)
+            .setTitle("👑 Sahip Komutları")
+            .setDescription(formatCommands(commandLists.sahip)),
 
-    // Dropdown menü
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId("helpMenu")
-      .setPlaceholder("Lütfen kategori seçiniz!")
-      .addOptions([
-        { label: "Ana Sayfa", value: "0" },
-        { label: "Genel Komutlar", value: "1" },
-        { label: "Kullanıcı Komutları", value: "2" },
-        { label: "Moderasyon", value: "3" },
-        { label: "Sistem", value: "4" },
-        { label: "Sahip Komutları", value: "5" },
-        { label: "Eğlence", value: "6" },
-        { label: "Ekonomi", value: "7" }, // yeni kategori
-      ]);
+        // Eğlence
+        'eğlence': new EmbedBuilder()
+            .setColor(0xe91e63)
+            .setTitle("🎉 Eğlence Komutları")
+            .setDescription(formatCommands(commandLists.eğlence)),
 
-    const row = new ActionRowBuilder().addComponents(menu);
+        // Ekonomi
+        'ekonomi': new EmbedBuilder()
+            .setColor(0x2ecc71)
+            .setTitle("💰 Ekonomi Komutları")
+            .setDescription(formatCommands(commandLists.ekonomi)),
+    };
 
-    const msg = await message.channel.send({
-      embeds: [pages[0]],
-      components: [row],
-    });
+    // --- 3. DROPDOWN MENÜ OLUŞTURMA (Emojiler Eklendi) ---
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId("helpMenu")
+      .setPlaceholder("Lütfen kategori seçiniz!")
+      .addOptions([
+        { label: "Ana Sayfa", description: "Yardım menüsünün ana sayfası.", value: "ana_sayfa", emoji: "🏠" },
+        { label: "Genel Komutlar", description: "Temel bot komutlarını içerir.", value: "genel", emoji: "⚙️" },
+        { label: "Kullanıcı Komutları", description: "Kullanıcı tabanlı bilgi komutları.", value: "kullanici", emoji: "👤" },
+        { label: "Moderasyon", description: "Sunucu yönetimi ve güvenlik komutları.", value: "moderasyon", emoji: "🛡️" },
+        { label: "Sistem", description: "Otorol, küfür engeli gibi otomatik sistemler.", value: "sistem", emoji: "🚨" },
+        { label: "Sahip Komutları", description: "Bot sahibine özel komutlar.", value: "sahip", emoji: "👑" },
+        { label: "Eğlence", description: "Kullanıcıların eğlenmesi için komutlar.", value: "eğlence", emoji: "🎉" },
+        { label: "Ekonomi", description: "Para kazanma ve harcama komutları.", value: "ekonomi", emoji: "💰" },
+      ]);
 
-    const collector = msg.createMessageComponentCollector({
-      filter: (i) => i.user.id === message.author.id,
-      time: 120000,
-    });
+    const row = new ActionRowBuilder().addComponents(menu);
 
-    collector.on("collect", async (i) => {
-      if (i.customId === "helpMenu") {
-        const selected = parseInt(i.values[0]);
-        await i.update({ embeds: [pages[selected]], components: [row] });
-      }
-    });
+    // --- 4. İLK MESAJI GÖNDERME ---
+    const msg = await message.channel.send({
+      embeds: [pages['ana_sayfa']],
+      components: [row],
+    });
 
-    collector.on("end", async () => {
-      try {
-        const disabledRow = new ActionRowBuilder().addComponents(
-          StringSelectMenuBuilder.from(menu).setDisabled(true)
-        );
-        await msg.edit({ components: [disabledRow] });
-      } catch {}
-    });
-  } catch (err) {
-    console.error("Yardım komutu hatası:", err);
-    message.channel.send("⚠️ | Yardım menüsü oluşturulurken bir hata oluştu.");
-  }
+    // --- 5. COLLECTOR VE ETKİLEŞİM ---
+    const collector = msg.createMessageComponentCollector({
+      filter: (i) => i.user.id === message.author.id, // Sadece komutu kullanan cevap verebilir
+      time: 120000,
+    });
+
+    collector.on("collect", async (i) => {
+      if (i.customId === "helpMenu") {
+        const selectedCategory = i.values[0];
+        // Seçilen kategoriye ait embed'i günceller
+        await i.update({ embeds: [pages[selectedCategory]], components: [row] });
+      }
+    });
+
+    collector.on("end", async () => {
+      try {
+        // Süre dolduğunda menüyü devre dışı bırakır
+        const disabledRow = new ActionRowBuilder().addComponents(
+          StringSelectMenuBuilder.from(menu)
+                .setDisabled(true)
+                .setPlaceholder("Menünün süresi doldu, komutu tekrar kullanın.")
+        );
+        const timeoutEmbed = new EmbedBuilder(pages['ana_sayfa']) // Ana sayfanın rengini ve başlığını kullan
+            .setDescription(`Prefix: \`g!\`\n\n⚠️ **İşlem süresi doldu.** Tekrar görüntülemek için \`g!yardım\` yazın.`)
+            .setFields([]); // Eski Fieldsları temizle
+
+        await msg.edit({ embeds: [timeoutEmbed], components: [disabledRow] });
+      } catch {}
+    });
+  } catch (err) {
+    console.error("Yardım komutu hatası:", err);
+    message.channel.send("⚠️ | Yardım menüsü oluşturulurken bir hata oluştu.");
+  }
 };
 
 module.exports.conf = { aliases: ["help", "yardim"] };
