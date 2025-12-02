@@ -1,50 +1,48 @@
-const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createCanvas, loadImage } = require('canvas');
 const path = require('path');
 
-// Görseldeki renklere yakın sabitler
-const DISCORD_BG = '#2f3136'; // Discord Embed Arkaplanı
-const BAR_BG = '#4f545c'; // Boş çubuk rengi (Koyu Gri)
-const BAR_FILL = '#ffcc00'; // Sarı Dolgu Rengi
+// --- Sabitler ve Yardımcı Fonksiyonlar ---
+
+const BAR_BG_COLOR = '#40444b'; // Boş çubuk rengi (Discord koyu gri)
 const TEXT_LIGHT = '#FFFFFF'; // Açık Renk Yazı
 const TEXT_GRAY = '#B9BBBE'; // Açıklama Yazısı Rengi
+const BUTTON_DURATION = 60000; // Butonun aktif kalacağı süre (60 saniye)
 
-// Yardımcı fonksiyon: İlerleme çubuğu rengini ve Embed rengini belirler
-function getColorByPing(ping) {
-    if (ping <= 50) return '#00aa00'; // Yeşil (Embed Rengi)
-    if (ping <= 150) return '#ffcc00'; // Sarı (Embed Rengi)
-    if (ping <= 300) return '#ff6600'; // Turuncu (Embed Rengi)
-    return '#ff0000'; // Kırmızı (Embed Rengi)
+// Ping değerine göre bar dolgu rengini ve gölge rengini belirler (Görseldeki sarı tona uygun)
+function getBarFillColor(ping) {
+    if (ping <= 50) return '#00FF00'; // Parlak Yeşil
+    if (ping <= 150) return '#FFCC00'; // Sarı (Görseldeki ana renk)
+    if (ping <= 300) return '#FFA500'; // Turuncu
+    return '#FF0000'; // Kırmızı
 }
 
-module.exports.run = async (client, message, args) => {
-    // Ping komutlarında kullanılan standart yüklenme embed'i
-    const loadingEmbed = new EmbedBuilder()
-        .setColor('Yellow')
-        .setDescription('⏳ Lütfen bekleyin, ağ verileri analiz ediliyor ve görsel oluşturuluyor...')
-        .setThumbnail(client.user.displayAvatarURL({ dynamic: true }));
+// Ping değerine göre Embed'in sol çizgi rengini belirler
+function getEmbedColor(ping) {
+    if (ping <= 50) return '#00aa00'; // Yeşil
+    if (ping <= 150) return '#FFCC00'; // Sarı
+    if (ping <= 300) return '#FF6600'; // Turuncu
+    return '#FF0000'; // Kırmızı
+}
 
-    const msg = await message.channel.send({ embeds: [loadingEmbed] });
+// --- Ana Görsel Oluşturma Fonksiyonu ---
 
-    const apiPing = Math.round(client.ws.ping);
-    const embedColor = getColorByPing(apiPing); // Embed için renk
-
-    // --- CANVAS İLE RESİM OLUŞTURMA ---
+async function createPingImage(client, apiPing, authorTag) {
     const width = 600; 
     const height = 180; 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     
-    // **1. Arkaplan ve Ana Çizim Alanı (Görseldeki Embed Arkaplanını Taklit Ediyoruz)**
+    // Görseldeki Discord Arkaplanı
+    const DISCORD_BG = '#2f3136'; 
     ctx.fillStyle = DISCORD_BG; 
     ctx.fillRect(0, 0, width, height);
     
-    // **2. Başlık ve Değerler**
     const PING_VALUE_WIDTH = 120;
-    const BAR_WIDTH = width - 80 - PING_VALUE_WIDTH; // 400 civarı
+    const BAR_WIDTH = width - 80 - PING_VALUE_WIDTH; 
     const BAR_HEIGHT = 40;
     const X_OFFSET = 40;
-    
+
     // SİSTEM GECİKMESİ (API) Başlığı
     ctx.font = 'bold 24px sans-serif';
     ctx.fillStyle = TEXT_LIGHT; 
@@ -56,23 +54,23 @@ module.exports.run = async (client, message, args) => {
     ctx.textAlign = 'right';
     ctx.fillText(`${apiPing} MS`, width - X_OFFSET, 50);
 
-    // **3. İlerleme Çubuğu Çizimi**
-    
-    // Boş Çubuk (Tamamı)
-    ctx.fillStyle = BAR_BG; 
+    // Boş Çubuk (Arka Plan)
+    ctx.fillStyle = BAR_BG_COLOR; 
     ctx.beginPath();
+    // roundRect, yuvarlak köşeler için kullanılır
     ctx.roundRect(X_OFFSET, 80, BAR_WIDTH, BAR_HEIGHT, BAR_HEIGHT / 2);
     ctx.fill();
 
     // Dolu Çubuk (Ping Değerine Göre)
-    // Dolu alanın boyutu, max 500ms'ye göre hesaplanır. (0ms=Tam dolu, 500ms=Boş)
     const filledRatio = Math.max(0, Math.min(1, (500 - apiPing) / 500)); 
     const filledBarWidth = BAR_WIDTH * filledRatio;
     
+    const barFillColor = getBarFillColor(apiPing);
+
     // Gölgelendirme (Glow Effect) Ayarları
-    ctx.shadowColor = BAR_FILL;
+    ctx.shadowColor = barFillColor;
     ctx.shadowBlur = 10;
-    ctx.fillStyle = BAR_FILL;
+    ctx.fillStyle = barFillColor;
 
     ctx.beginPath();
     ctx.roundRect(X_OFFSET, 80, filledBarWidth, BAR_HEIGHT, BAR_HEIGHT / 2);
@@ -81,26 +79,92 @@ module.exports.run = async (client, message, args) => {
     // Gölgelendirmeyi Kapat
     ctx.shadowBlur = 0;
 
-    // **4. Alt Açıklama**
+    // Alt Açıklama (İstediğiniz yeni metin)
     ctx.font = '14px sans-serif';
     ctx.fillStyle = TEXT_GRAY;
     ctx.textAlign = 'center';
-    ctx.fillText('Discord API sunucularına olan anlık bağlantı gecikmesi.', width / 2, 160);
+    ctx.fillText('GraveBOT Güncel ping değerleri.', width / 2, 160); 
 
-    // Resmi Buffer olarak dışa aktar ve Attachment olarak hazırla
+    // Resmi Buffer olarak dışa aktar
     const buffer = canvas.toBuffer('image/png');
-    const attachment = new AttachmentBuilder(buffer, { name: 'ping-analiz.png' });
+    return new AttachmentBuilder(buffer, { name: 'ping.png' });
+}
 
-    // --- Embed Oluşturma ---
+
+// --- Komut Çalıştırma Fonksiyonu ---
+
+module.exports.run = async (client, message, args) => {
+    // 1. Yükleniyor Mesajı
+    const loadingEmbed = new EmbedBuilder()
+        .setColor('Yellow')
+        .setDescription('⏳ Lütfen bekleyin, ağ verileri analiz ediliyor ve görsel oluşturuluyor...')
+        .setThumbnail(client.user.displayAvatarURL({ dynamic: true }));
+
+    const msg = await message.channel.send({ embeds: [loadingEmbed] });
+
+    // 2. İlk Ping Hesaplama ve Görsel Oluşturma
+    const initialPing = Math.round(client.ws.ping);
+    const attachment = await createPingImage(client, initialPing, message.author.tag);
+    
+    // 3. Buton Oluşturma
+    const updateButton = new ButtonBuilder()
+        .setCustomId('ping_update_button')
+        .setLabel('Verileri Güncelle!')
+        .setStyle(ButtonStyle.Primary); 
+
+    const row = new ActionRowBuilder().addComponents(updateButton);
+
+    // 4. Nihai Embed Oluşturma
     const resultEmbed = new EmbedBuilder()
-        .setColor(embedColor) 
-        .setImage('attachment://ping-analiz.png') // Oluşturduğumuz resmi Embed'e ekliyoruz!
+        .setColor(getEmbedColor(initialPing)) 
+        .setImage('attachment://ping.png') // Oluşturulan resmi Embed'e ekliyoruz!
         .setThumbnail(client.user.displayAvatarURL({ dynamic: true })) 
-        .setTitle('🌐 Ağ Bağlantı Analizi') // Ana başlık (Görselin üstündeki)
-        .setDescription(`Discord API sunucuları ile bot arasındaki gecikme **${apiPing} ms**'dir.`)
+        .setTitle('🌐 Ağ Bağlantı Analizi') 
+        .setDescription(`Discord API sunucuları ile bot arasındaki gecikme **${initialPing} ms**'dir.`)
         .setFooter({ text: `Talep: ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) });
 
-    await msg.edit({ content: '\u200b', embeds: [resultEmbed], files: [attachment] });
+    // 5. Mesajı Gönderme (Buton dahil)
+    await msg.edit({ 
+        content: '\u200b', 
+        embeds: [resultEmbed], 
+        files: [attachment],
+        components: [row] 
+    });
+
+    // --- BUTON İŞLEYİCİ (COLLECTOR) ---
+    const filter = (interaction) => interaction.customId === 'ping_update_button' && interaction.user.id === message.author.id;
+    const collector = msg.createMessageComponentCollector({ filter, time: BUTTON_DURATION });
+
+    collector.on('collect', async (interaction) => {
+        // Butona basıldığını Discord'a bildir
+        await interaction.deferUpdate();
+
+        // Yeni ping değerini al
+        const newApiPing = Math.round(client.ws.ping);
+        
+        // Yeni görsel ve embed'i oluştur
+        const newAttachment = await createPingImage(client, newApiPing, interaction.user.tag);
+        const newEmbedColor = getEmbedColor(newApiPing);
+
+        const newResultEmbed = new EmbedBuilder()
+            .setColor(newEmbedColor) 
+            .setImage('attachment://ping.png') 
+            .setThumbnail(client.user.displayAvatarURL({ dynamic: true })) 
+            .setTitle('🌐 Ağ Bağlantı Analizi') 
+            .setDescription(`Discord API sunucuları ile bot arasındaki gecikme **${newApiPing} ms**'dir.`)
+            .setFooter({ text: `Talep: ${interaction.user.tag} (Güncellendi)`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) });
+        
+        // Mesajı güncelle
+        await interaction.editReply({ embeds: [newResultEmbed], files: [newAttachment] }).catch(() => {});
+    });
+
+    collector.on('end', async () => {
+        // Süre bittiğinde butonu devre dışı bırak
+        const disabledRow = new ActionRowBuilder().addComponents(
+            updateButton.setDisabled(true)
+        );
+        await msg.edit({ components: [disabledRow] }).catch(() => {});
+    });
 };
 
 module.exports.conf = {
