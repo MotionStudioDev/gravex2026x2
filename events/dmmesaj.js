@@ -1,15 +1,13 @@
-const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-} = require("discord.js");
+const { EmbedBuilder } = require("discord.js");
 
+// DM mesajlarını yakala ve belirli bir kanala gönder
 module.exports = async (message) => {
+  // ✅ Sadece DM mesajlarını yakala
   if (message.guild || message.author.bot) return;
 
-  const guildId = "1408511083232362547";     // kendi sunucu ID'n
-  const logChannelId = "1416172498923294830"; // DM loglarını görmek istediğin kanal ID'si
+  // Hedef sunucu ve kanal ID'lerini sabit tutabilirsin
+  const guildId = "SUNUCU_ID";       // kendi sunucu ID'n
+  const logChannelId = "KANAL_ID";   // DM loglarını görmek istediğin kanal ID'si
 
   const guild = message.client.guilds.cache.get(guildId);
   if (!guild) return;
@@ -17,6 +15,7 @@ module.exports = async (message) => {
   const logChannel = guild.channels.cache.get(logChannelId);
   if (!logChannel) return;
 
+  // ✅ Embed oluştur
   const embed = new EmbedBuilder()
     .setColor("Blurple")
     .setTitle("📩 Yeni DM Mesajı")
@@ -27,12 +26,5 @@ module.exports = async (message) => {
     )
     .setThumbnail(message.author.displayAvatarURL({ dynamic: true }));
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`dm_reply_${message.author.id}`)
-      .setLabel("Mesaj Gönder")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  await logChannel.send({ embeds: [embed], components: [row] });
+  logChannel.send({ embeds: [embed] });
 };
