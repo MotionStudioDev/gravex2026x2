@@ -8,7 +8,7 @@ client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
   let x = [
-    `g!yardım - v1.0.4 - Gelişmiş Sistemler!`
+    `g!yardım - v1.0.4 - Yapay Zeka eklendi!`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
