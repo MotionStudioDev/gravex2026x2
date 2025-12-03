@@ -19,7 +19,7 @@ module.exports.run = async (client, message) => {
 
     // --- 1. KOMUT LİSTELERİ ---
     const commandLists = {
-        'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yardım'],
+        'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yapay-zeka',  'yardım'],
         'kullanici': ['avatar', 'profil', 'deprem', 'döviz', 'çeviri', 'emojiler', 'emoji-bilgi'],
         'moderasyon': ['ban', 'unban', 'kick', 'sil', 'rol-ver','rol-al', 'mute', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
         'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'sayaç', 'slowmode'],
@@ -38,7 +38,7 @@ module.exports.run = async (client, message) => {
             .setDescription(
                 `Prefix: \`g!\`\n\n**Merhaba ${message.author.username}, aşağıdaki menüden kategori seçiniz.**\n\n` +
                 `**Anlık Ping:** ${pingEmoji} **${ping}ms**\n` +
-                `**Destek Sunucusu:** [Buraya Tıklayın](https://discord.gg/desteksunucun)` // Varsayımsal destek linki
+                `**Destek Sunucusu:** [Buraya Tıklayın](https://discord.gg/CVZ4zEkJws)` // Varsayımsal destek linki
             )
             .setThumbnail(client.user.displayAvatarURL({ dynamic: true })) // Bot avatarı eklendi
             .setFooter({ text: `Komutu kullanan: ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
