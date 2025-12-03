@@ -78,7 +78,6 @@ client.otoroller = new Map();           // guildId → rolId
 client.otorolLogKanalları = new Map();  // guildId → kanalId
 client.reklamLogKanalları = new Map(); // guildId → kanalId
 
-const DM_LOG_CHANNEL_ID = '1416172498923294830';
 
 client.on('emojiCreate', require('./events/emojiCreate'));
 client.on('emojiDelete', require('./events/emojiDelete'));
