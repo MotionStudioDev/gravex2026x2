@@ -5,7 +5,8 @@ const { GoogleGenAI } = require('@google/genai');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
 const MAX_RETRIES = 3; 
 const INITIAL_BACKOFF_MS = 1000; 
-const BUTTON_TIMEOUT = 300000; // 5 dakika (5 * 60 * 1000)
+const BUTTON_TIMEOUT = 300000; // 5 dakika
+const MAX_HISTORY_TURNS = 10; // 10 soru-cevap çiftinden sonra uyarı verir
 
 // API Anahtarı Kontrolü
 if (!GEMINI_API_KEY) {
@@ -18,17 +19,14 @@ const modelName = 'gemini-2.5-flash';
 // Yardımcı fonksiyon: Belirtilen süre kadar bekler
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Botun istemci objesine sohbet oturumlarını kaydetmek için (client.js'te bu tanımın yapıldığını varsayıyoruz)
-if (!client.userSessions) {
-    client.userSessions = new Map();
-}
-
 /**
  * Kullanıcının sohbet oturumunu alır veya oluşturur.
+ * NOT: Bu fonksiyon, client.userSessions'ın run içinde başlatıldığını varsayar.
+ * @param {object} client - Discord Client objesi.
  * @param {string} userId - Discord kullanıcısının ID'si.
  * @returns {object} - Gemini Chat Session objesi.
  */
-function getOrCreateChatSession(userId) {
+function getOrCreateChatSession(client, userId) {
     let chat = client.userSessions.get(userId);
     
     if (!chat) {
@@ -43,8 +41,14 @@ function getOrCreateChatSession(userId) {
     return chat;
 }
 
-
 module.exports.run = async (client, message, args) => {
+    // --- BAŞLANGIÇ KONTROLÜ (Hafıza Yönetimi DÜZELTİLDİ) ---
+    // client objesi artık burada tanımlıdır.
+    if (!client.userSessions) {
+        client.userSessions = new Map();
+    }
+    // --------------------------------------------------------
+    
     // API anahtarı yoksa komutu çalıştırma
     if (!GEMINI_API_KEY) {
         return message.reply("❌ Yapay zeka sistemi API anahtarı eksik olduğu için devre dışıdır.");
@@ -63,8 +67,16 @@ module.exports.run = async (client, message, args) => {
         
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
-    let chat = getOrCreateChatSession(userId);
+    let chat = getOrCreateChatSession(client, userId);
     let lastError = null;
+    
+    // Geçmiş uyarısı
+    if (chat.getHistory().length / 2 >= MAX_HISTORY_TURNS) {
+        const resetEmbed = new EmbedBuilder()
+            .setColor('Orange')
+            .setDescription(`⚠️ Sohbet geçmişi çok uzadı (${MAX_HISTORY_TURNS} soru-cevap). Yeni bir konu için lütfen alttaki **Hafızayı Sıfırla** butonunu kullanın.`);
+        message.channel.send({ embeds: [resetEmbed] }).catch(() => {});
+    }
     
     // Butonları oluştur
     const row = new ActionRowBuilder().addComponents(
@@ -119,7 +131,7 @@ module.exports.run = async (client, message, args) => {
                 );
 
                 await i.update({ embeds: [resetSuccessEmbed], components: [disabledRow] });
-                collector.stop(); // Dinlemeyi durdur
+                collector.stop(); 
             });
             
             collector.on('end', async (collected, reason) => {
@@ -150,7 +162,7 @@ module.exports.run = async (client, message, args) => {
                 await sleep(backoffTime);
                 
             } else {
-                // Hata durumunda oturumu sıfırla
+                // Hata durumunda oturumu sıfırla ve döngüyü kır
                 client.userSessions.delete(userId);
                 break; 
             }
@@ -161,7 +173,7 @@ module.exports.run = async (client, message, args) => {
     const finalErrorEmbed = new EmbedBuilder()
         .setColor('Red')
         .setTitle('❌ Sorgu Başarısız Oldu')
-        .setDescription('Yapay zeka servisine bağlanılamadı veya rate limit aşıldı.')
+        .setDescription('Yapay zeka servisine bağlanılamadı veya tüm denemelerde hata oluştu. Oturumunuz sıfırlandı.')
         .addFields(
             { name: 'Hata Detayı', value: `\`\`\`${lastError ? (lastError.message || 'Bilinmeyen Hata') : 'API anahtarı eksik.'}\`\`\`` }
         )
@@ -171,7 +183,7 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = {
-    aliases: ['ai', 'yapay-zeka', 'soru-cevap']
+    aliases: ['ai', 'yapay-zeka', 'soru-cevap', 'ai-soru']
 };
 
 module.exports.help = {
