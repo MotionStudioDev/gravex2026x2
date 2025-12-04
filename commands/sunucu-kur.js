@@ -1,41 +1,84 @@
 const { EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 
-// --- Sunucu Şablonu Tanımları ---
+// --- GENİŞLETİLMİŞ SUNUCU ŞABLONU ---
+
 const ROLES = [
-    { name: 'Yönetici', color: '#e74c3c', permissions: [PermissionsBitField.Flags.Administrator] },
-    { name: 'Moderatör', color: '#f1c40f', permissions: [PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.KickMembers] },
+    { name: 'Kurucu', color: '#e74c3c', permissions: [PermissionsBitField.Flags.Administrator], hoist: true },
+    { name: 'Yönetim', color: '#e67e22', permissions: [PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageRoles, PermissionsBitField.Flags.KickMembers, PermissionsBitField.Flags.BanMembers], hoist: true },
+    { name: 'Geliştirici', color: '#9b59b6', permissions: [], hoist: true },
+    { name: 'Moderatör', color: '#f1c40f', permissions: [PermissionsBitField.Flags.ManageMessages, PermissionsBitField.Flags.MuteMembers, PermissionsBitField.Flags.DeafenMembers], hoist: true },
+    { name: 'VIP Üye', color: '#3498db', permissions: [] },
     { name: 'Üye', color: '#2ecc71', permissions: [] },
+    { name: 'Botlar', color: '#7289da', permissions: [PermissionsBitField.Flags.ViewChannel] },
 ];
 
 const CATEGORIES = [
     { 
-        name: '— BİLGİ —', 
+        name: '— GİRİŞ & BİLGİ —', 
         channels: [
+            { name: '#👋-hoş-geldin', type: ChannelType.GuildText },
             { name: '#📝-kurallar', type: ChannelType.GuildText },
             { name: '#📢-duyurular', type: ChannelType.GuildText },
+            { name: '#🔗-sosyal-medya', type: ChannelType.GuildText },
         ] 
     },
     { 
-        name: '— GENEL —', 
+        name: '— TOPLULUK SOHBETİ —', 
         channels: [
             { name: '#💬-genel-sohbet', type: ChannelType.GuildText },
-            { name: '#🖼️-medya', type: ChannelType.GuildText },
-            { name: '#🔊-genel-ses', type: ChannelType.GuildVoice },
+            { name: '#🤖-bot-komut', type: ChannelType.GuildText },
+            { name: '#🖼️-medya-paylaşım', type: ChannelType.GuildText },
+            { name: '#💡-öneri-şikayet', type: ChannelType.GuildText },
         ] 
     },
     { 
-        name: '— YÖNETİM —', 
+        name: '— SES KANALLARI —', 
         channels: [
-            { name: '#🚨-mod-log', type: ChannelType.GuildText },
-            { name: '#🛠️-komut-odası', type: ChannelType.GuildText },
-            { name: '#🎤-yönetim-ses', type: ChannelType.GuildVoice },
+            { name: '#🔊-genel-lounge', type: ChannelType.GuildVoice },
+            { name: '#🎤-muhabbet-odası', type: ChannelType.GuildVoice },
+        ] 
+    },
+    { 
+        name: '— ÖZEL ERİŞİM —', 
+        channels: [
+            // Bu kanala sadece 'VIP Üye' ve üstü erişebilir
+            { name: '#⭐-vip-lounge', type: ChannelType.GuildText, permissionOverwrites: (guild, roles) => ([
+                { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, // Herkese kapat
+                { id: roles['VIP Üye'].id, allow: [PermissionsBitField.Flags.ViewChannel] }, // VIP'e aç
+                { id: roles['Yönetim'].id, allow: [PermissionsBitField.Flags.ViewChannel] },
+                { id: roles['Kurucu'].id, allow: [PermissionsBitField.Flags.ViewChannel] },
+            ])},
+        ] 
+    },
+    { 
+        name: '— YÖNETİM & LOGS —', 
+        channels: [
+            // Bu kategoriye sadece 'Moderatör' ve üstü erişebilir
+            { 
+                name: '#🚨-mod-log', 
+                type: ChannelType.GuildText, 
+                permissionOverwrites: (guild, roles) => ([
+                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, // Herkese kapat
+                    { id: roles['Moderatör'].id, allow: [PermissionsBitField.Flags.ViewChannel] }, // Mod'a aç
+                ])
+            },
+            { 
+                name: '#🛠️-yönetim-sohbet', 
+                type: ChannelType.GuildText, 
+                permissionOverwrites: (guild, roles) => ([
+                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                    { id: roles['Yönetim'].id, allow: [PermissionsBitField.Flags.ViewChannel] },
+                ])
+            },
+            { name: '#⚙️-admin-ses', type: ChannelType.GuildVoice },
         ] 
     }
 ];
 
+// --- MODÜL BAŞLANGICI ---
+
 module.exports.run = async (client, message, args) => {
     
-    // --- YETKİ KONTROLÜ (Kurulum için Yüksek Yetki Gerekir) ---
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
         const embed = new EmbedBuilder()
             .setColor('Red')
@@ -44,16 +87,16 @@ module.exports.run = async (client, message, args) => {
         return message.channel.send({ embeds: [embed] });
     }
     
-    // --- ONAY AŞAMASI ---
+    // --- ONAY AŞAMASI (Önceki kod ile aynı mantık) ---
     const onayEmbed = new EmbedBuilder()
         .setColor('Orange')
-        .setTitle('⚠️ SUNUCU KURULUM ONAYI GEREKLİ')
+        .setTitle('⚠️ YÜKSEK SEVİYE KURULUM ONAYI GEREKLİ')
         .setDescription(`
-        **DİKKAT!** Bu işlem, sunucunuzdaki **mevcut kanalları, kategorileri ve rolleri silmeyecektir** ancak üzerine yeni bir yapı kuracaktır.
+        **DİKKAT!** Bu işlem sunucunuzdaki mevcut yapının **yanına** yeni, detaylı bir kurumsal yapı kuracaktır.
 
         Bu işlemi onaylıyor musunuz?
         
-        *İşlem tamamlandığında ${message.guild.name} sunucusu aşağıdaki yapıya sahip olacaktır.*
+        *Lütfen bu işlemden sonra sunucu ayarlarınızdan izinleri kontrol edin.*
         `)
         .addFields(
             { name: 'Oluşturulacak Rol Sayısı', value: `${ROLES.length} rol`, inline: true },
@@ -61,29 +104,28 @@ module.exports.run = async (client, message, args) => {
             { name: 'Oluşturulacak Kanal Sayısı', value: `${CATEGORIES.reduce((acc, cat) => acc + cat.channels.length, 0)} kanal`, inline: true }
         )
         .setTimestamp()
-        .setFooter({ text: 'Onaylamak için 30 saniyeniz var.' });
+        .setFooter({ text: 'Onaylamak için 30 saniyeniz var. İşlem iptal edilemez!' });
 
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('server_setup_onay').setLabel('✅ KURULUMU BAŞLAT').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('server_setup_reddet').setLabel('❌ İPTAL ET').setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId('pro_setup_onay').setLabel('✅ BAŞLAT').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('pro_setup_reddet').setLabel('❌ İPTAL ET').setStyle(ButtonStyle.Danger)
     );
 
     const msg = await message.channel.send({ embeds: [onayEmbed], components: [row] });
 
     const collector = msg.createMessageComponentCollector({
-        filter: i => i.customId.startsWith('server_setup_'),
+        filter: i => i.customId.startsWith('pro_setup_'),
         time: 30000 
     });
 
     collector.on('collect', async i => {
-        // Sadece komutu kullanan yetkilinin butonlara basmasını sağla
         if (i.user.id !== message.author.id) {
             return i.reply({ content: 'Bu butonları sadece işlemi başlatan yetkili kullanabilir.', ephemeral: true });
         }
 
-        collector.stop(); // Onay veya Red işlemi yapıldıysa dinlemeyi durdur
+        collector.stop(); 
 
-        if (i.customId === 'server_setup_onay') {
+        if (i.customId === 'pro_setup_onay') {
             await i.update({ 
                 embeds: [new EmbedBuilder().setColor('Yellow').setTitle('🔄 Sunucu Yapılandırması Başlatılıyor...').setDescription('Kanallar ve roller oluşturuluyor.')], 
                 components: [] 
@@ -91,7 +133,7 @@ module.exports.run = async (client, message, args) => {
 
             const guild = message.guild;
             let totalCreated = 0;
-            const log = [];
+            const createdRoles = {}; // İzinleri ayarlarken kullanmak için rolleri tutacağız
 
             try {
                 // 1. ROLLERİ OLUŞTURMA
@@ -100,11 +142,11 @@ module.exports.run = async (client, message, args) => {
                         name: roleData.name,
                         color: roleData.color,
                         permissions: roleData.permissions,
-                        reason: `${message.author.tag} tarafından sunucu kurulumu yapılıyor.`,
+                        hoist: roleData.hoist || false, // Hoist: Rolü üyelerden ayrı göster
+                        reason: `Pro Kurulum: ${message.author.tag}`,
                     });
-                    log.push(`✅ Rol Oluşturuldu: ${newRole.name}`);
+                    createdRoles[roleData.name] = newRole; // Rolü Map'e kaydet
                     totalCreated++;
-                    // Botun rolünü yeni rolleri yönetebilecek şekilde güncelleyebiliriz (opsiyonel)
                 }
 
                 // 2. KATEGORİ VE KANALLARI OLUŞTURMA
@@ -112,19 +154,26 @@ module.exports.run = async (client, message, args) => {
                     const newCategory = await guild.channels.create({
                         name: categoryData.name,
                         type: ChannelType.GuildCategory,
-                        reason: 'Sunucu Kurulumu'
+                        reason: 'Pro Sunucu Kurulumu'
                     });
-                    log.push(`\n📁 Kategori Oluşturuldu: ${newCategory.name}`);
                     totalCreated++;
 
                     for (const channelData of categoryData.channels) {
-                        const newChannel = await guild.channels.create({
+                        
+                        let permissionOverwrites = [];
+                        
+                        // Eğer permissionOverwrites fonksiyonu tanımlıysa (Özel erişim kanalları)
+                        if (channelData.permissionOverwrites) {
+                            permissionOverwrites = channelData.permissionOverwrites(guild, createdRoles);
+                        }
+                        
+                        await guild.channels.create({
                             name: channelData.name,
                             type: channelData.type,
                             parent: newCategory.id,
-                            reason: 'Sunucu Kurulumu'
+                            permissionOverwrites: permissionOverwrites, // İzinleri uygula
+                            reason: 'Pro Sunucu Kurulumu'
                         });
-                        log.push(`  → Kanal Oluşturuldu: ${newChannel.name}`);
                         totalCreated++;
                     }
                 }
@@ -132,15 +181,16 @@ module.exports.run = async (client, message, args) => {
                 // --- İŞLEM SONUÇLANDI ---
                 const finalEmbed = new EmbedBuilder()
                     .setColor('Green')
-                    .setTitle('✅ SUNUCU KURULUMU BAŞARILI')
+                    .setTitle('✅ KURUMSAL KURULUM BAŞARILI')
                     .setDescription(`
-                    Sunucunuzun temel yapısı başarıyla oluşturuldu!
+                    Sunucunuzun **kurumsal yapısı** başarıyla oluşturuldu!
                     
                     **Toplam Oluşturulan Öğe:** **${totalCreated}**
+                    
+                    **ÖNEMLİ:** Lütfen 'ÖZEL ERİŞİM' kategorisindeki kanalların izinlerini kontrol edin.
                     `)
                     .addFields(
-                        { name: 'Oluşturulan Roller', value: ROLES.map(r => r.name).join(', '), inline: false },
-                        { name: 'Oluşturulan Kategoriler', value: CATEGORIES.map(c => c.name).join(', '), inline: false }
+                        { name: 'Oluşturulan Roller', value: Object.keys(createdRoles).join(', '), inline: false }
                     )
                     .setFooter({ text: `${message.author.tag} tarafından kuruldu.` });
 
@@ -148,21 +198,21 @@ module.exports.run = async (client, message, args) => {
 
             } catch (error) {
                 // Kurulum sırasında genel hata
-                console.error("Sunucu Kurulum Hatası:", error);
+                console.error("Pro Sunucu Kurulum Hatası:", error);
                 const errorEmbed = new EmbedBuilder()
                     .setColor('Red')
-                    .setTitle('❌ Kurulum Hatası')
-                    .setDescription('Kurulum sırasında beklenmedik bir hata oluştu. Lütfen botun yetkilerini kontrol edin (özellikle en yüksek rol pozisyonunu).')
+                    .setTitle('❌ Kritik Kurulum Hatası')
+                    .setDescription('Kurulum sırasında beklenmedik bir hata oluştu. Botun **en yüksek rol pozisyonunda** olduğundan ve yeterli yetkiye sahip olduğundan emin olun.')
                     .addFields({ name: 'Hata Mesajı', value: `\`\`\`${error.message.substring(0, 500)}\`\`\`` });
 
                 await msg.edit({ embeds: [errorEmbed] });
             }
 
-        } else if (i.customId === 'server_setup_reddet') {
+        } else if (i.customId === 'pro_setup_reddet') {
             const rejectEmbed = new EmbedBuilder()
                 .setColor('Red')
                 .setTitle('❌ İşlem İptal Edildi')
-                .setDescription(`${message.author} işlemi **iptal etmeyi** seçti. Sunucu kurulumu başlamadı.`);
+                .setDescription(`Kurumsal kurulum işlemi ${message.author} tarafından **iptal edildi**.`);
             
             await i.update({ embeds: [rejectEmbed], components: [] });
         }
@@ -173,9 +223,8 @@ module.exports.run = async (client, message, args) => {
             const timeoutEmbed = new EmbedBuilder()
                 .setColor('Grey')
                 .setTitle('⏱️ İşlem Zaman Aşımı')
-                .setDescription('Onay süresi dolduğu için sunucu kurulumu otomatik olarak iptal edildi.');
+                .setDescription('Onay süresi dolduğu için kurulum otomatik olarak iptal edildi.');
             
-            // Butonları devre dışı bırak
             const disabledRow = new ActionRowBuilder().addComponents(
                 ButtonBuilder.from(row.components[0]).setDisabled(true),
                 ButtonBuilder.from(row.components[1]).setDisabled(true)
@@ -186,10 +235,10 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = {
-    aliases: ['server-setup', 'kurulum', 'hazir-sunucu']
+    aliases: ['server-pro', 'pro-kurulum', 'profosyonel-kur']
 };
 
 module.exports.help = {
-    name: 'sunucu-kur',
-    description: 'Hazır bir sunucu yapısını (roller, kanallar) tek tuşla kurar.'
+    name: 'sunucu-kur-pro',
+    description: 'Yüksek hiyerarşi ve özel erişim kanalları içeren profesyonel bir sunucu yapısı kurar.'
 };
