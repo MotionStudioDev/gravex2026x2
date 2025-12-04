@@ -123,7 +123,7 @@ module.exports.run = async (client, message, args) => {
                     .setColor('Green')
                     .setTitle('✅ Sohbet Hafızası Sıfırlandı')
                     .setDescription('Yeni bir konuya başlayabilirsiniz.')
-                    .setFooter({ text: `Powered by Gemini | ${message.author.tag}` });
+                    .setFooter({ text: `Powered by MotionAI | ${message.author.tag}` });
                 
                 // Butonu devre dışı bırak
                 const disabledRow = new ActionRowBuilder().addComponents(
