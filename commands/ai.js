@@ -1,16 +1,15 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { GoogleGenAI } = require('@google/genai');
 
 // ⚠️ .env dosyanızdan GEMINI_API_KEY değişkenini çeker.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
-const MAX_RETRIES = 3; // Maksimum deneme sayısı
-const INITIAL_BACKOFF_MS = 1000; // İlk bekleme süresi (1 saniye)
+const MAX_RETRIES = 3; 
+const INITIAL_BACKOFF_MS = 1000; 
+const BUTTON_TIMEOUT = 300000; // 5 dakika (5 * 60 * 1000)
 
 // API Anahtarı Kontrolü
 if (!GEMINI_API_KEY) {
     console.error("HATA: GEMINI_API_KEY çevresel değişkeni yüklenemedi. Lütfen .env dosyanızı kontrol edin.");
-    // Eğer anahtar yoksa, botun çökmesini önlemek için işlemciyi durdurmak yerine 
-    // sadece bu komutun çalışmasını engelleyebiliriz.
 }
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
@@ -19,6 +18,32 @@ const modelName = 'gemini-2.5-flash';
 // Yardımcı fonksiyon: Belirtilen süre kadar bekler
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Botun istemci objesine sohbet oturumlarını kaydetmek için (client.js'te bu tanımın yapıldığını varsayıyoruz)
+if (!client.userSessions) {
+    client.userSessions = new Map();
+}
+
+/**
+ * Kullanıcının sohbet oturumunu alır veya oluşturur.
+ * @param {string} userId - Discord kullanıcısının ID'si.
+ * @returns {object} - Gemini Chat Session objesi.
+ */
+function getOrCreateChatSession(userId) {
+    let chat = client.userSessions.get(userId);
+    
+    if (!chat) {
+        chat = ai.chats.create({
+            model: modelName,
+            config: {
+                 systemInstruction: "Sen Grave adlı bir Discord botunun yapay zeka asistanısın. Kısa, bilgilendirici ve ilgili dilde cevaplar ver. Kullanıcının önceki sorularını hatırla.",
+            }
+        });
+        client.userSessions.set(userId, chat);
+    }
+    return chat;
+}
+
+
 module.exports.run = async (client, message, args) => {
     // API anahtarı yoksa komutu çalıştırma
     if (!GEMINI_API_KEY) {
@@ -26,6 +51,7 @@ module.exports.run = async (client, message, args) => {
     }
     
     const query = args.join(' ');
+    const userId = message.author.id;
     
     if (!query) {
         return message.reply("Lütfen sormak istediğiniz soruyu belirtin. Örn: `g!sor Yapay zeka nedir?`");
@@ -37,18 +63,20 @@ module.exports.run = async (client, message, args) => {
         
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
+    let chat = getOrCreateChatSession(userId);
     let lastError = null;
+    
+    // Butonları oluştur
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('ai_reset').setLabel('🧠 Hafızayı Sıfırla').setStyle(ButtonStyle.Danger)
+    );
     
     // Geri Çekilme ve Yeniden Deneme Döngüsü
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-            // 1. API Çağrısı
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: query,
-            });
+            // API Çağrısı
+            const response = await chat.sendMessage({ message: query });
 
-            // Başarılı olursa döngüyü kır
             let answer = response.text.trim();
             if (answer.length > 4096) {
                  answer = answer.substring(0, 4000) + '... (Yanıt çok uzun, devamı kesildi.)';
@@ -61,34 +89,70 @@ module.exports.run = async (client, message, args) => {
                     { name: 'Soru', value: `\`${query}\``, inline: false },
                     { name: 'Cevap', value: answer, inline: false }
                 )
-                .setFooter({ text: `Powered by MotionAI | ${message.author.tag}` });
+                .setFooter({ text: `Powered by Gemini | ${message.author.tag} | Konuşma Hafızalı` });
 
-            await msg.edit({ embeds: [resultEmbed] });
+            await msg.edit({ embeds: [resultEmbed], components: [row] });
+            
+            // --- BUTON DİNLEYİCİSİ (COLLECTOR) ---
+            const collector = msg.createMessageComponentCollector({
+                filter: i => i.customId === 'ai_reset',
+                time: BUTTON_TIMEOUT
+            });
+            
+            collector.on('collect', async i => {
+                if (i.user.id !== message.author.id) {
+                    return i.reply({ content: 'Bu butonu sadece işlemi başlatan kişi kullanabilir.', ephemeral: true });
+                }
+
+                // Sohbet oturumunu silerek sıfırla
+                client.userSessions.delete(userId);
+                
+                const resetSuccessEmbed = new EmbedBuilder()
+                    .setColor('Green')
+                    .setTitle('✅ Sohbet Hafızası Sıfırlandı')
+                    .setDescription('Yeni bir konuya başlayabilirsiniz.')
+                    .setFooter({ text: `Powered by Gemini | ${message.author.tag}` });
+                
+                // Butonu devre dışı bırak
+                const disabledRow = new ActionRowBuilder().addComponents(
+                    ButtonBuilder.from(row.components[0]).setDisabled(true).setLabel('Hafıza Sıfırlandı')
+                );
+
+                await i.update({ embeds: [resetSuccessEmbed], components: [disabledRow] });
+                collector.stop(); // Dinlemeyi durdur
+            });
+            
+            collector.on('end', async (collected, reason) => {
+                if (reason === 'time') {
+                    // Süre dolduğunda butonu devre dışı bırak
+                    const disabledRow = new ActionRowBuilder().addComponents(
+                        ButtonBuilder.from(row.components[0]).setDisabled(true).setLabel('Süre Doldu')
+                    );
+                    await msg.edit({ components: [disabledRow] }).catch(() => {});
+                }
+            });
+
             return; // Komut başarıyla tamamlandı
 
         } catch (error) {
             lastError = error;
 
-            // Hata mesajında "rate limit" veya "429" arama
             const isRateLimit = error.message && (error.message.includes('429') || error.message.toLowerCase().includes('rate limit'));
 
             if (isRateLimit && attempt < MAX_RETRIES - 1) {
-                // Üstel olarak artan bekleme süresi (1s, 2s, 4s)
                 const backoffTime = INITIAL_BACKOFF_MS * (2 ** attempt);
                 
-                // Kullanıcıya bilgi ver
                 const waitingEmbed = new EmbedBuilder()
                     .setColor('Orange')
                     .setDescription(`🚨 Rate Limit! Yeniden deneme için ${Math.round(backoffTime / 1000)} saniye bekleniyor... (Deneme: ${attempt + 1}/${MAX_RETRIES})`);
                 
                 await msg.edit({ embeds: [waitingEmbed] }).catch(() => {});
-                
-                // Bekle
                 await sleep(backoffTime);
                 
             } else {
-                // Rate limit değilse veya son denemeyse, döngüyü kır ve hatayı göster
-                break;
+                // Hata durumunda oturumu sıfırla
+                client.userSessions.delete(userId);
+                break; 
             }
         }
     }
@@ -103,7 +167,7 @@ module.exports.run = async (client, message, args) => {
         )
         .setFooter({ text: 'Lütfen daha sonra tekrar deneyin.' });
         
-    await msg.edit({ embeds: [finalErrorEmbed] });
+    await msg.edit({ embeds: [finalErrorEmbed], components: [] });
 };
 
 module.exports.conf = {
