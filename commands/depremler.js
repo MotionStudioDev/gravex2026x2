@@ -70,7 +70,7 @@ module.exports.run = async (client, message, args) => {
     // Yükleniyor Mesajı
     const loadingEmbed = new EmbedBuilder()
         .setColor('Yellow')
-        .setDescription('⏳ Kandilli Rasathanesi verileri çekiliyor...');
+        .setDescription('<a:yukle:1440677432976867448> MotionAPI verileri çekiliyor...');
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
     let { depremler, mainStyle } = await getirDepremler();
@@ -94,7 +94,7 @@ module.exports.run = async (client, message, args) => {
             .setTitle(`${mainStyle.emoji} ${mainStyle.title} (Sayfa ${page + 1}/${maxPages})`)
             .setTimestamp()
             .setFooter({ 
-                text: `Kandilli Rasathanesi Verisi • Toplam: ${depremler.length} kayıt • Son güncelleme: ${new Date().toLocaleTimeString('tr-TR')}` 
+                text: `Motion Deprem Verisi • Toplam: ${depremler.length} kayıt • Son güncelleme: ${new Date().toLocaleTimeString('tr-TR')}` 
             })
             .setDescription(
                 slice.map(d => {
