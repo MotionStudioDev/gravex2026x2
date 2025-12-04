@@ -101,7 +101,7 @@ module.exports.run = async (client, message, args) => {
                     { name: 'Soru', value: `\`${query}\``, inline: false },
                     { name: 'Cevap', value: answer, inline: false }
                 )
-                .setFooter({ text: `Powered by Gemini | ${message.author.tag} | Konuşma Hafızalı` });
+                .setFooter({ text: `Powered by MotionAI | ${message.author.tag} | Konuşma Hafızalı` });
 
             await msg.edit({ embeds: [resultEmbed], components: [row] });
             
