@@ -1,4 +1,15 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, InteractionType } = require('discord.js');
+const { 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    PermissionsBitField, 
+    ModalBuilder, 
+    TextInputBuilder, 
+    TextInputStyle, 
+    ChannelType, 
+    InteractionType 
+} = require('discord.js');
 
 // Modal ID'leri ve İşlem Tipleri
 const MODAL_ID = 'kanalekle_modal';
@@ -19,7 +30,7 @@ module.exports.run = async (client, message, args) => {
                         .setTitle('❌ Yetki Hatası')
                         .setDescription('Bu komutu sadece **Yönetici** veya **Kanalları Yönet** yetkisine sahip olanlar kullanabilir.')
                 ],
-                ephemeral: true // Kullanıcıya özel yanıt
+                ephemeral: true
             });
         }
 
@@ -43,15 +54,16 @@ module.exports.run = async (client, message, args) => {
         });
 
         collector.on('collect', async i => {
-            await i.deferUpdate(); // Hızlı yanıt vermek için
-
+            // Hata çözümü: i.deferUpdate() kaldırıldı. Modal göstermek tek başına geçerli bir yanıttır.
+            
             if (i.customId === 'iptal') {
                 const cancelEmbed = new EmbedBuilder()
                     .setColor('#FF0000')
                     .setTitle('❌ İşlem İptal Edildi')
                     .setDescription('Kanal ekleme işlemi iptal edildi.');
                 
-                await msg.edit({ embeds: [cancelEmbed], components: [] });
+                // İptal butonuna tıklandığında mesajı güncelle
+                await i.update({ embeds: [cancelEmbed], components: [] }); 
                 return collector.stop();
             }
 
@@ -82,7 +94,8 @@ module.exports.run = async (client, message, args) => {
                 new ActionRowBuilder().addComponents(kategoriInput)
             );
 
-            await i.showModal(modal);
+            // Modal'ı göster. Bu, butona tek ve doğru yanıttır.
+            await i.showModal(modal); 
             collector.stop(); // Modal açıldıktan sonra buton kolektörünü durdur
 
             // --- Modal Yanıtını Yakalama ---
@@ -118,7 +131,6 @@ module.exports.run = async (client, message, args) => {
                         .setTitle('⚠️ Kategori Hatası')
                         .setDescription('Girilen Kategori ID geçersiz veya bir kategori kanalı değil. Kanal kök dizine eklenecek.');
                     await msg.edit({ embeds: [kategoriHataEmbed], components: [] });
-                    // Hata mesajını gösterdikten sonra devam et
                 }
             }
             
@@ -140,7 +152,7 @@ module.exports.run = async (client, message, args) => {
                 await msg.edit({ embeds: [doneEmbed], components: [] });
 
             } catch (err) {
-                console.error('Gelişmiş Kanal Ekleme Hatası:', err);
+                console.error('Kanal Oluşturma Hatası:', err);
                 const errorEmbed = new EmbedBuilder()
                     .setColor('#FF0000')
                     .setTitle('❌ Kanal Oluşturma Hatası')
@@ -151,12 +163,13 @@ module.exports.run = async (client, message, args) => {
         });
 
         collector.on('end', async (collected, reason) => {
-             if (reason !== 'user') { // Kullanıcı kendisi iptal etmediyse veya modal açılmadıysa butonları devre dışı bırak
+             // Kullanıcı kendisi iptal etmediyse veya modal açılmadıysa butonları devre dışı bırak
+             if (reason !== 'user' && reason !== 'modalSubmit') { 
                 try {
                     const disabledRow = new ActionRowBuilder().addComponents(
                         row.components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
                     );
-                    await msg.edit({ components: [disabledRow] });
+                    await msg.edit({ components: [disabledRow] }).catch(() => {});
                 } catch {}
              }
         });
