@@ -125,11 +125,8 @@ client.login(x).catch(e => {
 
 /*=======================================================================================*/
 ////// 7/24 
-const express = require('express');
-const app = express();
-
-// Render ortamında 'PORT' değişkeni otomatik olarak atanır.
-// Eğer atanmamışsa (Render'da bu nadiren olur ama güvenli olmak için) 8080 kullan.
+// main.js dosyanızda
+// Render ortam değişkeni olan PORT'u kullan. Yoksa güvenli bir varsayılan kullan.
 const port = process.env.PORT || 8080; 
 
 // Render sağlık kontrolü için basit bir yanıt
@@ -142,10 +139,7 @@ app.listen(port, () => {
   console.log(`HTTP sunucusu port ${port} üzerinde dinliyor.`);
 });
 
-// Bu kodun, botun ana dosyanızda (örneğin index.js) Discord client kodundan önce
-// çalıştığından emin olun.
-// Bu noktadan sonra normal Discord bot kodunuz başlar (client.login vb.)
-// ...
+// ... Discord Client başlatma kodunuz ...
 /////////////////////////////CAPS ENGELLL
 const GuildSettings = require("./models/GuildSettings");
 
