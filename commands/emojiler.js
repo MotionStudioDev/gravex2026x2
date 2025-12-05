@@ -7,7 +7,7 @@ module.exports.run = async (client, message, args) => {
     const allEmojis = message.guild.emojis.cache.map(e => ({
         gösterim: `${e} \`${e.name}\``,
         id: e.id,
-        // Düzeltme: Emoji#url yerine Emoji#imageURL() kullanıldı.
+        // DeprecationWarning ve güvenli URL için imageURL() metodu kullanıldı.
         url: e.imageURL({ extension: e.animated ? 'gif' : 'png' }), 
         name: e.name,
         animated: e.animated 
@@ -89,7 +89,7 @@ module.exports.run = async (client, message, args) => {
      */
     const row = (currentIndex, listLength, filter) => {
         
-        const currentEmoji = filteredEmojis[currentIndex]; // Filtrelenmiş liste kullanılır.
+        const currentEmoji = filteredEmojis[currentIndex];
 
         const filterRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('filter_all').setLabel('Tümü').setStyle(filter === 'ALL' ? ButtonStyle.Success : ButtonStyle.Secondary),
@@ -98,10 +98,18 @@ module.exports.run = async (client, message, args) => {
         );
         
         const navRow = new ActionRowBuilder().addComponents(
+            // Etkileşimli Buton
             new ButtonBuilder().setCustomId('prev').setLabel('⬅️ Önceki').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === 0 || listLength <= 1),
+            // Etkileşimli Buton
             new ButtonBuilder().setCustomId('download').setLabel('📥 İndir').setStyle(ButtonStyle.Success).setDisabled(listLength === 0),
-            // Hata Düzeltme: currentEmoji.url kullanılır.
-            new ButtonBuilder().setCustomId('url').setLabel('🔗 URL').setStyle(ButtonStyle.Link).setURL(listLength === 0 ? 'https://discord.com' : currentEmoji.url), 
+            
+            // 🛑 RangeError Düzeltmesi: setCustomId kaldırıldı.
+            new ButtonBuilder()
+                .setLabel('🔗 URL')
+                .setStyle(ButtonStyle.Link)
+                .setURL(listLength === 0 ? 'https://discord.com' : currentEmoji.url), 
+            
+            // Etkileşimli Buton
             new ButtonBuilder().setCustomId('next').setLabel('Sonraki ➡️').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === listLength - 1 || listLength <= 1)
         );
         
@@ -162,7 +170,7 @@ module.exports.run = async (client, message, args) => {
 
     collector.on('end', async () => {
         try {
-            // Zaman aşımında sadece disable butonları bırak
+            // Zaman aşımında butonları devre dışı bırak
             const finalRow = row(page, filteredEmojis.length, currentFilter);
             
             // Tüm butonları devre dışı bırak
