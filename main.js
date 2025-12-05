@@ -127,6 +127,7 @@ client.login(x).catch(e => {
 ////// 7/24 
 // main.js dosyanızda
 // Render ortam değişkeni olan PORT'u kullan. Yoksa güvenli bir varsayılan kullan.
+const express = require('express');
 const port = process.env.PORT || 8080; 
 
 // Render sağlık kontrolü için basit bir yanıt
