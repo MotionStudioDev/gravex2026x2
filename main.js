@@ -88,7 +88,7 @@ client.on('guildMemberRemove', require('./events/guildMemberRemove'));
 client.on('messageCreate', require('./events/messageCreate'));
 require("./events/message.js")
 require("./events/ready.js")
-require("./logger.js")(client);
+
 
 const guildLogs = require("./guildLogs");
 guildLogs(client);
