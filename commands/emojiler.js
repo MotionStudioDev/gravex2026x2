@@ -3,11 +3,12 @@ const axios = require('axios');
 
 module.exports.run = async (client, message, args) => {
     
-    // ⚠️ Düzeltme 1: DeprecationWarning için Emoji#url yerine Emoji#imageURL() kullanıldı.
+    // Tüm emojileri çek ve gerekli bilgileri hazırla
     const allEmojis = message.guild.emojis.cache.map(e => ({
         gösterim: `${e} \`${e.name}\``,
         id: e.id,
-        url: e.imageURL({ forceStatic: false }), // Yeni ve doğru kullanım
+        // Düzeltme: Emoji#url yerine Emoji#imageURL() kullanıldı.
+        url: e.imageURL({ extension: e.animated ? 'gif' : 'png' }), 
         name: e.name,
         animated: e.animated 
     }));
@@ -23,8 +24,11 @@ module.exports.run = async (client, message, args) => {
 
     let currentFilter = 'ALL'; 
     let page = 0;
-    let filteredEmojis = allEmojis; // Bu değişkeni kullanacağız
+    let filteredEmojis = allEmojis;
 
+    /**
+     * Filtreye göre emoji listesini hazırlar.
+     */
     const applyFilter = (filter) => {
         if (filter === 'STATIC') {
             return allEmojis.filter(e => !e.animated);
@@ -35,6 +39,9 @@ module.exports.run = async (client, message, args) => {
         }
     };
     
+    /**
+     * Dosya boyutunu kilobayt cinsinden çeker.
+     */
     async function fetchFileSize(url) {
         try {
             const response = await axios.head(url);
@@ -48,6 +55,9 @@ module.exports.run = async (client, message, args) => {
         }
     }
 
+    /**
+     * Embed'i oluşturur.
+     */
     const gösterEmbed = async (index, emojisList, filter) => {
         if (emojisList.length === 0) {
             return new EmbedBuilder()
@@ -75,13 +85,11 @@ module.exports.run = async (client, message, args) => {
     };
 
     /**
-     * ⚠️ Düzeltme 2: ReferenceError giderildi. emojis[currentIndex] yerine
-     * gönderilen listeye ait elemanlar (emojisList[currentIndex] veya filteredEmojis[page]) kullanıldı.
-     * Ancak row fonksiyonu çağrılırken `filteredEmojis` ve `page` değişkenlerine erişimi olduğu için
-     * bu değişkenler doğrudan kullanıldı.
+     * Buton grubunu oluşturur.
      */
     const row = (currentIndex, listLength, filter) => {
-        const currentEmoji = filteredEmojis[currentIndex]; // filteredEmojis değişkeni kullanıldı
+        
+        const currentEmoji = filteredEmojis[currentIndex]; // Filtrelenmiş liste kullanılır.
 
         const filterRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('filter_all').setLabel('Tümü').setStyle(filter === 'ALL' ? ButtonStyle.Success : ButtonStyle.Secondary),
@@ -92,7 +100,7 @@ module.exports.run = async (client, message, args) => {
         const navRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('prev').setLabel('⬅️ Önceki').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === 0 || listLength <= 1),
             new ButtonBuilder().setCustomId('download').setLabel('📥 İndir').setStyle(ButtonStyle.Success).setDisabled(listLength === 0),
-            // Hata burada oluşuyordu. currentEmoji (filteredEmojis[currentIndex]) kullanıldı.
+            // Hata Düzeltme: currentEmoji.url kullanılır.
             new ButtonBuilder().setCustomId('url').setLabel('🔗 URL').setStyle(ButtonStyle.Link).setURL(listLength === 0 ? 'https://discord.com' : currentEmoji.url), 
             new ButtonBuilder().setCustomId('next').setLabel('Sonraki ➡️').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === listLength - 1 || listLength <= 1)
         );
@@ -135,14 +143,9 @@ module.exports.run = async (client, message, args) => {
 
         else if (i.customId === 'download') {
             const currentEmoji = filteredEmojis[page];
-            const ext = currentEmoji.url.endsWith('.gif') ? 'gif' : 'png';
-            
-            // Eğer URL .gif veya .png ile bitmiyorsa, statik url'sini kullanalım (genellikle daha güvenlidir)
-            const safeUrl = currentEmoji.animated 
-                ? message.guild.emojis.cache.get(currentEmoji.id).imageURL({ extension: 'gif' })
-                : message.guild.emojis.cache.get(currentEmoji.id).imageURL({ extension: 'png' });
+            const ext = currentEmoji.animated ? 'gif' : 'png';
 
-            const attachment = new AttachmentBuilder(safeUrl, { name: `${currentEmoji.name}.${ext}` });
+            const attachment = new AttachmentBuilder(currentEmoji.url, { name: `${currentEmoji.name}.${ext}` });
             
             return i.reply({ content: `📥 **${currentEmoji.name}** emojisini indiriliyor!`, files: [attachment], ephemeral: true });
         }
@@ -152,3 +155,33 @@ module.exports.run = async (client, message, args) => {
                 embeds: [await gösterEmbed(page, filteredEmojis, currentFilter)], 
                 components: row(page, filteredEmojis.length, currentFilter) 
             });
+        } else {
+             await i.deferUpdate();
+        }
+    });
+
+    collector.on('end', async () => {
+        try {
+            // Zaman aşımında sadece disable butonları bırak
+            const finalRow = row(page, filteredEmojis.length, currentFilter);
+            
+            // Tüm butonları devre dışı bırak
+            const disabledComponents = finalRow.map(ar => 
+                new ActionRowBuilder().addComponents(
+                    ar.components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
+                )
+            );
+
+            await msg.edit({ components: disabledComponents }).catch(() => {});
+        } catch {}
+    });
+};
+
+module.exports.conf = {
+    aliases: ['emojilist', 'emojiler', 'serveremojis']
+};
+
+module.exports.help = {
+    name: 'emojiler',
+    description: 'Sunucudaki özel emojileri filtreleme, büyük görsel, boyut ve indirme desteğiyle listeler.'
+};
