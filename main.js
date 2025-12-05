@@ -128,7 +128,7 @@ client.login(x).catch(e => {
 // Gerekli modülleri dahil edin
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 3000; // Render'ın otomatik atadığı portu kullan
+const port = process.env.PORT || 8080; // Render'ın otomatik atadığı portu kullan
 
 // Render sağlık kontrolü için basit bir yanıt
 app.get('/', (req, res) => {
