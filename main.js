@@ -125,14 +125,16 @@ client.login(x).catch(e => {
 
 /*=======================================================================================*/
 ////// 7/24 
-// Gerekli modülleri dahil edin
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 8080; // Render'ın otomatik atadığı portu kullan
+
+// Render ortamında 'PORT' değişkeni otomatik olarak atanır.
+// Eğer atanmamışsa (Render'da bu nadiren olur ama güvenli olmak için) 8080 kullan.
+const port = process.env.PORT || 8080; 
 
 // Render sağlık kontrolü için basit bir yanıt
 app.get('/', (req, res) => {
-  res.send('Grave Botu Aktif!');
+  res.status(200).send('Discord Botu Aktif!');
 });
 
 // Sunucuyu dinlemeye başla
@@ -140,6 +142,8 @@ app.listen(port, () => {
   console.log(`HTTP sunucusu port ${port} üzerinde dinliyor.`);
 });
 
+// Bu kodun, botun ana dosyanızda (örneğin index.js) Discord client kodundan önce
+// çalıştığından emin olun.
 // Bu noktadan sonra normal Discord bot kodunuz başlar (client.login vb.)
 // ...
 /////////////////////////////CAPS ENGELLL
