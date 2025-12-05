@@ -125,20 +125,23 @@ client.login(x).catch(e => {
 
 /*=======================================================================================*/
 ////// 7/24 
-// Express sunucusu (Render gibi platformlarda botu canlı tutmak için)
-if (!client.shard || client.shard.ids[0] === 0) {
-  const express = require('express');
-  const app = express();
-  const port = process.env.PORT || 3000; // Render portu
+// Gerekli modülleri dahil edin
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000; // Render'ın otomatik atadığı portu kullan
 
-  app.get('/', (req, res) => {
-    res.sendStatus(200);
-  });
+// Render sağlık kontrolü için basit bir yanıt
+app.get('/', (req, res) => {
+  res.send('Grave Botu Aktif!');
+});
 
-  app.listen(port, () => {
-    console.log(`🌐 Web sunucu ${port} portunda çalışıyor (sadece Shard 0).`);
-  });
-}
+// Sunucuyu dinlemeye başla
+app.listen(port, () => {
+  console.log(`HTTP sunucusu port ${port} üzerinde dinliyor.`);
+});
+
+// Bu noktadan sonra normal Discord bot kodunuz başlar (client.login vb.)
+// ...
 /////////////////////////////CAPS ENGELLL
 const GuildSettings = require("./models/GuildSettings");
 
