@@ -20,7 +20,7 @@ module.exports.run = async (client, message) => {
     // --- 1. KOMUT LİSTELERİ ---
     const commandLists = {
         'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yapay-zeka',  'yardım'],
-        'kullanici': ['avatar', 'profil', 'deprem', 'döviz', 'çeviri', 'emojiler', 'emoji-bilgi'],
+        'kullanici': ['avatar', 'profil', 'deprem', 'döviz', 'çeviri', 'emojiler', 'steam', 'emoji-bilgi'],
         'moderasyon': ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver','rol-al', 'mute', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
         'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'sayaç', 'slowmode'],
         'sahip': ['reload', 'mesaj-gönder'],
