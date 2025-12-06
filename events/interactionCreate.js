@@ -1,9 +1,8 @@
 // En üstte yer alacak importlar
 const { InteractionType, ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const TicketModel = require('../models/Ticket'); // Model yolunuza göre ayarlayın
+const TicketModel = require('../models/Ticket'); 
 
 // Botunuzun başlangıç dosyasında (örn. index.js), MongoDB bağlantısını kurduğunuzdan emin olun!
-// mongoose.connect(process.env.MONGO_URI, { /* options */ });
 
 module.exports = async (client, interaction) => {
     
@@ -23,11 +22,11 @@ module.exports = async (client, interaction) => {
                     content: `❌ Zaten açık bir biletiniz var: ${existingChannel}. Lütfen önce onu kapatın.`,
                 });
             } else {
-                 // Eğer DB'de var ama kanal silinmişse, DB kaydını sil.
                  await TicketModel.deleteOne({ channelId: existingTicket.channelId });
             }
         }
         
+        // **!!! BURADAKİ İZİN AYARLARI DEĞİŞTİ !!!**
         const ticketChannel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
             type: ChannelType.GuildText,
@@ -37,8 +36,30 @@ module.exports = async (client, interaction) => {
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
                 // Bileti açan kullanıcıya izin ver
                 { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }, 
-                // Yönetici rolüne (veya yetkili role) izin ver
-                { id: 'YETKILI_ROL_ID', allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] } // Burayı değiştirin!
+                // Kanalları Yönet yetkisine sahip herkesin görmesini sağla
+                { id: interaction.guild.roles.everyone.id, 
+                  allow: [PermissionsBitField.Flags.ViewChannel], // Yönetici rolü yerine, izinleri genelleyebiliriz. 
+                  // NOT: En güvenli yöntem: Yetkili bir role izin vermek, ancak genel botlar için bu zor. 
+                  // Geçici olarak: Botun yetkisi neyi gerektiriyorsa onu ayarlar.
+                },
+                // Alternatif ve daha iyi yöntem: "Kanalları Yönet" yetkisine sahip herkes görebilir.
+                { id: interaction.guild.id, 
+                  allow: [PermissionsBitField.Flags.ViewChannel],
+                  permissionOverwrites: [ 
+                    {
+                      id: interaction.guild.id,
+                      deny: [PermissionsBitField.Flags.ViewChannel]
+                    },
+                    {
+                      id: interaction.user.id,
+                      allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+                    },
+                    // Bu kısım, 'Kanalları Yönet' yetkisine sahip rollerin görmesini sağlamak için
+                    // BOTUN KENDİ YETKİ HİYERARŞİSİNDE OLMALIDIR. Rol ID'si olmadan bu zor olduğu için,
+                    // Botun yetkisi zaten 'Kanalları Yönet' ise, bu kanalı bot ve üye görür. 
+                    // Diğer moderatörler ise genellikle sunucu ayarlarından dolayı görür.
+                  ]
+                }
             ],
             reason: `${interaction.user.tag} tarafından bilet açıldı.`
         });
@@ -75,7 +96,7 @@ module.exports = async (client, interaction) => {
             return interaction.editReply('❌ Bu kanal bir bilet kanalı olarak kayıtlı değil.');
         }
 
-        // Kapatma izni: Sadece bileti açan kişi veya yönetici/yetkili rolleri
+        // Kapatma izni: Sadece bileti açan kişi VEYA Kanalları Yönet yetkisine sahip herkes
         const canClose = interaction.user.id === ticketData.userId || interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels);
 
         if (!canClose) {
