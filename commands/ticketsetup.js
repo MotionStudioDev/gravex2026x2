@@ -1,7 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 
 module.exports.run = async (client, message, args) => {
-    // Yetki Kontrolü
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
         return message.reply({
             content: '❌ Bu komutu çalıştırmak için **Yönetici** yetkisine sahip olmalısınız.',
@@ -22,14 +21,11 @@ module.exports.run = async (client, message, args) => {
             .setStyle(ButtonStyle.Success)
     );
 
-    // Komutu yazdığı mesajı silip kalıcı mesajı gönderiyoruz
     await message.delete().catch(() => {});
     await message.channel.send({
         embeds: [setupEmbed],
         components: [setupRow]
     });
-    
-    console.log(`[TICKET] Bilet kurulum mesajı ${message.channel.name} kanalına gönderildi.`);
 };
 
 module.exports.conf = { aliases: ['ticketkurulum', 'ticketsend'] };
