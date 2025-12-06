@@ -30,4 +30,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: ['ticketkurulum', 'ticketsend'] };
-module.exports.help = { name: 'ticketsetup' };
+module.exports.help = { name: 'ticket-sistemi' };
