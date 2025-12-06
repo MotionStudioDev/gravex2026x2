@@ -1,16 +1,15 @@
-// En üstte yer alacak importlar
-const { InteractionType, ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const TicketModel = require('../models/Ticket'); 
 
-// Botunuzun başlangıç dosyasında (örn. index.js), MongoDB bağlantısını kurduğunuzdan emin olun!
+// Bu dosya events/interactionCreate.js veya benzeri bir yoldadır.
 
 module.exports = async (client, interaction) => {
     
-    // Yalnızca buton etkileşimlerini dinle
     if (!interaction.isButton()) return;
 
     // --- A) Bilet Oluşturma Butonu ---
     if (interaction.customId === 'create_ticket') {
+        // !!! KRİTİK FİX: ETKİLEŞİMİ HEMEN TANI (DeferReply) !!!
         await interaction.deferReply({ ephemeral: true });
 
         const existingTicket = await TicketModel.findOne({ guildId: interaction.guildId, userId: interaction.user.id, status: 'open' });
@@ -26,38 +25,25 @@ module.exports = async (client, interaction) => {
             }
         }
         
-        // **!!! BURADAKİ İZİN AYARLARI DEĞİŞTİ !!!**
+        // Kanal oluşturma ve izinleri ayarlama
         const ticketChannel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
             type: ChannelType.GuildText,
-            parent: null, // Bilet kategorisinin ID'sini buraya yazabilirsiniz!
+            parent: null, // İsteğe bağlı kategori ID'si
             permissionOverwrites: [
-                // @everyone iznini kapat
+                // 1. @everyone iznini kapat (Kimse görmesin)
                 { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
-                // Bileti açan kullanıcıya izin ver
+                // 2. Bileti açan kullanıcıya izin ver
                 { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }, 
-                // Kanalları Yönet yetkisine sahip herkesin görmesini sağla
-                { id: interaction.guild.roles.everyone.id, 
-                  allow: [PermissionsBitField.Flags.ViewChannel], // Yönetici rolü yerine, izinleri genelleyebiliriz. 
-                  // NOT: En güvenli yöntem: Yetkili bir role izin vermek, ancak genel botlar için bu zor. 
-                  // Geçici olarak: Botun yetkisi neyi gerektiriyorsa onu ayarlar.
-                },
-                // Alternatif ve daha iyi yöntem: "Kanalları Yönet" yetkisine sahip herkes görebilir.
+                // 3. Kanalları Yönet yetkisine sahip herkesin görmesini sağla
+                // Bu, genel botlar için en iyi yaklaşımdır.
                 { id: interaction.guild.id, 
-                  allow: [PermissionsBitField.Flags.ViewChannel],
+                  allow: [PermissionsBitField.Flags.ViewChannel], // Yönetici rolü yerine, izinleri genelleyebiliriz.
                   permissionOverwrites: [ 
                     {
-                      id: interaction.guild.id,
-                      deny: [PermissionsBitField.Flags.ViewChannel]
-                    },
-                    {
-                      id: interaction.user.id,
-                      allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
-                    },
-                    // Bu kısım, 'Kanalları Yönet' yetkisine sahip rollerin görmesini sağlamak için
-                    // BOTUN KENDİ YETKİ HİYERARŞİSİNDE OLMALIDIR. Rol ID'si olmadan bu zor olduğu için,
-                    // Botun yetkisi zaten 'Kanalları Yönet' ise, bu kanalı bot ve üye görür. 
-                    // Diğer moderatörler ise genellikle sunucu ayarlarından dolayı görür.
+                        id: interaction.guild.roles.cache.find(r => r.permissions.has(PermissionsBitField.Flags.ManageChannels))?.id || interaction.guild.id,
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+                    }
                   ]
                 }
             ],
@@ -110,11 +96,9 @@ module.exports = async (client, interaction) => {
         
         await interaction.editReply({ embeds: [closeEmbed], components: [] });
 
-        // MongoDB kaydını güncelle
         ticketData.status = 'closed';
         await ticketData.save();
 
-        // 5 saniye sonra kanalı sil
         setTimeout(async () => {
             await interaction.channel.delete('Bilet kapatıldı.').catch(err => console.error("Kanal silme hatası:", err));
         }, 5000);
