@@ -16,8 +16,9 @@ module.exports.run = async (client, message, args) => {
 
     const setupRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId('create_ticket')
-            .setLabel('🎟️ Bilet Aç')
+            // Custom ID'yi Modal'ı tetiklemek için değiştiriyoruz
+            .setCustomId('open_ticket_modal') 
+            .setLabel('🎟️ Bilet Aç / Talep Oluştur')
             .setStyle(ButtonStyle.Success)
     );
 
