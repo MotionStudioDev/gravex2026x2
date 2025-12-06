@@ -24,7 +24,7 @@ module.exports.run = async (client, message) => {
         'moderasyon': ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver','rol-al', 'nuke', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
         'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'sayaç', 'slowmode'],
         'sahip': ['reload', 'mesaj-gönder'],
-        'eğlence': ['ship', 'espiri', 'yazı-tura', 'zar-at'],
+        'eğlence': ['ship', 'espiri', 'yazı-tura', 'burger', 'iskender', 'zar-at'],
         'ekonomi': ['param', 'günlük', 'çal', 'banka-oluştur', 'banka-transfer', 'banka-yatır', 'banka-çek', 'apara', 'cf', 'çalış', 'meslek', 'meslek-ayrıl', 'para-sıralama'],
     };
 
