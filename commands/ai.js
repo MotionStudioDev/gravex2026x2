@@ -1,32 +1,29 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { createStreamableValue, generateText } = require('@ai-sdk/xai');
+const { generateText } = require('ai');           // BURASI ANA PAKET!
+const { xai } = require('@ai-sdk/xai');            // BURASI SADECE MODEL SAĞLAYICI
 
-// Sabitler
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1000;
-const BUTTON_TIMEOUT = 300000; // 5 dakika
-const MAX_HISTORY_TURNS = 10; // 10 soru-cevap turu
+const BUTTON_TIMEOUT = 300000;
+const MAX_HISTORY_TURNS = 10;
 
 if (!XAI_API_KEY) {
     console.error("HATA: XAI_API_KEY .env dosyasından yüklenemedi!");
 }
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Tarih/saat bilgisini ayarlama (setFooter'da kullanılırsa)
 const getFormattedTime = () => new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
 function getOrCreateChatHistory(client, userId) {
-    if (!client.userHistories) client.userHistories = new Map(); // İlk başta Map'i oluştur
-    let history = client.userHistories.get(userId) || [];
-    client.userHistories.set(userId, history);
-    return history;
+    if (!client.userHistories) client.userHistories = new Map();
+    if (!client.userHistories.has(userId)) {
+        client.userHistories.set(userId, []);
+    }
+    return client.userHistories.get(userId);
 }
 
 module.exports.run = async (client, message, args) => {
-    // ⚠️ client.userHistories kontrolü artık sadece getOrCreateChatHistory içinde yapılıyor.
-
     if (!XAI_API_KEY) {
         return message.reply("❌ Grok API anahtarı eksik, bot çalışamaz.");
     }
@@ -40,41 +37,39 @@ module.exports.run = async (client, message, args) => {
 
     const loadingEmbed = new EmbedBuilder()
         .setColor('Yellow')
-        .setDescription('⏳ Grok düşünüyor...');
+        .setDescription('Grok düşünüyor...');
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
     let history = getOrCreateChatHistory(client, userId);
     let lastError = null;
     let finalAnswer = null;
 
-    // Hafıza çok uzunsa uyarı (history array uzunluğuna göre)
+    // Hafıza uyarısı
     if (history.length / 2 >= MAX_HISTORY_TURNS) {
         const warn = new EmbedBuilder()
             .setColor('Orange')
-            .setDescription(`⚠️ Sohbet geçmişin çok uzadı (${MAX_HISTORY_TURNS} tur). Yeni konu için **Hafızayı Sıfırla** butonuna bas.`);
+            .setDescription(`Sohbet geçmişin çok uzadı (${MAX_HISTORY_TURNS} tur). Yeni konu için **Hafızayı Sıfırla** butonuna bas.`);
         message.channel.send({ embeds: [warn] }).catch(() => {});
     }
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('grok_reset')
-            .setLabel('🧠 Hafızayı Sıfırla')
+            .setLabel('Hafızayı Sıfırla')
             .setStyle(ButtonStyle.Danger)
     );
-    
-    // --- Geri Çekilmeli Yeniden Deneme Döngüsü ---
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        
-        // 1. SORUYU GEÇMİŞE EKLE (API çağrısı için)
-        history.push({ role: 'user', content: query });
 
+    // Soruyu geçici olarak ekle
+    history.push({ role: 'user', content: query });
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
             const { text } = await generateText({
-                model: 'grok-4', // Model adı
-                apiKey: XAI_API_KEY,
-                system: "Sen Grave adlı Discord botunun yapay zeka asistanısın. Kısa, bilgilendirici, esprili ve Türkçe cevap ver. Kullanıcının önceki mesajlarını hatırla.",
-                messages: history, // Güncel geçmişi gönder
+                model: xai('grok-4'), // BURADA xai() fonksiyonu kullanılıyor!
+                messages: history,
+                system: "Sen Grave adlı Discord botunun yapay zeka asistanısın. Kısa, bilgilendirici, esprili ve Türkçe cevap ver.",
                 temperature: 0.7,
+                maxTokens: 4096,
             });
 
             finalAnswer = text.trim();
@@ -82,19 +77,18 @@ module.exports.run = async (client, message, args) => {
                 finalAnswer = finalAnswer.substring(0, 3990) + "\n\n... (devamı kesildi)";
             }
 
-            // 2. YANITI GEÇMİŞE EKLE (Başarılı oldu)
+            // Başarılı → yanıtı da geçmişe ekle
             history.push({ role: 'assistant', content: finalAnswer });
-            break; // Başarılı, döngüden çık
-            
+            break;
+
         } catch (error) {
             lastError = error;
-            console.error("Grok API Hatası:", error.message || error);
+            console.error("Grok API Hatası:", error);
 
-            // 3. HATA DURUMUNDA KENDİ SORUMUZU GEÇMİŞTEN ÇIKAR
-            // API'ye gönderilen ama cevap alınamayan son mesajı (kullanıcı sorusunu) çıkar.
-            history.pop(); 
+            // Hata varsa son eklenen kullanıcı mesajını geri al
+            history.pop();
 
-            const isRateLimit = error.status === 429 || (error.message && error.message.toLowerCase().includes('rate limit'));
+            const isRateLimit = error.status === 429 || String(error.message).toLowerCase().includes('rate limit');
 
             if (isRateLimit && attempt < MAX_RETRIES - 1) {
                 const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
@@ -104,14 +98,13 @@ module.exports.run = async (client, message, args) => {
                 await msg.edit({ embeds: [waiting] }).catch(() => {});
                 await sleep(backoff);
             } else {
-                // Son deneme veya geri çekilemeyen hata
-                client.userHistories.delete(userId); // Oturumu sıfırla
+                client.userHistories.delete(userId);
                 break;
             }
         }
     }
-    
-    // --- SONUÇ GÖSTERİMİ ---
+
+    // Sonuç gösterimi
     if (finalAnswer) {
         const resultEmbed = new EmbedBuilder()
             .setColor('#00ff9d')
@@ -121,11 +114,11 @@ module.exports.run = async (client, message, args) => {
                 { name: 'Cevap', value: finalAnswer, inline: false }
             )
             .setFooter({ text: `Powered by xAI Grok • ${message.author.tag} | ${getFormattedTime()}` })
-            .setTimestamp(); // setTimestamp() kullanıldığında, alt bilgiye gerek kalmaz.
+            .setTimestamp();
 
         const finalMsg = await msg.edit({ embeds: [resultEmbed], components: [row] });
 
-        // Buton dinleyici (Collector)
+        // Buton collector
         const collector = finalMsg.createMessageComponentCollector({
             filter: i => i.customId === 'grok_reset',
             time: BUTTON_TIMEOUT
@@ -140,31 +133,30 @@ module.exports.run = async (client, message, args) => {
 
             const success = new EmbedBuilder()
                 .setColor('Green')
-                .setTitle('✅ Hafıza Sıfırlandı')
+                .setTitle('Hafıza Sıfırlandı')
                 .setDescription('Yeni bir sohbet başlatabilirsin.');
 
-            const disabledRow = new ActionRowBuilder().addComponents(
-                ButtonBuilder.from(row.components[0]).setLabel('Sıfırlandı').setDisabled(true)
+            const disabledRow = ActionRowBuilder.from(row).addComponents(
+                row.components[0].setDisabled(true).setLabel('Sıfırlandı')
             );
 
             await i.update({ embeds: [success], components: [disabledRow] });
             collector.stop();
         });
 
-        collector.on('end', async (collected, reason) => {
+        collector.on('end', async (_, reason) => {
             if (reason === 'time' && finalMsg.editable) {
-                const disabledRow = new ActionRowBuilder().addComponents(
-                    ButtonBuilder.from(row.components[0]).setLabel('Süre Doldu').setDisabled(true)
+                const disabledRow = ActionRowBuilder.from(row).addComponents(
+                    row.components[0].setDisabled(true).setLabel('Süre Doldu')
                 );
                 await finalMsg.edit({ components: [disabledRow] }).catch(() => {});
             }
         });
 
     } else {
-        // Tüm denemeler başarısızsa
         const errorEmbed = new EmbedBuilder()
             .setColor('Red')
-            .setTitle('❌ Grok’a Bağlanılamadı')
+            .setTitle('Grok’a Bağlanılamadı')
             .setDescription('API’de bir sorun oluştu, oturum sıfırlandı.')
             .addFields({ name: 'Hata', value: `\`\`\`${lastError?.message || 'Bilinmeyen hata'}\`\`\`` });
 
@@ -172,10 +164,5 @@ module.exports.run = async (client, message, args) => {
     }
 };
 
-module.exports.conf = {
-    aliases: ['ai', 'grok', 'sor']
-};
-
-module.exports.help = {
-    name: 'sor'
-};
+module.exports.conf = { aliases: ['ai', 'grok', 'sor'] };
+module.exports.help = { name: 'sor' };
