@@ -23,4 +23,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: ['botlistkurulum'] };
-module.exports.help = { name: 'botlist-sistemi' };
+module.exports.help = { name: 'botlist-kur' };
