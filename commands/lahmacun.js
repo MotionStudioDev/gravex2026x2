@@ -4,8 +4,9 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     PermissionsBitField,
-    ComponentType // ComponentType'ı ekledik
+    ComponentType 
 } = require('discord.js');
+const path = require('path'); // Görsel yolu için path modülünü ekledik
 
 module.exports.run = async (client, message, args) => {
     
@@ -20,11 +21,15 @@ module.exports.run = async (client, message, args) => {
     
     let selectedIngredients = []; // Seçilen malzemeleri tutacak dizi
 
+    // Görsel yolu (Eğer dosyanız botun ana dizininde "assets" klasöründeyse bu yolu kullanın)
+    const LAHMACUN_IMAGE_PATH = path.join(process.cwd(), 'assets', 'lahmacun.png');
+    const LAHMACUN_IMAGE_NAME = 'lahmacun.png'; // Discord'a gönderilecek dosya adı
+
     // Fonksiyon: Embed'i güncellemek için
     const createLahmacunEmbed = (status = 'Siparişiniz Bekleniyor...', color = 'Orange') => {
         const ingredientsText = selectedIngredients.length > 0 ? selectedIngredients.join(', ') : 'Hiçbir şey seçilmedi.';
         
-        return new EmbedBuilder()
+        const embed = new EmbedBuilder()
             .setColor(color)
             .setTitle('🌯 Lahmacun Siparişi')
             .setDescription(`**${message.author.username}**, lahmacununun yanına neleri istersin?`)
@@ -33,10 +38,14 @@ module.exports.run = async (client, message, args) => {
                 { name: 'Durum:', value: `\`${status}\``, inline: false },
                 { name: 'Hazırlayan:', value: `${message.author}`, inline: false }
             )
-            .setTimestamp();
+            .setTimestamp()
+            // Görseli ekle: attachment'ın URL'si olarak ayarla
+            .setImage(`attachment://${LAHMACUN_IMAGE_NAME}`); 
+
+        return embed;
     };
     
-    // Fonksiyon: Butonları oluşturmak için
+    // Fonksiyon: Butonları oluşturmak için (Önceki kodunuzla aynı)
     const createButtons = (disabled = false) => {
         const buttons = Object.keys(ingredientMap).map(id => {
             const label = ingredientMap[id];
@@ -44,8 +53,8 @@ module.exports.run = async (client, message, args) => {
             
             return new ButtonBuilder()
                 .setCustomId(id)
-                .setLabel(label.split(' ')[1]) // Sadece metin kısmını al (Örn: Limon Sıkıldı -> Limon)
-                .setStyle(isSelected ? ButtonStyle.Primary : ButtonStyle.Secondary) // Seçiliyse Mavi yap
+                .setLabel(label.split(' ')[1]) 
+                .setStyle(isSelected ? ButtonStyle.Primary : ButtonStyle.Secondary) 
                 .setDisabled(disabled);
         });
         
@@ -62,7 +71,6 @@ module.exports.run = async (client, message, args) => {
                 .setDisabled(disabled)
         );
 
-        // Butonları iki sıraya bölelim
         const row1 = new ActionRowBuilder().addComponents(buttons.slice(0, 4));
         const row2 = new ActionRowBuilder().addComponents(buttons.slice(4)).addComponents(controlButtons.components);
         
@@ -72,32 +80,30 @@ module.exports.run = async (client, message, args) => {
     // 1. Başlangıç Mesajını Gönder
     const msg = await message.channel.send({ 
         embeds: [createLahmacunEmbed()], 
-        components: createButtons()
+        components: createButtons(),
+        files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }] // Görseli dosya olarak gönder
     });
 
-    // 2. Buton Dinleyicisini (Collector) Başlat
+    // 2. Buton Dinleyicisini (Collector) Başlat (Kalan mantık aynı)
     const filter = (i) => i.user.id === message.author.id && i.customId.startsWith('la_');
     const collector = msg.createMessageComponentCollector({
         filter,
-        time: 60000, // 60 saniye boyunca dinle
+        time: 60000, 
         componentType: ComponentType.Button
     });
 
     collector.on('collect', async (interaction) => {
-        // Hata vermemesi için hemen yanıtla
         await interaction.deferUpdate(); 
         
         const customId = interaction.customId;
 
-        // ------------- Malzeme Seçimi Mantığı -------------
+        // Malzeme Seçimi Mantığı
         if (ingredientMap[customId]) {
             const label = ingredientMap[customId];
             
             if (selectedIngredients.includes(label)) {
-                // Seçiliyse çıkar (Toggle)
                 selectedIngredients = selectedIngredients.filter(item => item !== label);
             } else {
-                // Seçili değilse ekle
                 selectedIngredients.push(label);
             }
             
@@ -107,7 +113,7 @@ module.exports.run = async (client, message, args) => {
                 components: createButtons()
             });
 
-        // ------------- Onay/İptal Mantığı -------------
+        // Onay/İptal Mantığı
         } else if (customId === 'la_siparis_onay') {
             collector.stop('onaylandı');
             
@@ -141,10 +147,11 @@ module.exports.run = async (client, message, args) => {
             ).setTitle('⌛ Süre Doldu');
         }
         
-        // Butonları devre dışı bırak ve son Embed'i gönder
+        // Final mesajında da görseli göndermeye devam etmeliyiz
         await msg.edit({
             embeds: [finalEmbed],
-            components: createButtons(true) // Butonları devre dışı bırak
+            components: createButtons(true), // Butonları devre dışı bırak
+            files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }]
         }).catch(err => console.error("Final mesajı düzenlenirken hata:", err));
     });
 };
