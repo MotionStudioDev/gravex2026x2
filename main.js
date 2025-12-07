@@ -182,3 +182,28 @@ client.on("messageCreate", async (message) => {
   }
 });
 ////////////////////////// CAPS ENGEL
+client.on('interactionCreate', async interaction => {
+    // Sadece buton etkileşimlerini dinle
+    if (!interaction.isButton()) return;
+    
+    // Custom ID'si '2048_' ile başlayan butonlara odaklan
+    if (interaction.customId.startsWith('2048_')) {
+        
+        // 1. Komut dosyasını (2048.js) client.commands koleksiyonundan bul
+        const command = client.commands.get('2048'); // Komut adınız '2048' olduğu varsayılıyor
+        
+        // 2. Eğer komut mevcutsa ve handleMove fonksiyonuna sahipse çalıştır
+        if (command && command.handleMove) {
+            try {
+                // handleMove fonksiyonunu çağırıyoruz
+                await command.handleMove(interaction);
+            } catch (error) {
+                console.error('2048 Buton İşleme Hatası:', error);
+                // KullanıcıyaEphemeral (gizli) hata mesajı gönderme
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.reply({ content: 'Bu hareketi işlerken bir hata oluştu.', ephemeral: true });
+                }
+            }
+        }
+    }
+});
