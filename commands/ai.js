@@ -1,191 +1,167 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { GoogleGenAI } = require('@google/genai');
+const { Client } = require('xai-sdk'); // YENİ PAKET
 
-// ⚠️ .env dosyanızdan GEMINI_API_KEY değişkenini çeker.
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
-const MAX_RETRIES = 3; 
-const INITIAL_BACKOFF_MS = 1000; 
+const XAI_API_KEY = process.env.XAI_API_KEY;
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 1000;
 const BUTTON_TIMEOUT = 300000; // 5 dakika
-const MAX_HISTORY_TURNS = 10; // 10 soru-cevap çiftinden sonra uyarı verir
+const MAX_HISTORY_TURNS = 10;
 
-// API Anahtarı Kontrolü
-if (!GEMINI_API_KEY) {
-    console.error("HATA: GEMINI_API_KEY çevresel değişkeni yüklenemedi. Lütfen .env dosyanızı kontrol edin.");
+if (!XAI_API_KEY) {
+    console.error("HATA: XAI_API_KEY .env dosyasından yüklenemedi!");
 }
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-const modelName = 'gemini-2.5-flash';
+// xAI Client (OpenAI uyumlu)
+const xai = new Client({ apiKey: XAI_API_KEY });
 
-// Yardımcı fonksiyon: Belirtilen süre kadar bekler
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Kullanıcının sohbet oturumunu alır veya oluşturur.
- * NOT: Bu fonksiyon, client.userSessions'ın run içinde başlatıldığını varsayar.
- * @param {object} client - Discord Client objesi.
- * @param {string} userId - Discord kullanıcısının ID'si.
- * @returns {object} - Gemini Chat Session objesi.
- */
 function getOrCreateChatSession(client, userId) {
-    let chat = client.userSessions.get(userId);
-    
-    if (!chat) {
-        chat = ai.chats.create({
-            model: modelName,
-            config: {
-                 systemInstruction: "Sen Grave adlı bir Discord botunun yapay zeka asistanısın. Kısa, bilgilendirici ve ilgili dilde cevaplar ver. Kullanıcının önceki sorularını hatırla.",
-            }
+    let session = client.userSessions.get(userId);
+
+    if (!session) {
+        // Grok-4 veya Grok-3 seçebilirsin (grok-4 daha güçlü)
+        session = xai.chat.create({
+            model: "grok-4", // grok-3 de kullanabilirsin
+            temperature: 0.7,
+            system: "Sen Grave adlı Discord botunun yapay zeka asistanısın. Kısa, bilgilendirici, esprili ve Türkçe cevap ver. Kullanıcının önceki mesajlarını hatırla."
         });
-        client.userSessions.set(userId, chat);
+        client.userSessions.set(userId, session);
     }
-    return chat;
+    return session;
 }
 
 module.exports.run = async (client, message, args) => {
-    // --- BAŞLANGIÇ KONTROLÜ (Hafıza Yönetimi DÜZELTİLDİ) ---
-    // client objesi artık burada tanımlıdır.
-    if (!client.userSessions) {
-        client.userSessions = new Map();
+    if (!client.userSessions) client.userSessions = new Map();
+
+    if (!XAI_API_KEY) {
+        return message.reply("❌ Grok API anahtarı eksik, bot çalışamaz.");
     }
-    // --------------------------------------------------------
-    
-    // API anahtarı yoksa komutu çalıştırma
-    if (!GEMINI_API_KEY) {
-        return message.reply("❌ Yapay zeka sistemi API anahtarı eksik olduğu için devre dışıdır.");
-    }
-    
+
     const query = args.join(' ');
     const userId = message.author.id;
-    
+
     if (!query) {
-        return message.reply("Lütfen sormak istediğiniz soruyu belirtin. Örn: `g!sor Yapay zeka nedir?`");
+        return message.reply("Lütfen bir soru sor! Örnek: `g!sor Grok kimdir?`");
     }
 
     const loadingEmbed = new EmbedBuilder()
         .setColor('Yellow')
-        .setDescription('⏳ Cevabınız analiz ediliyor...');
-        
+        .setDescription('⏳ Grok düşünüyor...');
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
     let chat = getOrCreateChatSession(client, userId);
-    let lastError = null;
-    
-    // Geçmiş uyarısı
-    if (chat.getHistory().length / 2 >= MAX_HISTORY_TURNS) {
-        const resetEmbed = new EmbedBuilder()
+
+    // Hafıza çok uzunsa uyarı
+    if (chat.history.length / 2 >= MAX_HISTORY_TURNS) {
+        const warn = new EmbedBuilder()
             .setColor('Orange')
-            .setDescription(`⚠️ Sohbet geçmişi çok uzadı (${MAX_HISTORY_TURNS} soru-cevap). Yeni bir konu için lütfen alttaki **Hafızayı Sıfırla** butonunu kullanın.`);
-        message.channel.send({ embeds: [resetEmbed] }).catch(() => {});
+            .setDescription(`⚠️ Sohbet geçmişin çok uzadı (${MAX_HISTORY_TURNS} tur). Yeni konu için **Hafızayı Sıfırla** butonuna bas.`);
+        message.channel.send({ embeds: [warn] }).catch(() => {});
     }
-    
-    // Butonları oluştur
+
     const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('ai_reset').setLabel('🧠 Hafızayı Sıfırla').setStyle(ButtonStyle.Danger)
+        new ButtonBuilder()
+            .setCustomId('grok_reset')
+            .setLabel('🧠 Hafızayı Sıfırla')
+            .setStyle(ButtonStyle.Danger)
     );
-    
-    // Geri Çekilme ve Yeniden Deneme Döngüsü
+
+    let lastError = null;
+
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-            // API Çağrısı
-            const response = await chat.sendMessage({ message: query });
+            const response = await chat.sample({ user: query });
+            let answer = response.content.trim();
 
-            let answer = response.text.trim();
-            if (answer.length > 4096) {
-                 answer = answer.substring(0, 4000) + '... (Yanıt çok uzun, devamı kesildi.)';
+            if (answer.length > 4000) {
+                answer = answer.substring(0, 3990) + "\n\n... (devamı kesildi)";
             }
-            
+
             const resultEmbed = new EmbedBuilder()
-                .setColor('Green')
-                .setTitle('Grave Yapay Zeka Cevabı')
+                .setColor('#00ff9d')
+                .setTitle('Grave • Grok Cevabı')
                 .addFields(
                     { name: 'Soru', value: `\`${query}\``, inline: false },
                     { name: 'Cevap', value: answer, inline: false }
                 )
-                .setFooter({ text: `Powered by MotionAI | ${message.author.tag} | Konuşma Hafızalı` });
+                .setFooter({ text: `Powered by xAI Grok • ${message.author.tag}` })
+                .setTimestamp();
 
             await msg.edit({ embeds: [resultEmbed], components: [row] });
-            
-            // --- BUTON DİNLEYİCİSİ (COLLECTOR) ---
+
+            // Buton dinleyici
             const collector = msg.createMessageComponentCollector({
-                filter: i => i.customId === 'ai_reset',
+                filter: i => i.customId === 'grok_reset',
                 time: BUTTON_TIMEOUT
             });
-            
+
             collector.on('collect', async i => {
                 if (i.user.id !== message.author.id) {
-                    return i.reply({ content: 'Bu butonu sadece işlemi başlatan kişi kullanabilir.', ephemeral: true });
+                    return i.reply({ content: "Bu buton sadece soruyu soran kişi içindir.", ephemeral: true });
                 }
 
-                // Sohbet oturumunu silerek sıfırla
                 client.userSessions.delete(userId);
-                
-                const resetSuccessEmbed = new EmbedBuilder()
+
+                const success = new EmbedBuilder()
                     .setColor('Green')
-                    .setTitle('✅ Sohbet Hafızası Sıfırlandı')
-                    .setDescription('Yeni bir konuya başlayabilirsiniz.')
-                    .setFooter({ text: `Powered by MotionAI | ${message.author.tag}` });
-                
-                // Butonu devre dışı bırak
-                const disabledRow = new ActionRowBuilder().addComponents(
-                    ButtonBuilder.from(row.components[0]).setDisabled(true).setLabel('Hafıza Sıfırlandı')
+                    .setTitle('✅ Hafıza Sıfırlandı')
+                    .setDescription('Yeni bir sohbet başlatabilirsin.');
+
+                const disabledRow = ActionRowBuilder.from(row).setComponents(
+                    ButtonBuilder.from(row.components[0])
+                        .setLabel('Sıfırlandı').setDisabled(true)
                 );
 
-                await i.update({ embeds: [resetSuccessEmbed], components: [disabledRow] });
-                collector.stop(); 
+                await i.update({ embeds: [success], components: [disabledRow] });
+                collector.stop();
             });
-            
+
             collector.on('end', async (collected, reason) => {
-                if (reason === 'time') {
-                    // Süre dolduğunda butonu devre dışı bırak
-                    const disabledRow = new ActionRowBuilder().addComponents(
-                        ButtonBuilder.from(row.components[0]).setDisabled(true).setLabel('Süre Doldu')
+                if (reason === 'time' && msg.editable) {
+                    const disabledRow = ActionRowBuilder.from(row).setComponents(
+                        row.components[0].setDisabled(true).setLabel('Süre Doldu')
                     );
                     await msg.edit({ components: [disabledRow] }).catch(() => {});
                 }
             });
 
-            return; // Komut başarıyla tamamlandı
+            return;
 
         } catch (error) {
             lastError = error;
+            console.error("Grok API Hatası:", error.message || error);
 
-            const isRateLimit = error.message && (error.message.includes('429') || error.message.toLowerCase().includes('rate limit'));
+            const isRateLimit = error.status === 429 || (error.message && error.message.includes('rate limit'));
 
             if (isRateLimit && attempt < MAX_RETRIES - 1) {
-                const backoffTime = INITIAL_BACKOFF_MS * (2 ** attempt);
-                
-                const waitingEmbed = new EmbedBuilder()
+                const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+                const waiting = new EmbedBuilder()
                     .setColor('Orange')
-                    .setDescription(`🚨 Rate Limit! Yeniden deneme için ${Math.round(backoffTime / 1000)} saniye bekleniyor... (Deneme: ${attempt + 1}/${MAX_RETRIES})`);
-                
-                await msg.edit({ embeds: [waitingEmbed] }).catch(() => {});
-                await sleep(backoffTime);
-                
+                    .setDescription(`Rate limit! ${Math.round(backoff/1000)} saniye bekleniyor... (${attempt + 1}/${MAX_RETRIES})`);
+                await msg.edit({ embeds: [waiting] }).catch(() => {});
+                await sleep(backoff);
             } else {
-                // Hata durumunda oturumu sıfırla ve döngüyü kır
                 client.userSessions.delete(userId);
-                break; 
+                break;
             }
         }
     }
 
-    // --- Son Hata Mesajı (Tüm Denemeler Başarısız Olursa) ---
-    const finalErrorEmbed = new EmbedBuilder()
+    // Tüm denemeler başarısızsa
+    const errorEmbed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ Sorgu Başarısız Oldu')
-        .setDescription('Yapay zeka servisine bağlanılamadı veya tüm denemelerde hata oluştu. Oturumunuz sıfırlandı.')
-        .addFields(
-            { name: 'Hata Detayı', value: `\`\`\`${lastError ? (lastError.message || 'Bilinmeyen Hata') : 'API anahtarı eksik.'}\`\`\`` }
-        )
-        .setFooter({ text: 'Lütfen daha sonra tekrar deneyin.' });
-        
-    await msg.edit({ embeds: [finalErrorEmbed], components: [] });
+        .setTitle('❌ Grok’a Bağlanılamadı')
+        .setDescription('API’de bir sorun oluştu, oturum sıfırlandı.')
+        .addFields({ name: 'Hata', value: `\`\`\`${lastError?.message || 'Bilinmeyen hata'}`)\`\`\`` });
+
+    await msg.edit({ embeds: [errorEmbed], components: [] });
 };
 
 module.exports.conf = {
-    aliases: ['ai', 'yapay-zeka', 'soru-cevap', 'ai-soru']
+    aliases: ['ai', 'grok', 'sor']
 };
 
 module.exports.help = {
-    name: 'sor'
+    name: 'yapay-zeka'
 };
