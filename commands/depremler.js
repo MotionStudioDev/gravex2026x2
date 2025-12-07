@@ -92,10 +92,10 @@ const generateEmbed = (depremler, page, maxPages, mainStyle, filterText = null) 
             depremler.length > 0 ? slice.map(d => {
                 const { emoji } = getMagnitudeStyle(d.buyukluk);
                 const yerAdi = d.yer.trim() + (d.sehir.trim() !== '' ? ` (${d.sehir.trim()})` : '');
-                const mapLink = `https://www.google.com/maps/search/?api=1&query=$${d.enlem},${d.boylam}`; // Düzeltilmiş Harita Linki
+               const mapLink = `https://www.google.com/maps/search/?api=1&query=${d.enlem},${d.boylam}`;
                 
-                return `${emoji} **${d.buyukluk}** | **Derinlik:** ${d.derinlik} km\n` +
-                       `🕒 **${d.tarih}** ${d.saat} | 📍 [${yerAdi}](${mapLink})`;
+            return `${emoji} **${d.buyukluk}** | **Derinlik:** ${d.derinlik} km\n` +
+       `🕒 **${d.tarih}** ${d.saat} | 📍 [${yerAdi}](${mapLink})`;
             }).join('\n\n') : 'Bu filtreye uygun deprem kaydı bulunamadı.'
         );
 };
