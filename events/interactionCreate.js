@@ -344,3 +344,43 @@ module.exports = async (client, interaction) => {
         }
     }
 };
+
+// ... (Mevcut Botlist ve Ticket mantığının bittiği yere ekleyin) ...
+
+    // =========================================================
+    // 7. LOCK/UNLOCK BUTON İŞLEMİ
+    // =========================================================
+    if (interaction.isButton() && interaction.customId.startsWith('unlock_manual_')) {
+        
+        // Yetki kontrolü (Yönetici/Kanalları Yönet)
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels) &&
+            !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)
+        ) {
+            return interaction.reply({
+                content: '❌ Bu butonu kullanmak için **Kanalları Yönet** yetkisine sahip olmalısınız.',
+                ephemeral: true
+            });
+        }
+        
+        const channelId = interaction.customId.split('_')[2];
+        const channel = interaction.guild.channels.cache.get(channelId);
+
+        if (!channel) {
+            return interaction.reply({ content: '❌ Kanal bulunamadı.', ephemeral: true });
+        }
+        
+        // Kilidi Kaldır
+        await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+            SendMessages: true
+        }, `Yönetici butonu ile açıldı: ${interaction.user.tag}`);
+
+        const unlockedEmbed = new EmbedBuilder()
+            .setColor("#3498DB")
+            .setTitle("🔓 Kanal Kilidi Kaldırıldı!")
+            .setDescription(`Kanal, ${interaction.user} tarafından **manuel** olarak açıldı.`)
+            .setTimestamp();
+
+        // Buton mesajını güncelle ve butonu kaldır
+        await interaction.update({ embeds: [unlockedEmbed], components: [] });
+    }
+}; // Modül sonu (eğer burası dosyanın sonu ise)
