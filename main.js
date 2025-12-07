@@ -207,3 +207,21 @@ client.on('interactionCreate', async interaction => {
         }
     }
 });
+//////// DEPREM SİSTEMİ 
+client.on('interactionCreate', async interaction => {
+    if (interaction.isButton() && interaction.customId === 'deprem_filter') {
+        const command = client.commands.get('deprem');
+        if (command && command.showFilterModal) {
+            await command.showFilterModal(interaction);
+        }
+    }
+});
+////// deprem 2 
+client.on('interactionCreate', async interaction => {
+    if (interaction.isModalSubmit() && interaction.customId === 'deprem_filter_modal') {
+        const command = client.commands.get('deprem');
+        if (command && command.handleModalSubmission) {
+            await command.handleModalSubmission(interaction);
+        }
+    }
+});
