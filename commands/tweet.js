@@ -116,7 +116,7 @@ module.exports.run = async (client, message, args) => {
         const dateStr = date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric' });
         
         // Tweet'in alt kısmı (zaman)
-        const timeText = `${time} · ${dateStr} · Discord Bot`;
+        const timeText = `${time} · ${dateStr} ·Grave Discord Bot`;
         
         // Canvas yüksekliğini metne göre ayarla (Eğer metin kısa ise varsayılan 400'den küçük kalabilir)
         const finalHeight = Math.max(finalY + lineHeight + 50, HEIGHT);
@@ -140,7 +140,7 @@ module.exports.run = async (client, message, args) => {
             .setTitle('🐦 Twitter Tweet Simülasyonu')
             .setDescription(`**${name}** adlı kullanıcının tweeti:`)
             .setImage('attachment://simulated_tweet.png')
-            .setFooter({ text: 'Bu görsel Discord Canvas kullanılarak oluşturulmuştur.' });
+            .setFooter({ text: 'Bu görsel xAI & MotionAI kullanılarak oluşturulmuştur.' });
         
         await msg.edit({ embeds: [tweetEmbed], files: [file] });
 
