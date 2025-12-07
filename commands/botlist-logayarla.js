@@ -24,7 +24,7 @@ module.exports.run = async (client, message, args) => {
             await settings.save();
             return message.reply('✅ Bot başvuruları log kanalı başarıyla sıfırlandı!');
         } else {
-            return message.reply('⚠️ Lütfen bir kanal etiketleyin veya ID girin: `!botlist-ayarla log #kanal`');
+            return message.reply('⚠️ Lütfen bir kanal etiketleyin veya ID girin: `g!botlist-ayarla log #kanal`');
         }
     } 
     
@@ -44,4 +44,4 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = { aliases: ['blayarla'] };
-module.exports.help = { name: 'botlist-log' };
+module.exports.help = { name: 'botlist-ayarla' };
