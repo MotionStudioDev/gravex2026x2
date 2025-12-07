@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { generateText } = require('ai');           // BURASI ANA PAKET!
-const { xai } = require('@ai-sdk/xai');            // BURASI SADECE MODEL SAĞLAYICI
+const { generateText } = require('ai'); // ANA PAKET
+const { xai } = require('@ai-sdk/xai'); // xAI PROVIDER
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const MAX_RETRIES = 3;
@@ -37,35 +37,33 @@ module.exports.run = async (client, message, args) => {
 
     const loadingEmbed = new EmbedBuilder()
         .setColor('Yellow')
-        .setDescription('Grok düşünüyor...');
+        .setDescription('⏳ Grok düşünüyor...');
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
     let history = getOrCreateChatHistory(client, userId);
     let lastError = null;
     let finalAnswer = null;
 
-    // Hafıza uyarısı
     if (history.length / 2 >= MAX_HISTORY_TURNS) {
         const warn = new EmbedBuilder()
             .setColor('Orange')
-            .setDescription(`Sohbet geçmişin çok uzadı (${MAX_HISTORY_TURNS} tur). Yeni konu için **Hafızayı Sıfırla** butonuna bas.`);
+            .setDescription(`⚠️ Sohbet geçmişin çok uzadı (${MAX_HISTORY_TURNS} tur). Yeni konu için **Hafızayı Sıfırla** butonuna bas.`);
         message.channel.send({ embeds: [warn] }).catch(() => {});
     }
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('grok_reset')
-            .setLabel('Hafızayı Sıfırla')
+            .setLabel('🧠 Hafızayı Sıfırla')
             .setStyle(ButtonStyle.Danger)
     );
 
-    // Soruyu geçici olarak ekle
     history.push({ role: 'user', content: query });
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
             const { text } = await generateText({
-                model: xai('grok-4'), // BURADA xai() fonksiyonu kullanılıyor!
+                model: xai('grok-4'), // xAI modeli
                 messages: history,
                 system: "Sen Grave adlı Discord botunun yapay zeka asistanısın. Kısa, bilgilendirici, esprili ve Türkçe cevap ver.",
                 temperature: 0.7,
@@ -77,15 +75,13 @@ module.exports.run = async (client, message, args) => {
                 finalAnswer = finalAnswer.substring(0, 3990) + "\n\n... (devamı kesildi)";
             }
 
-            // Başarılı → yanıtı da geçmişe ekle
             history.push({ role: 'assistant', content: finalAnswer });
             break;
 
         } catch (error) {
             lastError = error;
-            console.error("Grok API Hatası:", error);
+            console.error("Grok API Hatası:", error.message || error);
 
-            // Hata varsa son eklenen kullanıcı mesajını geri al
             history.pop();
 
             const isRateLimit = error.status === 429 || String(error.message).toLowerCase().includes('rate limit');
@@ -94,7 +90,7 @@ module.exports.run = async (client, message, args) => {
                 const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
                 const waiting = new EmbedBuilder()
                     .setColor('Orange')
-                    .setDescription(`Rate limit! ${Math.round(backoff/1000)} saniye bekleniyor... (${attempt + 1}/${MAX_RETRIES})`);
+                    .setDescription(`🚨 Rate limit! ${Math.round(backoff/1000)} saniye bekleniyor... (${attempt + 1}/${MAX_RETRIES})`);
                 await msg.edit({ embeds: [waiting] }).catch(() => {});
                 await sleep(backoff);
             } else {
@@ -104,7 +100,6 @@ module.exports.run = async (client, message, args) => {
         }
     }
 
-    // Sonuç gösterimi
     if (finalAnswer) {
         const resultEmbed = new EmbedBuilder()
             .setColor('#00ff9d')
@@ -118,7 +113,6 @@ module.exports.run = async (client, message, args) => {
 
         const finalMsg = await msg.edit({ embeds: [resultEmbed], components: [row] });
 
-        // Buton collector
         const collector = finalMsg.createMessageComponentCollector({
             filter: i => i.customId === 'grok_reset',
             time: BUTTON_TIMEOUT
@@ -133,11 +127,15 @@ module.exports.run = async (client, message, args) => {
 
             const success = new EmbedBuilder()
                 .setColor('Green')
-                .setTitle('Hafıza Sıfırlandı')
+                .setTitle('✅ Hafıza Sıfırlandı')
                 .setDescription('Yeni bir sohbet başlatabilirsin.');
 
-            const disabledRow = ActionRowBuilder.from(row).addComponents(
-                row.components[0].setDisabled(true).setLabel('Sıfırlandı')
+            const disabledRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('grok_reset')
+                    .setLabel('Sıfırlandı')
+                    .setStyle(ButtonStyle.Danger)
+                    .setDisabled(true)
             );
 
             await i.update({ embeds: [success], components: [disabledRow] });
@@ -146,8 +144,12 @@ module.exports.run = async (client, message, args) => {
 
         collector.on('end', async (_, reason) => {
             if (reason === 'time' && finalMsg.editable) {
-                const disabledRow = ActionRowBuilder.from(row).addComponents(
-                    row.components[0].setDisabled(true).setLabel('Süre Doldu')
+                const disabledRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('grok_reset')
+                        .setLabel('Süre Doldu')
+                        .setStyle(ButtonStyle.Danger)
+                        .setDisabled(true)
                 );
                 await finalMsg.edit({ components: [disabledRow] }).catch(() => {});
             }
@@ -156,7 +158,7 @@ module.exports.run = async (client, message, args) => {
     } else {
         const errorEmbed = new EmbedBuilder()
             .setColor('Red')
-            .setTitle('Grok’a Bağlanılamadı')
+            .setTitle('❌ Grok’a Bağlanılamadı')
             .setDescription('API’de bir sorun oluştu, oturum sıfırlandı.')
             .addFields({ name: 'Hata', value: `\`\`\`${lastError?.message || 'Bilinmeyen hata'}\`\`\`` });
 
