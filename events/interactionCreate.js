@@ -1,16 +1,28 @@
-const { ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
+const { 
+    ChannelType, 
+    PermissionsBitField, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    EmbedBuilder, 
+    ModalBuilder, 
+    TextInputBuilder, 
+    TextInputStyle, 
+    InteractionType 
+} = require('discord.js');
 const TicketModel = require('../models/Ticket'); 
 // BOTLİST SİSTEMİ İÇİN GEREKLİ MODELLER
 const BotModel = require('../models/Bot');
 const BotlistSettings = require('../models/BotlistSettings');
 
+// ASYNC EKLEMESİ YAPILDI
 module.exports = async (client, interaction) => {
     
     // Yalnızca butonları ve modal gönderimlerini dinle
     if (!interaction.isButton() && interaction.type !== InteractionType.ModalSubmit) return;
 
     // =========================================================
-    // TICKET SİSTEMİ MANTIĞI (Mevcut Kodunuz)
+    // TICKET SİSTEMİ MANTIĞI
     // =========================================================
 
     // 1. TICKET MODAL AÇMA BUTONU
@@ -242,7 +254,7 @@ module.exports = async (client, interaction) => {
             const ADMIN_LOG_CHANNEL_ID = guildSettings ? guildSettings.logChannelId : null; 
             
             if (!ADMIN_LOG_CHANNEL_ID) {
-                 return interaction.editReply('❌ Bu sunucuda bot başvuruları log kanalı ayarlanmamış. Lütfen bir yöneticiye `!botlist-ayarla log #kanal` komutunu kullanmasını söyleyin.');
+                return interaction.editReply('❌ Bu sunucuda bot başvuruları log kanalı ayarlanmamış. Lütfen bir yöneticiye `!botlist-ayarla log #kanal` komutunu kullanmasını söyleyin.');
             }
 
             const logChannel = client.channels.cache.get(ADMIN_LOG_CHANNEL_ID);
@@ -343,12 +355,9 @@ module.exports = async (client, interaction) => {
             return interaction.editReply('❌ İşlem sırasında kritik bir hata oluştu.');
         }
     }
-};
-
-// ... (Mevcut Botlist ve Ticket mantığının bittiği yere ekleyin) ...
 
     // =========================================================
-    // 7. LOCK/UNLOCK BUTON İŞLEMİ
+    // 7. LOCK/UNLOCK BUTON İŞLEMİ (Sizin Eklediğiniz Blok)
     // =========================================================
     if (interaction.isButton() && interaction.customId.startsWith('unlock_manual_')) {
         
@@ -383,4 +392,4 @@ module.exports = async (client, interaction) => {
         // Buton mesajını güncelle ve butonu kaldır
         await interaction.update({ embeds: [unlockedEmbed], components: [] });
     }
-}; // Modül sonu (eğer burası dosyanın sonu ise)
+}; // Modül sonu (Şimdi doğru yerde, en sonda bitti.)
