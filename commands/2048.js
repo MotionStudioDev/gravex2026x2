@@ -286,7 +286,7 @@ module.exports.run = async (client, message, args) => {
     const helpEmbed = new EmbedBuilder()
         .setColor('Blue')
         .setTitle('2048 Bot Komutu')
-        .setDescription('Discord üzerinde **Görsel** 2048 oynamak için:\n\n**!2048 başlat**');
+        .setDescription('Discord üzerinde **Görsel** 2048 oynamak için:\n\n**g!2048 başlat**');
 
     await message.channel.send({ embeds: [helpEmbed] });
 };
