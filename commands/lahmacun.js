@@ -8,161 +8,132 @@ const {
 const path = require("path");
 
 module.exports.run = async (client, message, args) => {
-  // Malzeme eşleştirme
-  const ingredientMap = {
-    la_limon: "🍋 Limon Sıkıldı",
-    la_domates: "🍅 Domates",
-    la_soğan: "🧅 Soğan",
-    la_maydonoz: "🌿 Maydanoz",
-    la_biber: "🌶️ Biber"
+  const userId = message.author.id;
+
+  // Malzemeler
+  const choices = {
+    limon: { emoji: "🍋", label: "Limon", added: false },
+    domates: { emoji: "🍅", label: "Domates", added: false },
+    sogan: { emoji: "🧅", label: "Soğan", added: false },
+    maydonoz: { emoji: "🌿", label: "Maydanoz", added: false },
+    biber: { emoji: "🌶️", label: "Biber", added: false }
   };
 
-  let selectedIngredients = [];
-
-  // Görsel yolu
   const LAHMACUN_IMAGE_PATH = path.join(process.cwd(), "assets", "lahmacun.png");
   const LAHMACUN_IMAGE_NAME = "lahmacun.png";
 
   // Embed oluşturma
-  const createLahmacunEmbed = (
-    status = "Siparişiniz Bekleniyor...",
-    color = "Orange"
-  ) => {
-    const ingredientsText =
-      selectedIngredients.length > 0
-        ? selectedIngredients.join(", ")
-        : "Hiçbir şey seçilmedi.";
+  const getLahmacunEmbed = (currentChoices, status = "Siparişiniz Bekleniyor...", color = "Orange") => {
+    const addedIngredients = Object.values(currentChoices)
+      .filter(item => item.added)
+      .map(item => item.emoji + " " + item.label)
+      .join(", ");
+
+    const description = addedIngredients
+      ? `Lahmacununda şu an: **${addedIngredients}** var. 🤤\n\n`
+      : `Henüz hiçbir şey eklemedin. Başla! 🚀\n\n`;
 
     return new EmbedBuilder()
       .setColor(color)
       .setTitle("🌯 Lahmacun Siparişi")
-      .setDescription(
-        `**${message.author.username}**, lahmacununun yanına neleri istersin?`
-      )
-      .addFields(
-        { name: "Seçilen Malzemeler:", value: ingredientsText },
-        { name: "Durum:", value: `\`${status}\`` },
-        { name: "Hazırlayan:", value: `${message.author}` }
-      )
-      .setTimestamp()
-      .setImage(`attachment://${LAHMACUN_IMAGE_NAME}`);
+      .setDescription(description + "Malzemeleri seç, sonra 'Siparişi Onayla' butonuna tıkla.")
+      .addFields({ name: "Durum", value: `\`${status}\`` })
+      .setImage(`attachment://${LAHMACUN_IMAGE_NAME}`)
+      .setFooter({ text: "60 saniye içinde seçim yapmalısın." });
   };
 
-  // Buton oluşturma
-  const createButtons = (disabled = false) => {
-    const buttons = Object.keys(ingredientMap).map((id) => {
-      const label = ingredientMap[id];
-      const isSelected = selectedIngredients.includes(label);
-
-      return new ButtonBuilder()
-        .setCustomId(id)
-        .setLabel(label.split(" ")[1])
-        .setStyle(isSelected ? ButtonStyle.Primary : ButtonStyle.Secondary)
-        .setDisabled(disabled);
-    });
-
-    const controlButtons = new ActionRowBuilder().addComponents(
+  // Butonlar
+  const getLahmacunButtons = (currentChoices, disabled = false) => {
+    const row = new ActionRowBuilder();
+    for (const key in currentChoices) {
+      const item = currentChoices[key];
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`lahmacun_${key}`)
+          .setLabel(item.label)
+          .setEmoji(item.emoji)
+          .setStyle(item.added ? ButtonStyle.Success : ButtonStyle.Primary)
+          .setDisabled(disabled)
+      );
+    }
+    row.addComponents(
       new ButtonBuilder()
-        .setCustomId("la_siparis_onay")
+        .setCustomId("lahmacun_onay")
         .setLabel("✅ Siparişi Onayla")
         .setStyle(ButtonStyle.Success)
         .setDisabled(disabled),
       new ButtonBuilder()
-        .setCustomId("la_siparis_iptal")
+        .setCustomId("lahmacun_iptal")
         .setLabel("❌ İptal Et")
         .setStyle(ButtonStyle.Danger)
         .setDisabled(disabled)
     );
-
-    const row1 = new ActionRowBuilder().addComponents(buttons.slice(0, 4));
-    const row2 = new ActionRowBuilder()
-      .addComponents(buttons.slice(4))
-      .addComponents(controlButtons.components);
-
-    return [row1, row2];
+    return row;
   };
 
   // Başlangıç mesajı
   const msg = await message.channel.send({
-    embeds: [createLahmacunEmbed()],
-    components: createButtons(),
+    embeds: [getLahmacunEmbed(choices)],
+    components: [getLahmacunButtons(choices)],
     files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }]
   });
 
   // Collector
-  const filter = (i) =>
-    i.user.id === message.author.id && i.customId.startsWith("la_");
   const collector = msg.createMessageComponentCollector({
-    filter,
+    filter: i => i.user.id === userId && i.customId.startsWith("lahmacun_"),
     time: 60000,
     componentType: ComponentType.Button
   });
 
-  collector.on("collect", async (interaction) => {
-    await interaction.deferUpdate();
-    const customId = interaction.customId;
+  collector.on("collect", async i => {
+    await i.deferUpdate();
 
-    if (ingredientMap[customId]) {
-      const label = ingredientMap[customId];
-      if (selectedIngredients.includes(label)) {
-        selectedIngredients = selectedIngredients.filter(
-          (item) => item !== label
-        );
-      } else {
-        selectedIngredients.push(label);
-      }
-
-      // 🔧 FIX: Görseli her edit'te tekrar iliştiriyoruz
-      await msg.edit({
-        embeds: [createLahmacunEmbed()],
-        components: createButtons(),
-        files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }]
-      });
-    } else if (customId === "la_siparis_onay") {
+    if (i.customId === "lahmacun_onay") {
       collector.stop("onaylandı");
-    } else if (customId === "la_siparis_iptal") {
-      collector.stop("iptal edildi");
+      return;
     }
+    if (i.customId === "lahmacun_iptal") {
+      collector.stop("iptal");
+      return;
+    }
+
+    // Malzeme seçimi
+    const key = i.customId.replace("lahmacun_", "");
+    if (choices[key]) {
+      choices[key].added = !choices[key].added;
+    }
+
+    await msg.edit({
+      embeds: [getLahmacunEmbed(choices)],
+      components: [getLahmacunButtons(choices)],
+      files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }]
+    });
   });
 
   collector.on("end", async (collected, reason) => {
     let finalEmbed;
-
     if (reason === "onaylandı") {
-      const content =
-        selectedIngredients.length > 0
-          ? selectedIngredients.join(", ")
-          : "Sade (Hiçbir şey)";
-      finalEmbed = createLahmacunEmbed(
-        `Siparişiniz onaylandı! İçerik: ${content}`,
-        "Green"
-      ).setTitle("🎉 Lahmacun Siparişi Onaylandı!");
-    } else if (reason === "iptal edildi") {
-      finalEmbed = createLahmacunEmbed(
-        "Sipariş kullanıcı tarafından iptal edildi.",
-        "Red"
-      ).setTitle("❌ Lahmacun Siparişi İptal Edildi");
+      const selected = Object.values(choices)
+        .filter(item => item.added)
+        .map(item => item.label)
+        .join(", ") || "Sade (hiçbir şey)";
+      finalEmbed = getLahmacunEmbed(choices, `Siparişiniz onaylandı! İçerik: ${selected}`, "Green")
+        .setTitle("🎉 Lahmacun Hazır!");
+    } else if (reason === "iptal") {
+      finalEmbed = getLahmacunEmbed(choices, "Sipariş iptal edildi.", "Red")
+        .setTitle("❌ Lahmacun İptal");
     } else if (reason === "time") {
-      finalEmbed = createLahmacunEmbed(
-        "Süre doldu, sipariş otomatik olarak iptal edildi.",
-        "Red"
-      ).setTitle("⌛ Süre Doldu");
+      finalEmbed = getLahmacunEmbed(choices, "Süre doldu, sipariş iptal edildi.", "Red")
+        .setTitle("⌛ Süre Doldu");
     }
 
-    await msg
-      .edit({
-        embeds: [finalEmbed],
-        components: createButtons(true),
-        files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }]
-      })
-      .catch((err) => console.error("Final mesajı düzenlenirken hata:", err));
+    await msg.edit({
+      embeds: [finalEmbed],
+      components: [getLahmacunButtons(choices, true)],
+      files: [{ attachment: LAHMACUN_IMAGE_PATH, name: LAHMACUN_IMAGE_NAME }]
+    }).catch(() => {});
   });
 };
 
-module.exports.conf = {
-  aliases: ["lahmacun"]
-};
-
-module.exports.help = {
-  name: "lahmacun"
-};
+module.exports.conf = { aliases: ["lahmacun"] };
+module.exports.help = { name: "lahmacun" };
