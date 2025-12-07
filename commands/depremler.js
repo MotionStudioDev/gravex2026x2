@@ -132,7 +132,7 @@ function createFilterModal() {
 
     const filterInput = new TextInputBuilder()
         .setCustomId('filter_input')
-        .setLabel('Şehir, İlçe veya Bölge Adı (Örn: İstanbul, EGE)')
+        .setLabel('Şehir, Bölge (Örn: İstanbul, EGE)')
         .setStyle(TextInputStyle.Short)
         .setMinLength(2)
         .setRequired(true);
