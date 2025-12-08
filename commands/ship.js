@@ -24,12 +24,63 @@ function drawCircularImage(ctx, image, x, y, size) {
     ctx.restore();
 }
 
+/**
+ * Canvas üzerine profesyonel uyum çubuğu çizer.
+ * @param {Canvas.CanvasRenderingContext2D} ctx - Canvas bağlamı (context).
+ * @param {number} uyum - Uyum yüzdesi (0-100).
+ */
+function drawProgressBar(ctx, uyum) {
+    const BAR_WIDTH = 600;
+    const BAR_HEIGHT = 20;
+    const X = 50;
+    const Y = 200;
+    const RADIUS = 10; // Köşe yuvarlama
+
+    // 1. Arka Planı Çiz (Gri/Beyaz çerçeve)
+    ctx.fillStyle = '#CCCCCC';
+    ctx.beginPath();
+    ctx.roundRect(X, Y, BAR_WIDTH, BAR_HEIGHT, RADIUS);
+    ctx.fill();
+
+    // 2. Dolu Kısmı Çiz
+    const fillWidth = (uyum / 100) * BAR_WIDTH;
+    
+    // Geçişli Renk (Gradient) oluşturma: Kırmızıdan Maviye
+    const gradient = ctx.createLinearGradient(X, Y, X + BAR_WIDTH, Y);
+    if (uyum <= 50) {
+        // Düşük uyum: Kırmızıdan Sarıya
+        gradient.addColorStop(0, '#FF0000'); // Kırmızı
+        gradient.addColorStop(1, '#FFD700'); // Sarı
+    } else {
+        // Yüksek uyum: Yeşilden Pembeye
+        gradient.addColorStop(0, '#32CD32'); // Limon Yeşili
+        gradient.addColorStop(1, '#FF69B4'); // Pembe
+    }
+    
+    // Geçişli rengi uygula
+    ctx.fillStyle = gradient;
+    
+    // Yuvarlatılmış köşeler için sadece doluluk kadar alan çizilir
+    ctx.beginPath();
+    // Doluluk oranı 0'dan büyükse çizime başla
+    if (fillWidth > 0) {
+        ctx.roundRect(X, Y, fillWidth, BAR_HEIGHT, RADIUS);
+        ctx.fill();
+    }
+
+    // 3. Yüzde Metni (Çubuğun Üzerine)
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText(`%${uyum}`, X + fillWidth / 2, Y + BAR_HEIGHT / 2 + 5); 
+}
+
+
 module.exports.run = async (client, message, args) => {
-    // 1. Hedefleri Belirleme (İki kişi gerekli!)
+    // 1. Hedefleri Belirleme
     let target1 = message.author;
     let target2Member = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
 
-    // target2Member'ı User objesine çeviriyoruz.
     let target2;
     if (target2Member) {
         target2 = target2Member.user;
@@ -37,7 +88,6 @@ module.exports.run = async (client, message, args) => {
 
     // Kullanım Hatalarını ve undefined kontrolünü güçlendirme
     if (!target2Member && args[0]) {
-        // ID ile kullanıcı arama başarısız olursa
         return message.reply({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Kullanım Hatası').setDescription('Belirtilen ID veya etiket ile bir kullanıcı bulamadım.')] });
     }
 
@@ -55,7 +105,6 @@ module.exports.run = async (client, message, args) => {
         return message.reply({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Kullanım Hatası').setDescription('Lütfen iki farklı kişiyi etiketleyin veya bir kişiyi etiketleyerek kendinizle ship yapın.')] });
     }
     
-    // Botu ship'lemeyi engelle
     if (target1.bot || target2.bot) {
         return message.reply("🤖 Botlar aşkı kaldıramaz! Lütfen sadece kullanıcıları ship'leyin.");
     }
@@ -67,93 +116,114 @@ module.exports.run = async (client, message, args) => {
         seed += sortedIds.charCodeAt(i);
     }
     const uyum = (seed * 97) % 101; // Tutarlı yüzde hesaplama
-
-    // Romantik cümleler (Mevcut koddan alındı)
+    
+    // Romantik cümleler
     const romantikCumleler = [
         (a, b) => `Kader ${a.username} ile ${b.username}'i birleştirdi 💫`,
         (a, b) => `${a.username} ve ${b.username}, kalpleriniz aynı ritimde atıyor 💓`,
         (a, b) => `${a.username} ❤️ ${b.username} aşkının önünde kimse duramaz 🔥`,
-        (a, b) => `Gökyüzü bile ${a.username} ile ${b.username}'i izliyor 🌌`,
         (a, b) => `Birlikte her şey daha güzel: ${a.username} + ${b.username} 🌹`,
         (a, b) => `${a.username} ve ${b.username}, aşkınız efsane olacak ✨`,
-        (a, b) => `İki ruh, tek kalp: ${a.username} & ${b.username} 💕`
+        (a, b) => `İki ruh, tek kalp: ${a.username} & ${b.username} 💕`,
+        (a, b) => `Bu uyum, gökyüzündeki yıldızları bile kıskandırır! 🌟`
     ];
 
-    // Embed üretici (Mevcut koddan alındı)
+    // Embed Üretici (Canvas ile senkronize)
     function shipEmbed(author, target, uyum) {
         let emoji = '💖';
-        if (uyum < 30) emoji = '💔';
-        else if (uyum < 70) emoji = '💞';
+        let descriptionEmoji = '✨';
+        let color = '#FF69B4'; // Pembe
 
+        if (uyum < 30) {
+            emoji = '💔';
+            descriptionEmoji = '⚠️';
+            color = '#FF0000'; // Kırmızı
+        } else if (uyum < 70) {
+            emoji = '💞';
+            descriptionEmoji = '💛';
+            color = '#FFD700'; // Altın sarısı
+        }
+
+        // Embed metninde uyum çubuğunu da gösterelim (Görseli desteklemek için)
         const filled = Math.round(uyum / 10);
-        const gradient = ['🟥','🟧','🟨','🟩','🟦','🟪'];
-        const bar = Array.from({ length: 10 }, (_, i) =>
-            i < filled ? gradient[i % gradient.length] : '⬜'
-        ).join('');
+        const empty = 10 - filled;
+        const barText = '█'.repeat(filled) + '░'.repeat(empty);
 
-        // Embed metninde kullanıcı etiketlerini kullanıyoruz.
         const romantik = romantikCumleler[Math.floor(Math.random() * romantikCumleler.length)](author, target);
 
         return new EmbedBuilder()
-            .setColor('#FF69B4')
-            .setTitle('💖 Grave Ship!')
-            .setDescription(`${author} ❤️ ${target}\n\n${emoji} Uyum: **%${uyum}**\n${bar}\n\n_${romantik}_`)
+            .setColor(color)
+            .setTitle(`${emoji} ${author.username} ve ${target.username} Ship Sonucu`)
+            .setDescription(
+                `${descriptionEmoji} **UYUM PUANI:** **%${uyum}**\n` +
+                `\`${barText}\`\n\n` + 
+                `_${romantik}_`
+            )
             .setImage('attachment://ship.jpg');
     }
 
-    // 2. Canvas Görseli Oluşturma
-    const canvas = Canvas.createCanvas(700, 250);
+    // 2. Canvas Görseli Oluşturma (Boyut büyütüldü)
+    const canvas = Canvas.createCanvas(700, 300); // Yüksekliği artırıldı
     const ctx = canvas.getContext('2d');
     
-    // Arka Plan Yükleme
-    let background;
-    try {
-        background = await Canvas.loadImage('./assets/kalpli.jpg'); 
-        ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-    } catch {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
+    // Arka Planı Beyaz veya Açık Gri yapalım (Varsayılan)
+    ctx.fillStyle = '#F0F0F0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
     // Avatarları Yükleme
-    const AVATAR_SIZE = 200;
+    const AVATAR_SIZE = 150; // Boyut biraz küçültüldü
+    const X1 = 80;
+    const X2 = 700 - 80 - AVATAR_SIZE;
+    const Y_AVATAR = 40;
+
     const avatar1 = await Canvas.loadImage(target1.displayAvatarURL({ extension: 'png', size: 256 }));
     const avatar2 = await Canvas.loadImage(target2.displayAvatarURL({ extension: 'png', size: 256 }));
     
-    // Yuvarlak Avatarları Çizme
-    drawCircularImage(ctx, avatar1, 50, 25, AVATAR_SIZE);
-    drawCircularImage(ctx, avatar2, 450, 25, AVATAR_SIZE);
+    // Yuvarlak Avatarları Çizme ve Çerçeve Ekleme
+    ctx.strokeStyle = '#FFFFFF'; // Beyaz çerçeve
+    ctx.lineWidth = 6;
     
-    // Kalp Simgesi (Ortaya)
-    ctx.font = '72px sans-serif'; 
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FF0000';
-    ctx.fillText('❤️', 350, 150); 
-    
-    // Uyum Yüzdesi Metni (Kalbin Altına)
-    ctx.font = '30px sans-serif';
-    ctx.fillStyle = '#FF69B4'; 
-    ctx.fillText(`%${uyum}`, 350, 200);
+    // Avatar 1
+    drawCircularImage(ctx, avatar1, X1, Y_AVATAR, AVATAR_SIZE);
+    ctx.beginPath();
+    ctx.arc(X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE / 2, AVATAR_SIZE / 2 + 3, 0, Math.PI * 2, true);
+    ctx.stroke();
 
-    // İsimleri Yazma: İSTENMEDİĞİ İÇİN KALDIRILDI
-    // ctx.fillText(target1.username, 150, 230); 
-    // ctx.fillText(target2.username, 550, 230); 
+    // Avatar 2
+    drawCircularImage(ctx, avatar2, X2, Y_AVATAR, AVATAR_SIZE);
+    ctx.beginPath();
+    ctx.arc(X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE / 2, AVATAR_SIZE / 2 + 3, 0, Math.PI * 2, true);
+    ctx.stroke();
+    
+    // KALIN YÜZDE METNİ (Ortaya)
+    ctx.font = '80px sans-serif'; // Büyük font
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FF69B4'; // Pembe renk
+    ctx.fillText(`${uyum}%`, 350, 120); 
+
+    // KALPLER VE İSİM AYIRICI
+    ctx.font = '40px sans-serif';
+    ctx.fillStyle = '#FF0000';
+    ctx.fillText('❤️', 350, 180); 
+    
+    // ULTRA GELİŞMİŞ UYUM ÇUBUĞU
+    drawProgressBar(ctx, uyum);
 
     const attachment = { files: [{ attachment: canvas.toBuffer(), name: 'ship.jpg' }] };
     const embed = shipEmbed(target1, target2, uyum);
 
-    // Butonlar (Mevcut koddan alındı)
+    // Butonlar
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('ship_delete').setLabel('Sil').setStyle(ButtonStyle.Danger),
-        // Tekrar ship butonu şimdilik kapalı
+        new ButtonBuilder().setCustomId('ship_again').setLabel('Tekrar Dene (Rastgele)').setStyle(ButtonStyle.Success),
     );
 
     const msg = await message.channel.send({ embeds: [embed], components: [row], ...attachment });
 
-    // Collector (Mevcut koddan alındı)
+    // Collector ve Tekrar Deneme Mantığı
     const collector = msg.createMessageComponentCollector({
         filter: i => i.user.id === message.author.id,
-        time: 30000
+        time: 300000 // 5 dakika
     });
 
     collector.on('collect', async i => {
@@ -161,11 +231,45 @@ module.exports.run = async (client, message, args) => {
             await msg.delete().catch(() => {});
             collector.stop();
         }
-        // Tekrar ship mantığı (rastgelelik istenirse)
+        
         if (i.customId === 'ship_again') {
-             const yeniUyum = Math.floor(Math.random() * 101); 
-             const newEmbed = shipEmbed(target1, target2, yeniUyum);
-             await i.update({ embeds: [newEmbed], components: [row], ...attachment });
+            // Rastgele uyum hesaplama
+            const yeniUyum = Math.floor(Math.random() * 101);
+            
+            // Yeni Canvas görseli oluşturma (Yeni uyum ile)
+            const newCanvas = Canvas.createCanvas(700, 300);
+            const newCtx = newCanvas.getContext('2d');
+            newCtx.fillStyle = '#F0F0F0';
+            newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+            
+            // Avatarları ve çerçeveleri tekrar çizme
+            drawCircularImage(newCtx, avatar1, X1, Y_AVATAR, AVATAR_SIZE);
+            drawCircularImage(newCtx, avatar2, X2, Y_AVATAR, AVATAR_SIZE);
+            newCtx.strokeStyle = '#FFFFFF'; 
+            newCtx.lineWidth = 6;
+            newCtx.beginPath();
+            newCtx.arc(X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE / 2, AVATAR_SIZE / 2 + 3, 0, Math.PI * 2, true);
+            newCtx.stroke();
+            newCtx.beginPath();
+            newCtx.arc(X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE / 2, AVATAR_SIZE / 2 + 3, 0, Math.PI * 2, true);
+            newCtx.stroke();
+
+            // Yeni yüzde ve kalp
+            newCtx.font = '80px sans-serif';
+            newCtx.textAlign = 'center';
+            newCtx.fillStyle = '#FF69B4'; 
+            newCtx.fillText(`${yeniUyum}%`, 350, 120);
+            newCtx.font = '40px sans-serif';
+            newCtx.fillStyle = '#FF0000';
+            newCtx.fillText('❤️', 350, 180); 
+            
+            // Yeni uyum çubuğunu çizme
+            drawProgressBar(newCtx, yeniUyum);
+
+            const newAttachment = { files: [{ attachment: newCanvas.toBuffer(), name: 'ship.jpg' }] };
+            const newEmbed = shipEmbed(target1, target2, yeniUyum);
+            
+            await i.update({ embeds: [newEmbed], components: [row], ...newAttachment });
         }
     });
 
