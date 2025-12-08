@@ -9,21 +9,17 @@ const Canvas = require('canvas');
 function drawCircularImage(ctx, image, x, y, size, color) {
     ctx.save();
     
-    // 1. GLOW Efekti (Gölge)
     ctx.shadowBlur = 15;
     ctx.shadowColor = color; 
 
-    // 2. Daire Maskesi
     ctx.beginPath();
     ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2, true);
     ctx.closePath();
     ctx.clip();
     
-    // 3. Resmi Çizme
     ctx.drawImage(image, x, y, size, size);
     ctx.restore();
 
-    // 4. Çerçeve (Glow'un üzerine daha keskin bir çerçeve)
     ctx.strokeStyle = color;
     ctx.lineWidth = 5;
     ctx.beginPath();
@@ -36,24 +32,21 @@ function drawCircularImage(ctx, image, x, y, size, color) {
  */
 function drawProgressBar(ctx, uyum, Y_POS) {
     const BAR_WIDTH = 600;
-    const BAR_HEIGHT = 25; // Yüksekliği artırıldı
+    const BAR_HEIGHT = 25; 
     const X = 50;
     const RADIUS = 12; 
 
-    // 1. Arka Planı Çiz (Koyu Gri)
     ctx.fillStyle = '#333333';
     ctx.beginPath();
     ctx.roundRect(X, Y_POS, BAR_WIDTH, BAR_HEIGHT, RADIUS);
     ctx.fill();
 
-    // 2. Dolu Kısmı Çiz (Görseldeki gibi Gold/Red Gradient)
     const fillWidth = (uyum / 100) * BAR_WIDTH;
     
     const gradient = ctx.createLinearGradient(X, Y_POS, X + BAR_WIDTH, Y_POS);
-    // Görseldeki gibi soldan sağa geçiş
-    gradient.addColorStop(0, '#FFC72C'); // Altın sarısı
-    gradient.addColorStop(0.5, '#FF7F50'); // Mercan
-    gradient.addColorStop(1, '#DC143C'); // Kırmızı
+    gradient.addColorStop(0, '#FFC72C'); 
+    gradient.addColorStop(0.5, '#FF7F50'); 
+    gradient.addColorStop(1, '#DC143C'); 
     
     ctx.fillStyle = gradient;
     if (fillWidth > 0) {
@@ -62,8 +55,7 @@ function drawProgressBar(ctx, uyum, Y_POS) {
         ctx.fill();
     }
 
-    // 3. Yüzde Metni (Bar Üzerinde)
-    ctx.font = '16px sans-serif'; // Varsayılan font
+    ctx.font = '16px sans-serif'; 
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.fillText(`%${uyum}`, X + fillWidth / 2, Y_POS + BAR_HEIGHT / 2 + 5); 
@@ -74,11 +66,10 @@ module.exports.run = async (client, message, args) => {
     let target1 = message.author;
     let target2Member = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
     let target2 = target2Member ? target2Member.user : null;
-
+    
     if (!target2Member && args[0]) {
         return message.reply({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Kullanım Hatası').setDescription('Belirtilen ID veya etiket ile bir kullanıcı bulamadım.')] });
     }
-    // ... (Diğer hatalar aynı) ...
     if (message.mentions.members.size === 1) {
         if (target2.id === message.author.id) {
             return message.reply({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Kullanım Hatası').setDescription('Lütfen kendinizden farklı bir kişiyi etiketleyin.')] });
@@ -162,12 +153,12 @@ module.exports.run = async (client, message, args) => {
     const COLOR1 = '#00FFDD'; // Turkuaz neon
     const COLOR2 = '#FF00A0'; // Pembe neon
     
-    // Yüzde Metni Sabitleri (Kesin Hizalama)
-    const PERCENTAGE_VALUE = uyum.toString(); // Yüzde değeri
-    const PERCENTAGE_FONT_SIZE = 72;
-    const PERCENTAGE_Y = 150; // Metnin dikey merkez çizgisi
-    const CIRCLE_RADIUS = 60;
-    const HEART_Y = 220;
+    // Yüzde Metni Sabitleri (Görseldeki gibi hizalama)
+    const PERCENTAGE_FONT_SIZE = 60; // Font küçültüldü
+    const CIRCLE_RADIUS = 70; // Çember büyütüldü
+    const CIRCLE_CENTER_X = 350;
+    const CIRCLE_CENTER_Y = Y_AVATAR + AVATAR_SIZE / 2; // Avatarlarla aynı dikey merkez
+    const HEART_Y = CIRCLE_CENTER_Y + CIRCLE_RADIUS + 15; // Kalp, çemberin altına
 
     const avatar1 = await Canvas.loadImage(target1.displayAvatarURL({ extension: 'png', size: 256 }));
     const avatar2 = await Canvas.loadImage(target2.displayAvatarURL({ extension: 'png', size: 256 }));
@@ -183,38 +174,33 @@ module.exports.run = async (client, message, args) => {
     ctx.fillStyle = COLOR2;
     ctx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
     
-    // BÜYÜK YÜZDE METNİ VE İŞARETİ (Hizalama DÜZELTİLDİ)
-    
-    // 1. Yüzde Değeri
+    // YÜZDE ÇERÇEVESİ (Önce çemberi çiz, görseldeki gibi kalın, beyaz)
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 8;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#FF00A0'; // Neon pembe gölge
+    ctx.beginPath();
+    ctx.arc(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS, 0, Math.PI * 2, true);
+    ctx.stroke();
+    ctx.shadowBlur = 0; // Gölgeyi sıfırla
+
+    // BÜYÜK YÜZDE METNİ (Çemberin içine tam merkezlenmiş)
     ctx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
-    ctx.textAlign = 'right'; // Metni sağa dayalı yap (Böylece %'den önceki kısım sabitlenir)
+    ctx.textAlign = 'center'; // Metin merkezden çizilecek
+    ctx.textBaseline = 'middle'; // Dikey olarak da merkezden başla
     ctx.fillStyle = '#FFFFFF'; 
     ctx.shadowBlur = 10;
     ctx.shadowColor = '#FF00A0'; 
-    // Metin başlama noktası
-    const TEXT_START_X = 360; 
-    ctx.fillText(PERCENTAGE_VALUE, TEXT_START_X, PERCENTAGE_Y);
-
-    // 2. Yüzde İşareti
-    ctx.font = '40px sans-serif'; // Daha küçük font
-    ctx.textAlign = 'left'; // Metni sola dayalı yap
-    ctx.fillText('%', TEXT_START_X + 5, PERCENTAGE_Y);
-
+    
+    // Yüzde metnini çemberin tam merkezine (CIRCLE_CENTER_X, CIRCLE_CENTER_Y) çiz
+    ctx.fillText(`${uyum}%`, CIRCLE_CENTER_X, CIRCLE_CENTER_Y + 5); 
+    
     ctx.shadowBlur = 0; // Gölgeyi sıfırla
-
-    // YÜZDE ÇERÇEVESİ (Metin ve % işareti artık merkezde)
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    // Merkez X pozisyonunu iki metnin ortasına ayarlıyoruz (350)
-    // Merkez Y pozisyonunu metin fontunun 2/3'ü kadar yukarı taşıyoruz (150 - 2/3*72 ≈ 102)
-    ctx.arc(350, 115, CIRCLE_RADIUS, 0, Math.PI * 2, true); 
-    ctx.stroke();
-
-    // KALPLER (Görseldeki gibi ortadaki alana)
-    ctx.font = '72px sans-serif'; 
+    
+    // KALPLER (Çemberin hemen altında)
+    ctx.font = '40px sans-serif'; 
     ctx.fillStyle = '#FF00A0'; 
-    ctx.fillText('❤️', 350, HEART_Y); 
+    ctx.fillText('❤️', CIRCLE_CENTER_X, HEART_Y); 
     
     // EFSANEVİ UYUM ÇUBUĞU
     drawProgressBar(ctx, uyum, Y_BAR);
@@ -222,7 +208,7 @@ module.exports.run = async (client, message, args) => {
     const attachment = { files: [{ attachment: canvas.toBuffer(), name: 'ship.jpg' }] };
     const embed = shipEmbed(target1, target2, uyum);
 
-    // --- BUTONLAR ve COLLECTOR (Tekrar Dene mantığı) ---
+    // --- BUTONLAR ve COLLECTOR (Aynı kaldı) ---
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('ship_delete').setLabel('Sil').setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId('ship_again').setLabel('Tekrar Dene (Rastgele)').setStyle(ButtonStyle.Success),
@@ -262,31 +248,30 @@ module.exports.run = async (client, message, args) => {
             newCtx.fillStyle = COLOR2;
             newCtx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
 
-            // Yeni Yüzde Metni (Düzeltilmiş Hizalama)
+            // Yeni Yüzde Çerçevesi
+            newCtx.strokeStyle = '#FFFFFF';
+            newCtx.lineWidth = 8;
+            newCtx.shadowBlur = 10;
+            newCtx.shadowColor = '#FF00A0'; 
+            newCtx.beginPath();
+            newCtx.arc(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS, 0, Math.PI * 2, true);
+            newCtx.stroke();
+            newCtx.shadowBlur = 0; 
+            
+            // Yeni Yüzde Metni
             newCtx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
-            newCtx.textAlign = 'right';
+            newCtx.textAlign = 'center'; 
+            newCtx.textBaseline = 'middle';
             newCtx.fillStyle = '#FFFFFF'; 
             newCtx.shadowBlur = 10;
             newCtx.shadowColor = '#FF00A0'; 
-            newCtx.fillText(yeniUyum.toString(), TEXT_START_X, PERCENTAGE_Y); 
-
-            newCtx.font = '40px sans-serif';
-            newCtx.textAlign = 'left';
-            newCtx.fillText('%', TEXT_START_X + 5, PERCENTAGE_Y);
-
+            newCtx.fillText(`${yeniUyum}%`, CIRCLE_CENTER_X, CIRCLE_CENTER_Y + 5); 
             newCtx.shadowBlur = 0; 
             
-            // Yeni Yüzde Çerçevesi
-            newCtx.strokeStyle = '#FFFFFF';
-            newCtx.lineWidth = 4;
-            newCtx.beginPath();
-            newCtx.arc(350, 115, CIRCLE_RADIUS, 0, Math.PI * 2, true); 
-            newCtx.stroke();
-
             // Kalp
-            newCtx.font = '72px sans-serif';
+            newCtx.font = '40px sans-serif';
             newCtx.fillStyle = '#FF00A0'; 
-            newCtx.fillText('❤️', 350, HEART_Y); 
+            newCtx.fillText('❤️', CIRCLE_CENTER_X, HEART_Y); 
             
             // Yeni Uyum Çubuğu
             drawProgressBar(newCtx, yeniUyum, Y_BAR);
