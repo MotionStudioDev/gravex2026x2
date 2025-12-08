@@ -1,6 +1,9 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Canvas = require('canvas');
 
+// Tüm boyutları ve koordinatları 4K (HD) için ölçekleme faktörü
+const SCALE = 2; 
+
 // --- YARDIMCI FONKSİYONLAR ---
 
 /**
@@ -8,16 +11,21 @@ const Canvas = require('canvas');
  */
 function drawCircularImage(ctx, image, x, y, size, color) {
     ctx.save();
-    ctx.shadowBlur = 15;
+    
+    // Ölçekli kalınlık ve gölge
+    ctx.shadowBlur = 15 * SCALE; 
     ctx.shadowColor = color; 
+
     ctx.beginPath();
     ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2, true);
     ctx.closePath();
     ctx.clip();
+    
     ctx.drawImage(image, x, y, size, size);
     ctx.restore();
+
     ctx.strokeStyle = color;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 5 * SCALE;
     ctx.beginPath();
     ctx.arc(x + size / 2, y + size / 2, size / 2 + 2, 0, Math.PI * 2, true);
     ctx.stroke();
@@ -27,10 +35,10 @@ function drawCircularImage(ctx, image, x, y, size, color) {
  * Profesyonel uyum çubuğu çizer.
  */
 function drawProgressBar(ctx, uyum, Y_POS) {
-    const BAR_WIDTH = 600;
-    const BAR_HEIGHT = 25; 
-    const X = 50;
-    const RADIUS = 12; 
+    const BAR_WIDTH = 600 * SCALE;
+    const BAR_HEIGHT = 25 * SCALE; 
+    const X = 50 * SCALE;
+    const RADIUS = 12 * SCALE; 
 
     ctx.fillStyle = '#333333';
     ctx.beginPath();
@@ -50,10 +58,10 @@ function drawProgressBar(ctx, uyum, Y_POS) {
         ctx.fill();
     }
 
-    ctx.font = '16px sans-serif'; 
+    ctx.font = `${16 * SCALE}px sans-serif`; 
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
-    ctx.fillText(`%${uyum}`, X + fillWidth / 2, Y_POS + BAR_HEIGHT / 2 + 5); 
+    ctx.fillText(`%${uyum}`, X + fillWidth / 2, Y_POS + BAR_HEIGHT / 2 + (5 * SCALE)); 
 }
 
 module.exports.run = async (client, message, args) => {
@@ -91,54 +99,64 @@ module.exports.run = async (client, message, args) => {
         return new EmbedBuilder().setColor(color).setTitle(`${titleEmoji} Efsanevi Ship Sonucu`).setDescription(`**${author.username}** ve **${target.username}**'in Kader Çizgisi:\n\n${descriptionEmoji} **TOPLAM UYUM PUANI:** **%${uyum}**\n\`${barText}\`\n\n_${romantik}_`).setImage('attachment://ship.jpg');
     }
 
-    // --- 2. CANVAS GÖRSELİ OLUŞTURMA (KÜÇÜLTÜLMÜŞ FONT) ---
-    const canvas = Canvas.createCanvas(700, 350); 
+    // --- 2. CANVAS GÖRSELİ OLUŞTURMA (4K HD ÖLÇEKLİ) ---
+    // ⬇️ ÇÖZÜNÜRLÜK ARTTIRILDI: 700x2 = 1400, 350x2 = 700
+    const canvas = Canvas.createCanvas(700 * SCALE, 350 * SCALE); 
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    const AVATAR_SIZE = 150; const X1 = 80; const X2 = 700 - 80 - AVATAR_SIZE; const Y_AVATAR = 50;
+    // Sabitler (Hepsi ölçekli)
+    const AVATAR_SIZE = 150 * SCALE; 
+    const X1 = 80 * SCALE; 
+    const X2 = (700 - 80 - 150) * SCALE; // X2 hesaplama (700 - X1 - AVATAR_SIZE) * SCALE
+    const Y_AVATAR = 50 * SCALE;
+    const Y_BAR = 280 * SCALE;
     const COLOR1 = '#00FFDD'; const COLOR2 = '#FF00A0';
     
-    // Yüzde Metni ve Çember Sabitleri
-    // ⬇️ DÜZELTME: Font boyutu küçültüldü
-    const PERCENTAGE_FONT_SIZE = 50; 
-    const CIRCLE_RADIUS = 70; 
-    const CIRCLE_CENTER_X = 350;
+    // Yüzde Metni ve Çember Sabitleri (Ölçekli)
+    const PERCENTAGE_FONT_SIZE = 50 * SCALE; // 100px
+    const CIRCLE_RADIUS = 70 * SCALE; // 140px
+    const CIRCLE_CENTER_X = 350 * SCALE; // 700px
     const CIRCLE_CENTER_Y = Y_AVATAR + AVATAR_SIZE / 2; 
-    const Y_BAR = 280;
 
-    const avatar1 = await Canvas.loadImage(target1.displayAvatarURL({ extension: 'png', size: 256 }));
-    const avatar2 = await Canvas.loadImage(target2.displayAvatarURL({ extension: 'png', size: 256 }));
+    const avatar1 = await Canvas.loadImage(target1.displayAvatarURL({ extension: 'png', size: 512 })); // Daha büyük resim yükle
+    const avatar2 = await Canvas.loadImage(target2.displayAvatarURL({ extension: 'png', size: 512 }));
     
     drawCircularImage(ctx, avatar1, X1, Y_AVATAR, AVATAR_SIZE, COLOR1);
     drawCircularImage(ctx, avatar2, X2, Y_AVATAR, AVATAR_SIZE, COLOR2);
     
-    ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillStyle = COLOR1; ctx.fillText(target1.username, X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
-    ctx.fillStyle = COLOR2; ctx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
+    // İsimler
+    ctx.font = `${24 * SCALE}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillStyle = COLOR1; ctx.fillText(target1.username, X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + (30 * SCALE));
+    ctx.fillStyle = COLOR2; ctx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + (30 * SCALE));
     
-    // --- KESİN HİZALANMIŞ VE KÜÇÜLTÜLMÜŞ YÜZDE METNİ ---
+    // --- KESİN HİZALANMIŞ YÜZDE METNİ ---
     ctx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
     const text = `${uyum}%`;
     const metrics = ctx.measureText(text);
     const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+    // Hesaplama: Çember Merkezi Y + (Yükseklik / 2) - Descent
     const textY = CIRCLE_CENTER_Y + (textHeight / 2) - metrics.actualBoundingBoxDescent;
 
     // Yüzde Çerçevesi
-    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 8;
-    ctx.shadowBlur = 10; ctx.shadowColor = '#FF00A0'; 
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 8 * SCALE;
+    ctx.shadowBlur = 10 * SCALE; ctx.shadowColor = '#FF00A0'; 
     ctx.beginPath(); ctx.arc(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS, 0, Math.PI * 2, true);
     ctx.stroke(); ctx.shadowBlur = 0; 
 
     // Yüzde Metni
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFFFFF'; ctx.shadowBlur = 10; ctx.shadowColor = '#FF00A0'; 
-    ctx.fillText(text, CIRCLE_CENTER_X, textY); // Hesaplanan hassas Y konumu
+    ctx.fillStyle = '#FFFFFF'; ctx.shadowBlur = 10 * SCALE; ctx.shadowColor = '#FF00A0'; 
+    ctx.fillText(text, CIRCLE_CENTER_X, textY); 
     ctx.shadowBlur = 0; 
     
-    // Kalp
-    ctx.font = '40px sans-serif'; ctx.fillStyle = '#FF00A0'; ctx.textAlign = 'center';
-    ctx.fillText('❤️', CIRCLE_CENTER_X, CIRCLE_CENTER_Y + CIRCLE_RADIUS + 25); 
+    // Kalp (⬇️ Konum Değişikliği: Çemberin Altına Alındı)
+    ctx.font = `${40 * SCALE}px sans-serif`; 
+    ctx.fillStyle = '#FF00A0'; 
+    ctx.textAlign = 'center';
+    // Kalp Y konumu: Çemberin alt sınırı + 25px boşluk
+    const HEART_Y = CIRCLE_CENTER_Y + CIRCLE_RADIUS + (25 * SCALE); 
+    ctx.fillText('❤️', CIRCLE_CENTER_X, HEART_Y); 
     
     // Uyum Çubuğu
     drawProgressBar(ctx, uyum, Y_BAR);
@@ -162,33 +180,34 @@ module.exports.run = async (client, message, args) => {
         if (i.customId === 'ship_again') {
             const yeniUyum = Math.floor(Math.random() * 101);
             
-            // Yeni Canvas çizimi (Aynı kesin hizalama ve küçültülmüş font mantığıyla)
-            const newCanvas = Canvas.createCanvas(700, 350); const newCtx = newCanvas.getContext('2d');
+            // Yeni Canvas çizimi (Ölçekli)
+            const newCanvas = Canvas.createCanvas(700 * SCALE, 350 * SCALE); 
+            const newCtx = newCanvas.getContext('2d');
             newCtx.fillStyle = '#000000'; newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
             drawCircularImage(newCtx, avatar1, X1, Y_AVATAR, AVATAR_SIZE, COLOR1);
             drawCircularImage(newCtx, avatar2, X2, Y_AVATAR, AVATAR_SIZE, COLOR2);
-            newCtx.font = '24px sans-serif'; newCtx.textAlign = 'center';
-            newCtx.fillStyle = COLOR1; newCtx.fillText(target1.username, X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
-            newCtx.fillStyle = COLOR2; newCtx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
+            newCtx.font = `${24 * SCALE}px sans-serif`; newCtx.textAlign = 'center';
+            newCtx.fillStyle = COLOR1; newCtx.fillText(target1.username, X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + (30 * SCALE));
+            newCtx.fillStyle = COLOR2; newCtx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + (30 * SCALE));
 
-            newCtx.strokeStyle = '#FFFFFF'; newCtx.lineWidth = 8; newCtx.shadowBlur = 10; newCtx.shadowColor = '#FF00A0'; 
+            newCtx.strokeStyle = '#FFFFFF'; newCtx.lineWidth = 8 * SCALE; newCtx.shadowBlur = 10 * SCALE; newCtx.shadowColor = '#FF00A0'; 
             newCtx.beginPath(); newCtx.arc(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS, 0, Math.PI * 2, true);
             newCtx.stroke(); newCtx.shadowBlur = 0; 
 
-            // KESİN HİZALAMA VE KÜÇÜK FONT (Tekrar Dene kısmı için)
-            // ⬇️ DÜZELTME: Font boyutu küçültüldü
+            // KESİN HİZALAMA (Tekrar Dene kısmı için)
             newCtx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
             const newText = `${yeniUyum}%`;
             const newMetrics = newCtx.measureText(newText);
             const newTextHeight = newMetrics.actualBoundingBoxAscent + newMetrics.actualBoundingBoxDescent;
             const newTextY = CIRCLE_CENTER_Y + (newTextHeight / 2) - newMetrics.actualBoundingBoxDescent;
 
-            newCtx.textAlign = 'center'; newCtx.fillStyle = '#FFFFFF'; newCtx.shadowBlur = 10; newCtx.shadowColor = '#FF00A0'; 
+            newCtx.textAlign = 'center'; newCtx.fillStyle = '#FFFFFF'; newCtx.shadowBlur = 10 * SCALE; newCtx.shadowColor = '#FF00A0'; 
             newCtx.fillText(newText, CIRCLE_CENTER_X, newTextY);
             newCtx.shadowBlur = 0; 
             
-            newCtx.font = '40px sans-serif'; newCtx.fillStyle = '#FF00A0'; 
-            newCtx.fillText('❤️', CIRCLE_CENTER_X, CIRCLE_CENTER_Y + CIRCLE_RADIUS + 25); 
+            // Kalp
+            newCtx.font = `${40 * SCALE}px sans-serif`; newCtx.fillStyle = '#FF00A0'; 
+            newCtx.fillText('❤️', CIRCLE_CENTER_X, HEART_Y); 
             drawProgressBar(newCtx, yeniUyum, Y_BAR);
 
             const newAttachment = { files: [{ attachment: newCanvas.toBuffer(), name: 'ship.jpg' }] };
