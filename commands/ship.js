@@ -91,7 +91,7 @@ module.exports.run = async (client, message, args) => {
         return new EmbedBuilder().setColor(color).setTitle(`${titleEmoji} Efsanevi Ship Sonucu`).setDescription(`**${author.username}** ve **${target.username}**'in Kader Çizgisi:\n\n${descriptionEmoji} **TOPLAM UYUM PUANI:** **%${uyum}**\n\`${barText}\`\n\n_${romantik}_`).setImage('attachment://ship.jpg');
     }
 
-    // --- 2. CANVAS GÖRSELİ OLUŞTURMA (KESİN HİZALAMA DÜZELTMESİ) ---
+    // --- 2. CANVAS GÖRSELİ OLUŞTURMA (KÜÇÜLTÜLMÜŞ FONT) ---
     const canvas = Canvas.createCanvas(700, 350); 
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -100,7 +100,8 @@ module.exports.run = async (client, message, args) => {
     const COLOR1 = '#00FFDD'; const COLOR2 = '#FF00A0';
     
     // Yüzde Metni ve Çember Sabitleri
-    const PERCENTAGE_FONT_SIZE = 72; // Font tekrar büyütüldü
+    // ⬇️ DÜZELTME: Font boyutu küçültüldü
+    const PERCENTAGE_FONT_SIZE = 50; 
     const CIRCLE_RADIUS = 70; 
     const CIRCLE_CENTER_X = 350;
     const CIRCLE_CENTER_Y = Y_AVATAR + AVATAR_SIZE / 2; 
@@ -116,13 +117,11 @@ module.exports.run = async (client, message, args) => {
     ctx.fillStyle = COLOR1; ctx.fillText(target1.username, X1 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
     ctx.fillStyle = COLOR2; ctx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
     
-    // --- KESİN HİZALANMIŞ YÜZDE METNİ ---
+    // --- KESİN HİZALANMIŞ VE KÜÇÜLTÜLMÜŞ YÜZDE METNİ ---
     ctx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
     const text = `${uyum}%`;
     const metrics = ctx.measureText(text);
-    // Metnin gerçek yüksekliğini hesapla (yukarı ve aşağı taşmalar dahil)
     const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-    // Metnin dikey merkezini çemberin merkezine oturtacak Y koordinatını hesapla
     const textY = CIRCLE_CENTER_Y + (textHeight / 2) - metrics.actualBoundingBoxDescent;
 
     // Yüzde Çerçevesi
@@ -163,7 +162,7 @@ module.exports.run = async (client, message, args) => {
         if (i.customId === 'ship_again') {
             const yeniUyum = Math.floor(Math.random() * 101);
             
-            // Yeni Canvas çizimi (Aynı kesin hizalama mantığıyla)
+            // Yeni Canvas çizimi (Aynı kesin hizalama ve küçültülmüş font mantığıyla)
             const newCanvas = Canvas.createCanvas(700, 350); const newCtx = newCanvas.getContext('2d');
             newCtx.fillStyle = '#000000'; newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
             drawCircularImage(newCtx, avatar1, X1, Y_AVATAR, AVATAR_SIZE, COLOR1);
@@ -176,7 +175,8 @@ module.exports.run = async (client, message, args) => {
             newCtx.beginPath(); newCtx.arc(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS, 0, Math.PI * 2, true);
             newCtx.stroke(); newCtx.shadowBlur = 0; 
 
-            // KESİN HİZALAMA (Tekrar Dene kısmı için)
+            // KESİN HİZALAMA VE KÜÇÜK FONT (Tekrar Dene kısmı için)
+            // ⬇️ DÜZELTME: Font boyutu küçültüldü
             newCtx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
             const newText = `${yeniUyum}%`;
             const newMetrics = newCtx.measureText(newText);
