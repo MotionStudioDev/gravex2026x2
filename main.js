@@ -225,26 +225,5 @@ client.on('interactionCreate', async interaction => {
         }
     }
 });
-/////// kara liste 
-const Blacklist = require('./models/karaliste'); // Modeli çağırın
 
-client.on('messageCreate', async message => {
-    // 1. Bot veya DM Kontrolü (Aynı kalır)
-    if (message.author.bot || message.channel.type === 1) return; // type 1 DM anlamına gelir
 
-    // ⬇️ EN ÖNEMLİ KONTROL: KARA LİSTE KONTROLÜ
-    const isBlacklisted = await Blacklist.findOne({ guildID: message.guild.id });
-    
-    if (isBlacklisted) {
-        // Opsiyonel: Sunucuyu kara listeye aldığınızı bildirip sessizce ayrılabilirsiniz
-        // message.guild.leave().catch(console.error);
-        return; // Komutun çalışmasını engelle
-    }
-    // ⬆️ KARA LİSTE KONTROLÜ SONU
-
-    // 2. Prefix Kontrolü (Aynı kalır)
-    if (!message.content.startsWith(prefix)) return;
-
-    // ... Geri kalan komut işleme mantığı ...
-});
-//////
