@@ -8,7 +8,7 @@ var config = require("../config.js");
 const client = require("..");
 
 // ⬇️ KARA LİSTE MODELİ VE PREFIX TANIMLARI
-const Blacklist = require('./models/karaliste'); // 🚨 Model dosyasının yolu doğru olmalı
+const Blacklist = require('../models/karaliste'); // 🚨 Model dosyasının yolu doğru olmalı
 const prefix = config.prefix;
 
 client.on("messageCreate", async (message) => {
