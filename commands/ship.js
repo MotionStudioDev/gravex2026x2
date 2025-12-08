@@ -30,8 +30,8 @@ module.exports.run = async (client, message, args) => {
         c.arc(170, 200, 100, 0, Math.PI * 2);
         c.strokeStyle = '#00ffff';
         c.lineWidth = 12;
-        c.shadowBlur =  = 50;
-        c.shadowColor   = '#00ffff';
+        c.shadowBlur = 50;
+        c.shadowColor = '#00ffff';
         c.stroke();
         c.clip();
         c.drawImage(av1, 70, 100, 200, 200);
@@ -43,8 +43,8 @@ module.exports.run = async (client, message, args) => {
         c.arc(630, 200, 100, 0, Math.PI * 2);
         c.strokeStyle = '#ff00ff';
         c.lineWidth = 12;
-        c.shadowBlur  = 50;
-        c.shadowColor   = '#ff00ff';
+        c.shadowBlur = 50;
+        c.shadowColor = '#ff00ff';
         c.stroke();
         c.clip();
         c.drawImage(av2, 530, 100, 200, 200);
@@ -62,7 +62,7 @@ module.exports.run = async (client, message, args) => {
         c.fillText(kişi2.username.toLowerCase(), 630, 340);
         c.shadowBlur = 0;
 
-        // Glow çember
+        // Dış glow çember
         c.beginPath();
         c.arc(400, 200, 110, 0, Math.PI * 2);
         c.lineWidth = 20;
@@ -71,6 +71,7 @@ module.exports.run = async (client, message, args) => {
         c.shadowColor = '#ff00ff';
         c.stroke();
 
+        // İç beyaz çember
         c.beginPath();
         c.arc(400, 200, 95, 0, Math.PI * 2);
         c.lineWidth = 10;
@@ -107,7 +108,7 @@ module.exports.run = async (client, message, args) => {
         grad.addColorStop(0.5, '#ff00ff');
         grad.addColorStop(1, '#00ffff');
         c.fillStyle = grad;
-        c.roundRect(120, 365, (yuzde/100)*560, 20, 20);
+        c.roundRect(120, 365, (yuzde / 100) * 560, 20, 20);
         c.fill();
 
         c.font = 'bold 22px Arial';
@@ -133,7 +134,7 @@ module.exports.run = async (client, message, args) => {
                 .setCustomId('tekrar')
                 .setLabel('Tekrar Dene')
                 .setStyle(ButtonStyle.Success)
-                .setEmoji('U+1F3B2'), // BU DOĞRU YOL! (zar emojisi)
+                .setEmoji('🎲'), // Doğru zar emojisi
             new ButtonBuilder()
                 .setCustomId('sil')
                 .setLabel('Sil')
@@ -149,13 +150,13 @@ module.exports.run = async (client, message, args) => {
 
         if (i.customId === 'tekrar') {
             oran = Math.floor(Math.random() * 101);
-            const yeniBuffer = await draw(oran);
+            const yeniBuffer = await85 draw(oran);
             const yeniDosya = new AttachmentBuilder(yeniBuffer, { name: 'ship.png' });
 
             await i.update({
                 embeds: [new EmbedBuilder()
                     .setColor('#ff1493')
-                    .setDescription(`${kişi1} ❤️ ${kişi2}\n\nRastgele: %${oran}**`)
+                    .setDescription(`${kişi1} ❤️ ${kişi2}\n\n**Rastgele: %${oran}**`)
                     .setImage('attachment://ship.png')
                 ],
                 files: [yeniDosya],
