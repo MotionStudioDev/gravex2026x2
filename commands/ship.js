@@ -66,7 +66,7 @@ module.exports.run = async (client, message, args) => {
     let target1 = message.author;
     let target2Member = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
     let target2 = target2Member ? target2Member.user : null;
-    
+
     if (!target2Member && args[0]) {
         return message.reply({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle('❌ Kullanım Hatası').setDescription('Belirtilen ID veya etiket ile bir kullanıcı bulamadım.')] });
     }
@@ -137,7 +137,7 @@ module.exports.run = async (client, message, args) => {
             .setImage('attachment://ship.jpg');
     }
 
-    // --- 2. CANVAS GÖRSELİ OLUŞTURMA (Hizalama Düzeltildi) ---
+    // --- 2. CANVAS GÖRSELİ OLUŞTURMA (NİHAİ DÜZELTME) ---
     const canvas = Canvas.createCanvas(700, 350); 
     const ctx = canvas.getContext('2d');
     
@@ -153,12 +153,12 @@ module.exports.run = async (client, message, args) => {
     const COLOR1 = '#00FFDD'; // Turkuaz neon
     const COLOR2 = '#FF00A0'; // Pembe neon
     
-    // Yüzde Metni Sabitleri (Görseldeki gibi hizalama)
-    const PERCENTAGE_FONT_SIZE = 60; // Font küçültüldü
-    const CIRCLE_RADIUS = 70; // Çember büyütüldü
+    // Yüzde Metni Sabitleri (Küçültülmüş ve Hizalanmış)
+    const PERCENTAGE_FONT_SIZE = 55; // Bir tık daha küçültüldü
+    const CIRCLE_RADIUS = 65; // Çember bir tık daha küçültüldü
     const CIRCLE_CENTER_X = 350;
     const CIRCLE_CENTER_Y = Y_AVATAR + AVATAR_SIZE / 2; // Avatarlarla aynı dikey merkez
-    const HEART_Y = CIRCLE_CENTER_Y + CIRCLE_RADIUS + 15; // Kalp, çemberin altına
+    const HEART_Y = CIRCLE_CENTER_Y + CIRCLE_RADIUS + 15; 
 
     const avatar1 = await Canvas.loadImage(target1.displayAvatarURL({ extension: 'png', size: 256 }));
     const avatar2 = await Canvas.loadImage(target2.displayAvatarURL({ extension: 'png', size: 256 }));
@@ -174,32 +174,34 @@ module.exports.run = async (client, message, args) => {
     ctx.fillStyle = COLOR2;
     ctx.fillText(target2.username, X2 + AVATAR_SIZE / 2, Y_AVATAR + AVATAR_SIZE + 30);
     
-    // YÜZDE ÇERÇEVESİ (Önce çemberi çiz, görseldeki gibi kalın, beyaz)
+    // YÜZDE ÇERÇEVESİ
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 8;
     ctx.shadowBlur = 10;
-    ctx.shadowColor = '#FF00A0'; // Neon pembe gölge
+    ctx.shadowColor = '#FF00A0'; 
     ctx.beginPath();
     ctx.arc(CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS, 0, Math.PI * 2, true);
     ctx.stroke();
-    ctx.shadowBlur = 0; // Gölgeyi sıfırla
+    ctx.shadowBlur = 0; 
 
-    // BÜYÜK YÜZDE METNİ (Çemberin içine tam merkezlenmiş)
+    // BÜYÜK YÜZDE METNİ (Tam merkezlenmiş)
     ctx.font = `${PERCENTAGE_FONT_SIZE}px sans-serif`;
-    ctx.textAlign = 'center'; // Metin merkezden çizilecek
-    ctx.textBaseline = 'middle'; // Dikey olarak da merkezden başla
+    ctx.textAlign = 'center'; 
+    ctx.textBaseline = 'middle'; // Dikey hizalama (metin tam merkeze oturur)
     ctx.fillStyle = '#FFFFFF'; 
     ctx.shadowBlur = 10;
     ctx.shadowColor = '#FF00A0'; 
     
     // Yüzde metnini çemberin tam merkezine (CIRCLE_CENTER_X, CIRCLE_CENTER_Y) çiz
+    // Dikey hizalama için +5 gibi küçük bir offset kullanmak, çoğu fontta daha iyi görünür
     ctx.fillText(`${uyum}%`, CIRCLE_CENTER_X, CIRCLE_CENTER_Y + 5); 
     
-    ctx.shadowBlur = 0; // Gölgeyi sıfırla
+    ctx.shadowBlur = 0; 
     
-    // KALPLER (Çemberin hemen altında)
+    // KALPLER 
     ctx.font = '40px sans-serif'; 
     ctx.fillStyle = '#FF00A0'; 
+    ctx.textAlign = 'center';
     ctx.fillText('❤️', CIRCLE_CENTER_X, HEART_Y); 
     
     // EFSANEVİ UYUM ÇUBUĞU
@@ -271,6 +273,7 @@ module.exports.run = async (client, message, args) => {
             // Kalp
             newCtx.font = '40px sans-serif';
             newCtx.fillStyle = '#FF00A0'; 
+            newCtx.textAlign = 'center';
             newCtx.fillText('❤️', CIRCLE_CENTER_X, HEART_Y); 
             
             // Yeni Uyum Çubuğu
