@@ -4,49 +4,55 @@ const moment = require('moment');
 require('moment-duration-format');
 moment.locale('tr');
 
-// Butonun özel kimliği için prefix
-const REFRESH_CUSTOM_ID = 'songorulme_guncelle';
-
 // Milisaniye cinsinden süreyi Türkçe formatta dönüştürür
 function formatDuration(ms) {
     if (ms <= 0) return 'Veri yok';
-    return moment.duration(ms).format("y [yıl], M [ay], d [gün], h [saat], m [dakika], s [saniye]");
+    const duration = moment.duration(ms);
+    
+    // Saat, dakika, saniye formatı
+    const hours = Math.floor(duration.asHours());
+    const minutes = duration.minutes();
+    const seconds = duration.seconds();
+    
+    const parts = [];
+    if (hours > 0) parts.push(`${hours} saat`);
+    if (minutes > 0) parts.push(`${minutes} dakika`);
+    if (seconds > 0) parts.push(`${seconds} saniye`);
+    
+    return parts.join(' ') || '0 saniye';
 }
 
-// Kolektörleri saklamak için bir cache (mesaj ID -> kolektör)
-const activeCollectors = new Map();
+// Formatlı tarih gösterimi
+function formatDate(date) {
+    return moment(date).format('DD MMMM YYYY HH:mm');
+}
+
+// Rölative zaman gösterimi
+function formatRelative(date) {
+    return moment(date).fromNow();
+}
+
+// Butonun özel kimliği için prefix
+const REFRESH_CUSTOM_ID = 'songorulme_guncelle';
 
 // --------------------------------------------------------------------------------------
-// ANA FONKSİYON: getAndSendLastSeen (Verileri çeker, Embed ve Butonu gönderir/günceller)
+// ANA FONKSİYON: getAndSendLastSeen (Basit ve Direkt Gösterim)
 // --------------------------------------------------------------------------------------
-async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targetMember) {
-    // Etkileşim türünü kontrol et
+async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targetMember, commandUser) {
     const isInteraction = interactionOrMessage.isButton?.() || false;
     const guild = interactionOrMessage.guild;
     
-    // GÜNCELLEME: TargetMember verisini API'dan yeniden çekerek cache'i zorluyoruz.
+    // TargetMember'ı güncelle
     let refreshedTargetMember = targetMember;
     if (guild.members.cache.has(targetUser.id)) {
         try {
             refreshedTargetMember = await guild.members.fetch(targetUser.id);
         } catch (error) {
-            // Fetch başarısız olursa cached üyeyi kullan
             refreshedTargetMember = targetMember;
         }
     }
     
-    // Güvenli Yanıt Fonksiyonu Tanımı
-    const replyFunction = isInteraction 
-        ? async (options) => {
-            if (interactionOrMessage.deferred || interactionOrMessage.replied) {
-                return interactionOrMessage.editReply(options);
-            }
-            return interactionOrMessage.update(options);
-        }
-        : interactionOrMessage.reply.bind(interactionOrMessage);
-    
-    // targetMember değişkenini güncellenmiş üye olarak kullan
-    targetMember = refreshedTargetMember; 
+    targetMember = refreshedTargetMember;
     
     if (!targetUser) {
         targetUser = targetMember.user;
@@ -59,196 +65,182 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
     });
 
     if (!data) {
-        if (!isInteraction) {
-            return interactionOrMessage.reply({ 
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor('#FFA500')
-                        .setDescription(`**${targetUser.tag}** için sunucuda henüz yeterli giriş/çıkış verisi bulunmuyor.`)
-                ],
-                ephemeral: true
-            });
-        }
-        return;
+        const noDataEmbed = new EmbedBuilder()
+            .setColor('#FFA500')
+            .setDescription(`**${targetUser.tag}** için sunucuda henüz yeterli giriş/çıkış verisi bulunmuyor.`)
+            .setFooter({ text: `Sorgulayan: ${commandUser.tag}` });
+        
+        return isInteraction 
+            ? interactionOrMessage.reply({ embeds: [noDataEmbed], ephemeral: true })
+            : interactionOrMessage.reply({ embeds: [noDataEmbed] });
     }
 
     // --- VERİ HESAPLAMALARI ---
     const lastJoin = data.lastJoin !== 0 ? data.lastJoin : null;
+    const lastLeave = data.lastLeave !== 0 ? data.lastLeave : null;
     
-    // Kullanıcının sunucuda olup olmadığını kontrol etme
+    // Kullanıcının sunucuda olup olmadığını kontrol et
     const isUserCurrentlyInGuild = guild.members.cache.has(targetUser.id);
     
-    // Son Giriş Metni: Kullanıcı sunucuda ise "Aktif", değilse son giriş zamanını göster
-    const lastJoinText = isUserCurrentlyInGuild
-        ? '✅ Sunucuda şu an aktif.'
-        : (lastJoin 
-            ? `<t:${Math.floor(lastJoin / 1000)}:F> (<t:${Math.floor(lastJoin / 1000)}:R>)`
-            : '❌ Veri Yok'
-        );
-    
-    const lastLeave = data.lastLeave !== 0 ? data.lastLeave : null;
-    const lastLeaveText = lastLeave 
-        ? `<t:${Math.floor(lastLeave / 1000)}:F> (<t:${Math.floor(lastLeave / 1000)}:R>)` 
-        : '❌ Veri Yok / Hiç Ayrılmamış';
-
-    const totalActiveDurationText = formatDuration(data.totalActiveDuration);
-
+    // Çıkıştan girişe kadar geçen süre
     let timeBetweenLeaveAndJoin = 'Hesaplanamıyor';
+    let timeBetweenRelative = '';
+    
     if (lastLeave && lastJoin && lastJoin > lastLeave) {
         const durationMs = lastJoin - lastLeave;
         timeBetweenLeaveAndJoin = formatDuration(durationMs);
+        timeBetweenRelative = `(${moment(lastLeave).fromNow()})`;
     }
     
-    let currentSessionDuration = 'Aktif Değil';
+    // Aktiflik süresi
+    const activeDuration = formatDuration(data.totalActiveDuration);
     
-    if (isUserCurrentlyInGuild && lastJoin) {
-        const durationMs = Date.now() - lastJoin;
-        currentSessionDuration = formatDuration(durationMs);
-    }
-
-    // --- EMBED OLUŞTURMA ---
+    // --- EMBED OLUŞTURMA (Basit Gösterim) ---
     const embed = new EmbedBuilder()
-        .setColor(targetMember?.displayHexColor !== '#000000' ? targetMember?.displayHexColor : 'Purple')
-        .setAuthor({ name: `${targetUser.tag} | Son Görülme Analizi (Güncel)`, iconURL: targetUser.displayAvatarURL() })
-        .setDescription(`**${guild.name}** sunucusu için **${targetUser.tag}** kullanıcısının aktivite kayıtları.`)
-        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        .setColor(targetMember?.displayHexColor || '#5865F2')
+        .setTitle(`🎯 ${targetUser.username} Kişisinin Son Görülme Bilgileri`)
+        .setDescription(`**Sunucu:** ${guild.name}`)
+        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
         .addFields(
-            { name: "🟢 Son Sunucuya Giriş", value: lastJoinText, inline: false },
-            { name: "🔴 Son Sunucudan Çıkış", value: lastLeaveText, inline: false },
-            { name: "⏳ Aktiflik Süresi (Toplam)", value: `\`${totalActiveDurationText}\``, inline: false },
-            { name: "⏱️ Son Oturum Süresi (Şu Anki)", value: `\`${currentSessionDuration}\``, inline: true },
-            { name: "🔄 Çıkıştan Girişe Kadar Geçen Süre", value: `\`${timeBetweenLeaveAndJoin}\``, inline: true }
+            {
+                name: '🟢 **Son Giriş:**',
+                value: lastJoin 
+                    ? `${formatDate(lastJoin)}\n${formatRelative(lastJoin)}`
+                    : '❌ Veri Yok',
+                inline: false
+            },
+            {
+                name: '🔴 **Son Çıkış:**',
+                value: lastLeave 
+                    ? `${formatDate(lastLeave)}\n${formatRelative(lastLeave)}`
+                    : '❌ Veri Yok / Hiç Ayrılmamış',
+                inline: false
+            }
         )
-        .setFooter({ text: `Kullanıcı ID: ${targetUser.id} | Son Güncelleme: ${moment().format('LTS')}` })
+        .addFields(
+            {
+                name: '⏳ **Son Çıkıştan Son Girişe Kadar Geçen Süre:**',
+                value: `\`${timeBetweenLeaveAndJoin}\` ${timeBetweenRelative}`,
+                inline: false
+            }
+        )
+        .addFields(
+            {
+                name: '📊 **Aktiflik Süresi (Toplam):**',
+                value: `\`${activeDuration}\``,
+                inline: true
+            }
+        )
+        .setFooter({ 
+            text: `Sorgulayan: ${commandUser.username} | Kullanıcı ID: ${targetUser.id} • ${moment().format('HH:mm')}`,
+            iconURL: commandUser.displayAvatarURL()
+        })
         .setTimestamp();
 
-    // Butonu oluştur
+    // Buton oluştur (isteğe bağlı)
     const refreshButton = new ButtonBuilder()
         .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}`)
-        .setLabel('Verileri Güncelle (Canlı)')
-        .setStyle(ButtonStyle.Success)
+        .setLabel('Yenile')
+        .setStyle(ButtonStyle.Primary)
         .setEmoji('🔄');
 
     const row = new ActionRowBuilder().addComponents(refreshButton);
     
-    // Yanıt gönder/güncelle
-    const response = await replyFunction({ embeds: [embed], components: [row] }).catch(error => {
-        console.error('Songörülme yanıt/güncelleme hatası:', error.code, 'Tür:', isInteraction ? 'Button' : 'Command');
-        return null;
-    });
-
-    // Sadece ilk komut çalıştırıldığında kolektörü başlat
-    if (!isInteraction && response) {
-        // API yanıtından mesaj nesnesini doğru şekilde alıyoruz
-        const msg = response.fetch ? await response.fetch() : response;
-
-        // Daha önce bu mesaj için kolektör varsa durdur
-        if (activeCollectors.has(msg.id)) {
-            const oldCollector = activeCollectors.get(msg.id);
-            if (oldCollector) oldCollector.stop();
+    // Yanıtı gönder
+    const replyOptions = { embeds: [embed], components: [row] };
+    
+    if (isInteraction) {
+        if (interactionOrMessage.deferred || interactionOrMessage.replied) {
+            return interactionOrMessage.editReply(replyOptions);
         }
-
-        // --- 60 SANİYELİK KOLEKTÖR BAŞLANGICI ---
+        return interactionOrMessage.reply(replyOptions);
+    } else {
+        const response = await interactionOrMessage.reply(replyOptions);
+        
+        // Kolektör başlat (60 saniye)
+        const msg = response.fetch ? await response.fetch() : response;
+        
         const collector = msg.createMessageComponentCollector({
-            filter: i => i.customId.startsWith(REFRESH_CUSTOM_ID) && i.user.id === interactionOrMessage.author.id,
-            time: 60000, // 60 saniye
-            max: 30, 
+            filter: i => i.customId.startsWith(REFRESH_CUSTOM_ID) && i.user.id === commandUser.id,
+            time: 60000
         });
-
-        // Kolektörü cache'e kaydet
-        activeCollectors.set(msg.id, collector);
 
         collector.on('collect', async i => {
-            await module.exports.handleInteraction(i);
+            await module.exports.handleInteraction(i, commandUser);
         });
 
-        collector.on('end', async (collected, reason) => {
-            // Kolektörü cache'den kaldır
-            activeCollectors.delete(msg.id);
-            
-            // Butonu devre dışı bırak
-            const finalRefreshButton = new ButtonBuilder()
+        collector.on('end', async () => {
+            const disabledButton = new ButtonBuilder()
                 .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}`)
-                .setLabel(reason === 'time' ? 'Süre Doldu' : 'Kullanılamıyor')
+                .setLabel('Süre Doldu')
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(true);
 
-            const disabledRow = new ActionRowBuilder().addComponents(finalRefreshButton);
-
-            // Mesajı güncelle, butonu devre dışı bırakılmış haliyle gönder
+            const disabledRow = new ActionRowBuilder().addComponents(disabledButton);
+            
             try {
                 await msg.edit({ components: [disabledRow] });
             } catch (error) {
-                // Mesaj silinmiş veya erişim yoksa hata yakala
-                console.error('Mesaj güncellenemedi:', error.code);
+                // Mesaj silinmişse hata yakala
             }
         });
-        // --- KOLEKTÖR BİTİŞİ ---
     }
 }
+
 // --------------------------------------------------------------------------------------
-
-
+// KOMUT ÇALIŞTIRICI
+// --------------------------------------------------------------------------------------
 module.exports.run = async (client, message, args) => {
     // Hedef kullanıcıyı belirle
     const targetMember = message.mentions.members.first() || message.member;
     const targetUser = targetMember.user;
+    const commandUser = message.author;
 
-    // Komut çalıştırıldığında ana fonksiyonu çağır
-    await getAndSendLastSeen(client, message, targetUser, targetMember);
+    // Ana fonksiyonu çağır
+    await getAndSendLastSeen(client, message, targetUser, targetMember, commandUser);
 };
 
-
 // --------------------------------------------------------------------------------------
-// BUTON ETKİLEŞİM İŞLEYİCİSİ (KOLEKTÖR İÇİN GEREKLİ)
+// BUTON ETKİLEŞİM İŞLEYİCİSİ
 // --------------------------------------------------------------------------------------
-module.exports.handleInteraction = async (interaction) => {
+module.exports.handleInteraction = async (interaction, commandUser) => {
     if (!interaction.isButton() || !interaction.customId.startsWith(REFRESH_CUSTOM_ID)) return;
     
-    // Güçlü Kontrol: Eğer zaten yanıtlanmışsa veya ertelenmişse dur.
-    if (interaction.deferred || interaction.replied) return; 
-
-    // DeferUpdate (Güncellemeyi bekle)
-    await interaction.deferUpdate().catch(err => {
-        console.error(`[Songörülme Hata]: Buton deferUpdate başarısız. Code: ${err.code}`);
-        return; 
-    }); 
+    await interaction.deferUpdate().catch(() => {});
     
-    if (!interaction.deferred && !interaction.replied) return;
-
     const [_, __, targetUserId] = interaction.customId.split('_'); 
     
     const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
     
     if (!targetUser) {
-        return interaction.editReply({ content: 'Sorgulanan kullanıcı bulunamadı!', ephemeral: true });
+        return interaction.editReply({ content: 'Kullanıcı bulunamadı!', ephemeral: true });
     }
 
-    // Güncel sorgulanan üye verisini çek
     let targetMember = interaction.guild.members.cache.get(targetUserId);
     if (!targetMember) {
         try {
             targetMember = await interaction.guild.members.fetch(targetUserId);
         } catch (error) {
-            // Kullanıcı sunucuda yoksa
             targetMember = null;
         }
     }
 
-    // Ana fonksiyonu butondan gelen interaction ile çağır
-    await getAndSendLastSeen(interaction.client, interaction, targetUser, targetMember);
+    // Eğer commandUser parametresi yoksa, interaction kullanıcısını al
+    const userToShow = commandUser || interaction.user;
+    
+    await getAndSendLastSeen(interaction.client, interaction, targetUser, targetMember, userToShow);
 };
 
 // --------------------------------------------------------------------------------------
 // KOMUT KONFİGÜRASYONU
 // --------------------------------------------------------------------------------------
 module.exports.conf = {
-    aliases: ['lastseen', 'aktivite'],
+    aliases: ['lastseen', 'aktivite', 'songörülüm'],
     permLevel: 0
 };
 
 module.exports.help = {
     name: 'songörülme',
-    description: 'Bir kullanıcının sunucudaki son giriş, çıkış ve toplam aktiflik süresini gösterir.',
+    description: 'Bir kullanıcının sunucudaki son giriş, çıkış ve aktiflik süresini gösterir.',
     usage: 'g!songörülme [@Kullanıcı]'
 };
