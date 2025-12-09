@@ -13,25 +13,37 @@ function formatDuration(ms) {
     return moment.duration(ms).format("y [yıl], M [ay], d [gün], h [saat], m [dakika], s [saniye]");
 }
 
+// Kolektörleri saklamak için bir cache (mesaj ID -> kolektör)
+const activeCollectors = new Map();
+
 // --------------------------------------------------------------------------------------
 // ANA FONKSİYON: getAndSendLastSeen (Verileri çeker, Embed ve Butonu gönderir/günceller)
 // --------------------------------------------------------------------------------------
 async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targetMember) {
     // Etkileşim türünü kontrol et
-    const isInteraction = interactionOrMessage.type === ComponentType.Button;
+    const isInteraction = interactionOrMessage.isButton?.() || false;
     const guild = interactionOrMessage.guild;
     
     // GÜNCELLEME: TargetMember verisini API'dan yeniden çekerek cache'i zorluyoruz.
-    // Bu, kullanıcının o an sunucuda olup olmadığını doğru anlamak için kritik.
     let refreshedTargetMember = targetMember;
     if (guild.members.cache.has(targetUser.id)) {
-        refreshedTargetMember = await guild.members.fetch(targetUser.id).catch(() => targetMember);
+        try {
+            refreshedTargetMember = await guild.members.fetch(targetUser.id);
+        } catch (error) {
+            // Fetch başarısız olursa cached üyeyi kullan
+            refreshedTargetMember = targetMember;
+        }
     }
     
     // Güvenli Yanıt Fonksiyonu Tanımı
     const replyFunction = isInteraction 
-        ? interactionOrMessage.editReply.bind(interactionOrMessage) 
-        : interactionOrMessage.reply.bind(interactionOrMessage); 
+        ? async (options) => {
+            if (interactionOrMessage.deferred || interactionOrMessage.replied) {
+                return interactionOrMessage.editReply(options);
+            }
+            return interactionOrMessage.update(options);
+        }
+        : interactionOrMessage.reply.bind(interactionOrMessage);
     
     // targetMember değişkenini güncellenmiş üye olarak kullan
     targetMember = refreshedTargetMember; 
@@ -96,7 +108,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
 
     // --- EMBED OLUŞTURMA ---
     const embed = new EmbedBuilder()
-        .setColor(targetMember.displayHexColor !== '#000000' ? targetMember.displayHexColor : 'Purple')
+        .setColor(targetMember?.displayHexColor !== '#000000' ? targetMember?.displayHexColor : 'Purple')
         .setAuthor({ name: `${targetUser.tag} | Son Görülme Analizi (Güncel)`, iconURL: targetUser.displayAvatarURL() })
         .setDescription(`**${guild.name}** sunucusu için **${targetUser.tag}** kullanıcısının aktivite kayıtları.`)
         .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
@@ -112,7 +124,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
 
     // Butonu oluştur
     const refreshButton = new ButtonBuilder()
-        .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}_${interactionOrMessage.member.id}`)
+        .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}`)
         .setLabel('Verileri Güncelle (Canlı)')
         .setStyle(ButtonStyle.Success)
         .setEmoji('🔄');
@@ -122,7 +134,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
     // Yanıt gönder/güncelle
     const response = await replyFunction({ embeds: [embed], components: [row] }).catch(error => {
         console.error('Songörülme yanıt/güncelleme hatası:', error.code, 'Tür:', isInteraction ? 'Button' : 'Command');
-        return;
+        return null;
     });
 
     // Sadece ilk komut çalıştırıldığında kolektörü başlat
@@ -130,29 +142,46 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
         // API yanıtından mesaj nesnesini doğru şekilde alıyoruz
         const msg = response.fetch ? await response.fetch() : response;
 
+        // Daha önce bu mesaj için kolektör varsa durdur
+        if (activeCollectors.has(msg.id)) {
+            const oldCollector = activeCollectors.get(msg.id);
+            if (oldCollector) oldCollector.stop();
+        }
+
         // --- 60 SANİYELİK KOLEKTÖR BAŞLANGICI ---
         const collector = msg.createMessageComponentCollector({
-            filter: i => i.customId.startsWith(REFRESH_CUSTOM_ID),
+            filter: i => i.customId.startsWith(REFRESH_CUSTOM_ID) && i.user.id === interactionOrMessage.author.id,
             time: 60000, // 60 saniye
-            max: 10, 
+            max: 30, 
         });
+
+        // Kolektörü cache'e kaydet
+        activeCollectors.set(msg.id, collector);
 
         collector.on('collect', async i => {
             await module.exports.handleInteraction(i);
         });
 
-        collector.on('end', async () => {
+        collector.on('end', async (collected, reason) => {
+            // Kolektörü cache'den kaldır
+            activeCollectors.delete(msg.id);
+            
             // Butonu devre dışı bırak
             const finalRefreshButton = new ButtonBuilder()
-                .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}_${interactionOrMessage.member.id}`)
-                .setLabel('Süre Doldu')
+                .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}`)
+                .setLabel(reason === 'time' ? 'Süre Doldu' : 'Kullanılamıyor')
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(true);
 
             const disabledRow = new ActionRowBuilder().addComponents(finalRefreshButton);
 
             // Mesajı güncelle, butonu devre dışı bırakılmış haliyle gönder
-            await msg.edit({ components: [disabledRow] }).catch(() => {});
+            try {
+                await msg.edit({ components: [disabledRow] });
+            } catch (error) {
+                // Mesaj silinmiş veya erişim yoksa hata yakala
+                console.error('Mesaj güncellenemedi:', error.code);
+            }
         });
         // --- KOLEKTÖR BİTİŞİ ---
     }
@@ -196,7 +225,15 @@ module.exports.handleInteraction = async (interaction) => {
     }
 
     // Güncel sorgulanan üye verisini çek
-    const targetMember = interaction.guild.members.cache.get(targetUserId);
+    let targetMember = interaction.guild.members.cache.get(targetUserId);
+    if (!targetMember) {
+        try {
+            targetMember = await interaction.guild.members.fetch(targetUserId);
+        } catch (error) {
+            // Kullanıcı sunucuda yoksa
+            targetMember = null;
+        }
+    }
 
     // Ana fonksiyonu butondan gelen interaction ile çağır
     await getAndSendLastSeen(interaction.client, interaction, targetUser, targetMember);
