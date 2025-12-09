@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const LastSeen = require('../models/sonGorulme');
 const moment = require('moment');
 require('moment-duration-format');
@@ -17,7 +17,7 @@ function formatDuration(ms) {
 // ANA FONKSİYON: getAndSendLastSeen (Verileri çeker, Embed ve Butonu gönderir/günceller)
 // --------------------------------------------------------------------------------------
 async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targetMember) {
-    const isInteraction = interactionOrMessage.isButton ? true : false;
+    const isInteraction = interactionOrMessage.type === ComponentType.Button ? true : false;
     const guild = interactionOrMessage.guild;
     
     // Yanıt gönderme fonksiyonu. (İlk çalıştırma veya buton güncellemesi)
@@ -27,6 +27,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
         targetUser = targetMember.user;
     }
     
+    // Veritabanı sorgusu
     const data = await LastSeen.findOne({ 
         guildID: guild.id, 
         userID: targetUser.id 
@@ -39,7 +40,8 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
                     new EmbedBuilder()
                         .setColor('#FFA500')
                         .setDescription(`**${targetUser.tag}** için sunucuda henüz yeterli giriş/çıkış verisi bulunmuyor.`)
-                ] 
+                ],
+                ephemeral: true // Bu mesajı sadece komutu çalıştıran görebilir
             });
         }
         return;
@@ -101,7 +103,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
     // Yanıt gönder/güncelle
     const response = await replyFunction({ embeds: [embed], components: [row] });
     
-    // Eğer komut ilk kez çalıştırıldıysa (message ile), kolektörü başlat
+    // Eğer komut ilk kez çalıştırıldıysa (mesaj ile), kolektörü başlat
     if (!isInteraction) {
         // Discord.js'in API yanıtından mesaj nesnesini doğru şekilde alıyoruz
         const msg = response.fetch ? await response.fetch() : response;
@@ -110,6 +112,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
         const collector = msg.createMessageComponentCollector({
             filter: i => i.customId.startsWith(REFRESH_CUSTOM_ID),
             time: 60000, // 60 saniye
+            max: 10, // Max 10 güncelleme izni
         });
 
         collector.on('collect', async i => {
@@ -118,12 +121,17 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
         });
 
         collector.on('end', async () => {
-            // 60 saniye dolduğunda butonu devre dışı bırak
-            const disabledRow = new ActionRowBuilder().addComponents(
-                refreshButton.setDisabled(true).setLabel('Süre Doldu')
-            );
+            // Butonu tekrar oluşturarak devre dışı bırakıyoruz
+            const finalRefreshButton = new ButtonBuilder()
+                .setCustomId(`${REFRESH_CUSTOM_ID}_${targetUser.id}_${interactionOrMessage.member.id}`)
+                .setLabel('Süre Doldu')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true);
+
+            const disabledRow = new ActionRowBuilder().addComponents(finalRefreshButton);
 
             // Mesajı güncelle, butonu devre dışı bırakılmış haliyle gönder
+            // Hata almamak için try-catch kullanıyoruz
             await msg.edit({ components: [disabledRow] }).catch(() => {});
         });
         // --- KOLEKTÖR BİTİŞİ ---
@@ -148,8 +156,17 @@ module.exports.run = async (client, message, args) => {
 module.exports.handleInteraction = async (interaction) => {
     if (!interaction.isButton() || !interaction.customId.startsWith(REFRESH_CUSTOM_ID)) return;
     
+    // Etkileşim zaten yanıtlanmışsa veya ertelenmişse tekrar denemeyin
+    // Bu, "InteractionAlreadyReplied" hatasını engeller.
+    if (interaction.deferred || interaction.replied) return; 
+
     // DeferUpdate (Güncellemeyi bekle)
-    await interaction.deferUpdate(); 
+    // Bu, "Unknown Interaction" hatasını engeller.
+    await interaction.deferUpdate().catch(err => {
+        // Eğer deferUpdate başarısız olursa (örneğin 3 saniye dolduysa), loglayıp dururuz.
+        console.error('songörülme deferUpdate hatası:', err.code);
+        return;
+    }); 
     
     // Custom ID: songorulme_guncelle_TARGETID_COMMANDUSERID
     const [_, __, targetUserId] = interaction.customId.split('_'); 
@@ -157,14 +174,14 @@ module.exports.handleInteraction = async (interaction) => {
     const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
     
     if (!targetUser) {
-        // DeferUpdate sonrası editReply kullanılır
+        // Hata durumunda editReply kullanılır.
         return interaction.editReply({ content: 'Sorgulanan kullanıcı bulunamadı!', ephemeral: true });
     }
 
     // Güncel sorgulanan üye verisini çek
     const targetMember = interaction.guild.members.cache.get(targetUserId);
 
-    // Ana fonksiyonu butondan gelen interaction ile çağır (Bu sadece embedi günceller)
+    // Ana fonksiyonu butondan gelen interaction ile çağır (Bu, deferUpdate yapıldığı için update() kullanır)
     await getAndSendLastSeen(interaction.client, interaction, targetUser, targetMember);
 };
 
