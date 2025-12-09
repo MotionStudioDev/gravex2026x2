@@ -21,12 +21,20 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
     const isInteraction = interactionOrMessage.type === ComponentType.Button;
     const guild = interactionOrMessage.guild;
     
-    // GÜVENLİ YANIT FONKSİYONU TANIMI:
-    // Buton etkileşimlerinde (isInteraction=true) her zaman editReply kullanılır. 
-    // Komut mesajlarında (isInteraction=false) reply kullanılır.
+    // GÜNCELLEME: TargetMember verisini API'dan yeniden çekerek cache'i zorluyoruz.
+    // Bu, kullanıcının o an sunucuda olup olmadığını doğru anlamak için kritik.
+    let refreshedTargetMember = targetMember;
+    if (guild.members.cache.has(targetUser.id)) {
+        refreshedTargetMember = await guild.members.fetch(targetUser.id).catch(() => targetMember);
+    }
+    
+    // Güvenli Yanıt Fonksiyonu Tanımı
     const replyFunction = isInteraction 
         ? interactionOrMessage.editReply.bind(interactionOrMessage) 
         : interactionOrMessage.reply.bind(interactionOrMessage); 
+    
+    // targetMember değişkenini güncellenmiş üye olarak kullan
+    targetMember = refreshedTargetMember; 
     
     if (!targetUser) {
         targetUser = targetMember.user;
@@ -54,9 +62,17 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
 
     // --- VERİ HESAPLAMALARI ---
     const lastJoin = data.lastJoin !== 0 ? data.lastJoin : null;
-    const lastJoinText = lastJoin 
-        ? `<t:${Math.floor(lastJoin / 1000)}:F> (<t:${Math.floor(lastJoin / 1000)}:R>)` 
-        : '❌ Sunucuda şu an aktif.';
+    
+    // Kullanıcının sunucuda olup olmadığını kontrol etme
+    const isUserCurrentlyInGuild = guild.members.cache.has(targetUser.id);
+    
+    // Son Giriş Metni: Kullanıcı sunucuda ise "Aktif", değilse son giriş zamanını göster
+    const lastJoinText = isUserCurrentlyInGuild
+        ? '✅ Sunucuda şu an aktif.'
+        : (lastJoin 
+            ? `<t:${Math.floor(lastJoin / 1000)}:F> (<t:${Math.floor(lastJoin / 1000)}:R>)`
+            : '❌ Veri Yok'
+        );
     
     const lastLeave = data.lastLeave !== 0 ? data.lastLeave : null;
     const lastLeaveText = lastLeave 
@@ -72,8 +88,7 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
     }
     
     let currentSessionDuration = 'Aktif Değil';
-    const isUserCurrentlyInGuild = guild.members.cache.has(targetUser.id); 
-
+    
     if (isUserCurrentlyInGuild && lastJoin) {
         const durationMs = Date.now() - lastJoin;
         currentSessionDuration = formatDuration(durationMs);
@@ -106,7 +121,6 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
     
     // Yanıt gönder/güncelle
     const response = await replyFunction({ embeds: [embed], components: [row] }).catch(error => {
-        // Reply veya editReply'da hata olursa (örneğin Unknown Interaction), işlemi durdur.
         console.error('Songörülme yanıt/güncelleme hatası:', error.code, 'Tür:', isInteraction ? 'Button' : 'Command');
         return;
     });
@@ -124,7 +138,6 @@ async function getAndSendLastSeen(client, interactionOrMessage, targetUser, targ
         });
 
         collector.on('collect', async i => {
-            // Butona basıldığında handleInteraction fonksiyonunu çağır
             await module.exports.handleInteraction(i);
         });
 
@@ -167,14 +180,11 @@ module.exports.handleInteraction = async (interaction) => {
     if (interaction.deferred || interaction.replied) return; 
 
     // DeferUpdate (Güncellemeyi bekle)
-    // Unknown Interaction hatalarını yakalamak için try-catch
     await interaction.deferUpdate().catch(err => {
-        // Hata kodunu kontrol et, özellikle 10062 (Unknown Interaction)
         console.error(`[Songörülme Hata]: Buton deferUpdate başarısız. Code: ${err.code}`);
         return; 
     }); 
     
-    // Eğer defer başarısız olduysa, işlemi durdur.
     if (!interaction.deferred && !interaction.replied) return;
 
     const [_, __, targetUserId] = interaction.customId.split('_'); 
@@ -182,7 +192,6 @@ module.exports.handleInteraction = async (interaction) => {
     const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
     
     if (!targetUser) {
-        // Defer yapıldığı için editReply kullanılır.
         return interaction.editReply({ content: 'Sorgulanan kullanıcı bulunamadı!', ephemeral: true });
     }
 
