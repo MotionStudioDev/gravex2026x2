@@ -5,7 +5,7 @@ const { createCanvas, loadImage } = require('canvas');
 const TIME_LIMIT = 15000; // 15 saniye
 
 // --------------------------------------------------------------------------------------
-// CANVAS FONKSİYONU: Çay Görseli Oluşturma
+// CANVAS FONKSİYONU: Çay Görseli Oluşturma (YENİ FİNCAN ŞEKLİ)
 // --------------------------------------------------------------------------------------
 async function createTeaImage(color, sugar) {
     const width = 400;
@@ -17,35 +17,67 @@ async function createTeaImage(color, sugar) {
     ctx.fillStyle = '#f0f0f0';
     ctx.fillRect(0, 0, width, height);
     
-    // Fincan Rengi
+    // --- Fincan (Cup) Çizimi ---
+    const cupBottomY = 350;
+    const cupTopY = 150;
+    const cupWidth = 200;
+    const cupX = (width - cupWidth) / 2;
+
+    // Fincan Gövdesi (Beyaz)
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
+    
     ctx.beginPath();
-    ctx.roundRect(50, 150, 300, 200, 20); // Bardak gövdesi
+    ctx.moveTo(cupX, cupTopY); // Sol üst köşe
+    ctx.lineTo(cupX - 20, cupBottomY); // Sol alt köşe (hafif geniş)
+    ctx.lineTo(cupX + cupWidth + 20, cupBottomY); // Sağ alt köşe
+    ctx.lineTo(cupX + cupWidth, cupTopY); // Sağ üst köşe
+    ctx.closePath();
     ctx.stroke();
     ctx.fill();
 
-    // Çay Rengi (Demlilik)
-    let teaColor = color === 'demli' ? '#652a0e' : '#a0522d'; // Demli: Koyu kahve, Açık: Açık kahve
-    ctx.fillStyle = teaColor;
+    // Fincan Kolu (Basit bir yay)
     ctx.beginPath();
-    ctx.roundRect(55, 155, 290, 190, 15); // Çay sıvısı
-    ctx.fill();
-
-    // Buhar efekti (Basit)
+    ctx.arc(cupX + cupWidth + 50, cupTopY + 80, 40, 0, Math.PI * 2); // Merkez (x, y), Yarıçap
     ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    // --- Çay Sıvısı (Liquid) ---
+    let teaColor = color === 'demli' ? '#652a0e' : '#a0522d'; 
+    ctx.fillStyle = teaColor;
+    const liquidTopY = cupTopY + 10;
+    
+    ctx.beginPath();
+    ctx.moveTo(cupX + 5, liquidTopY); // Sol üst köşe
+    ctx.lineTo(cupX - 15, cupBottomY - 5); // Sol alt
+    ctx.lineTo(cupX + cupWidth + 15, cupBottomY - 5); // Sağ alt
+    ctx.lineTo(cupX + cupWidth - 5, liquidTopY); // Sağ üst
+    ctx.closePath();
+    ctx.fill();
+    
+    // Çay Yüzeyi (Üstte hafif köpük/parlama)
+    ctx.strokeStyle = '#8b4513';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cupX + 5, liquidTopY);
+    ctx.lineTo(cupX + cupWidth - 5, liquidTopY);
+    ctx.stroke();
+    
+    // --- Buhar Efekti ---
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(150, 140);
-    ctx.bezierCurveTo(180, 100, 220, 100, 250, 140);
+    ctx.moveTo(cupX + cupWidth / 2, cupTopY - 10);
+    ctx.bezierCurveTo(cupX + cupWidth / 2 - 30, cupTopY - 50, cupX + cupWidth / 2 + 30, cupTopY - 50, cupX + cupWidth / 2, cupTopY - 80);
     ctx.stroke();
-
-    // Şeker Durumu Yazısı
+    
+    // --- Şeker Durumu Yazısı (Doğru Konumda) ---
     ctx.fillStyle = '#333333';
-    ctx.font = '24px Arial';
+    ctx.font = '30px Impact'; // Daha dikkat çekici font
     ctx.textAlign = 'center';
-    ctx.fillText(sugar, width / 2, 80);
+    ctx.fillText(sugar, width / 2, 50); 
 
     return new AttachmentBuilder(canvas.toBuffer(), { name: 'cay_result.png' });
 }
@@ -111,6 +143,7 @@ module.exports.run = async (client, message, args) => {
             .setTitle(`Çay Tipi: ${selectedDemlilik === 'demli' ? 'Demli' : 'Açık'}`)
             .setDescription('Şimdi de çayınızı **şekerli** mi yoksa **şekersiz** mi istersiniz?');
 
+        // Mesajı 2. aşama butonları ile güncelle
         await response.edit({ embeds: [stage2Embed], components: [row2] });
 
         // 2. Aşama Kolektörü Filtresi (Sadece komutu başlatan kullanıcı ve 2. aşama butonları)
@@ -126,9 +159,10 @@ module.exports.run = async (client, message, args) => {
 
         collector2.on('collect', async i2 => {
             const selectedSeker = i2.customId.split('_')[1]; // sekerli veya sekersiz
-
+            
             // Canvas ile görseli oluştur
-            const attachment = await createTeaImage(selectedDemlilik, selectedSeker === 'sekerli' ? 'Şekerli' : 'Şekersiz');
+            const sugarLabel = selectedSeker === 'sekerli' ? 'Şekerli Çay' : 'Şekersiz Çay';
+            const attachment = await createTeaImage(selectedDemlilik, sugarLabel);
 
             const finalEmbed = new EmbedBuilder()
                 .setColor('Green')
@@ -145,10 +179,11 @@ module.exports.run = async (client, message, args) => {
             });
 
             collector2.stop(); // 2. aşama tamamlandı
+            collector1.stop(); // 1. aşamayı da durdur
         });
 
         collector2.on('end', async (collected, reason) => {
-            if (reason === 'time') {
+            if (reason === 'time' && collected.size === 0) {
                 const timeoutEmbed = new EmbedBuilder()
                     .setColor('Grey')
                     .setDescription('İkinci aşamada zaman aşımına uğradınız. Çay siparişi iptal edildi.');
