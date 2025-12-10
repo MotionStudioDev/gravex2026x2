@@ -12,29 +12,59 @@ module.exports.run = async (client, message, args) => {
         return message.reply('⚠️ Lütfen çalıştırmak istediğin kodu yaz!\nÖrnek: `g!eval message.channel.send("Merhaba")`');
     }
 
+    // TOKEN GÖSTERMEYİ ENGELLEYEN KONTROL
+    const forbiddenPatterns = [
+        'client.token',
+        'client.options.token',
+        'process.env',
+        '.env',
+        'TOKEN',
+        'token'
+    ];
+    
+    const userCode = args.join(' ');
+    
+    // EĞER TOKEN İLE İLGİLİ BİR KOD VARSA BLOKLA
+    if (forbiddenPatterns.some(pattern => 
+        userCode.toLowerCase().includes(pattern.toLowerCase())
+    )) {
+        return message.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#FF0000')
+                    .setTitle('🚫 GÜVENLİK ENGELLEDİ')
+                    .setDescription('Token veya hassas bilgi içeren kodlar çalıştırılamaz!')
+                    .addFields(
+                        { name: 'Engellenen Kalıp', value: codeBlock('js', userCode), inline: false }
+                    )
+                    .setFooter({ text: 'Güvenlik Politikası' })
+            ]
+        });
+    }
+
     try {
         // KODU BİRLEŞTİR
         let code = args.join(' ');
         
         // EĞER "await" VARSA ASYNC İFADEYE ÇEVİR
-        if (code.includes('await')) {
+        if (code.includes('await') && !code.includes('async')) {
             code = `(async () => { ${code} })()`;
         }
 
         // BAŞLANGIÇ ZAMANI
         const startTime = Date.now();
         
-        // KODU ÇALIŞTIR
-        let evaled = await eval(code);
+        // KODU ÇALIŞTIR (withTimeout ile)
+        let evaled = await withTimeout(code, 5000); // 5 saniye timeout
         
         // BİTİŞ ZAMANI
         const endTime = Date.now();
         const duration = endTime - startTime;
 
         // ÇIKTIYI FORMATLA
-        let output = inspect(evaled, { depth: 0 });
+        let output = inspect(evaled, { depth: 1 });
         
-        // HASSAS BİLGİLERİ TEMİZLE (TOKEN, API KEY vs.)
+        // HASSAS BİLGİLERİ TEMİZLE
         output = clean(output);
 
         // ÇIKTI ÇOK UZUNSA KISALT
@@ -93,26 +123,90 @@ module.exports.run = async (client, message, args) => {
     }
 };
 
+// TIMEOUT İLE KOD ÇALIŞTIRMA
+function withTimeout(code, timeout) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error('Kod çalıştırma süresi aşıldı (5 saniye)'));
+        }, timeout);
+        
+        try {
+            const result = eval(code);
+            
+            if (result && typeof result.then === 'function') {
+                result.then(value => {
+                    clearTimeout(timer);
+                    resolve(value);
+                }).catch(err => {
+                    clearTimeout(timer);
+                    reject(err);
+                });
+            } else {
+                clearTimeout(timer);
+                resolve(result);
+            }
+        } catch (error) {
+            clearTimeout(timer);
+            reject(error);
+        }
+    });
+}
+
 // HASSAS BİLGİLERİ TEMİZLEME FONKSİYONU
 function clean(text) {
     if (typeof text !== 'string') {
-        text = inspect(text, { depth: 0 });
+        text = inspect(text, { depth: 1 });
     }
     
-    // TOKEN'LARI, API KEY'LERİ vs. TEMİZLE
-    text = text
-        .replace(/token\s*[:=]\s*["'][^"']+["']/gi, 'token: "[REDACTED]"')
-        .replace(/["'][A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}["']/g, '"[REDACTED]"')
-        .replace(/process\.env\.[A-Z_]+/g, '"[REDACTED]"')
-        .replace(/password\s*[:=]\s*["'][^"']+["']/gi, 'password: "[REDACTED]"')
-        .replace(/api[_-]?key\s*[:=]\s*["'][^"']+["']/gi, 'api_key: "[REDACTED]"');
+    // TÜM TOKEN VE HASSAS BİLGİLERİ TEMİZLE
+    const patterns = [
+        // Discord Tokenleri
+        /[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}/g,
+        /mfa\.[A-Za-z0-9_-]{84}/g,
+        
+        // client.token ve türevleri
+        /client\.token/g,
+        /client\.options\.token/g,
+        /bot\.token/g,
+        
+        // process.env değişkenleri
+        /process\.env\.[A-Z_]+/g,
+        
+        // Şifreler ve API key'leri
+        /password\s*[:=]\s*["'][^"']+["']/gi,
+        /api[_-]?key\s*[:=]\s*["'][^"']+["']/gi,
+        /secret\s*[:=]\s*["'][^"']+["']/gi,
+        /auth\s*[:=]\s*["'][^"']+["']/gi,
+        /access[_-]?token\s*[:=]\s*["'][^"']+["']/gi,
+        
+        // Database bağlantıları
+        /mongodb(\+srv)?:\/\/[^"\s]+/gi,
+        /mysql:\/\/[^"\s]+/gi,
+        /postgresql:\/\/[^"\s]+/gi,
+        /DATABASE_URL=["'][^"']+["']/gi,
+        
+        // Uzun base64 string'ler
+        /["']([A-Za-z0-9+/]{40,})["']/g,
+    ];
+    
+    patterns.forEach(pattern => {
+        text = text.replace(pattern, '[REDACTED]');
+    });
+    
+    // Client objesindeki token'ları temizle
+    if (text.includes('Client')) {
+        text = text.replace(/token: '[^']+'/, "token: '[REDACTED]'")
+                   .replace(/token: "[^"]+"/, 'token: "[REDACTED]"')
+                   .replace(/token: `[^`]+`/, 'token: `[REDACTED]`')
+                   .replace(/["'][A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}["']/g, '"[REDACTED]"');
+    }
     
     return text;
 }
 
 module.exports.conf = {
     aliases: ['eval', 'run', 'execute', 'kod'],
-    permLevel: 999 // EN YÜKSEK YETKİ
+    permLevel: 999
 };
 
 module.exports.help = {
@@ -121,8 +215,3 @@ module.exports.help = {
     usage: 'g!eval <javascript_kodu>',
     category: 'Sahip'
 };
-
-// 📌 ÖNEMLİ: BOT_SAHIBI_ID YERİNE KENDİ DISCORD ID'Nİ YAZ!
-// Discord ID'ni nasıl bulursun:
-// 1. Discord'da Ayarlar → Gelişmiş → Geliştirici Modu'nu aç
-// 2. Kendi profilinde sağ tık → ID'yi Kopyala
