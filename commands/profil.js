@@ -1,195 +1,55 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, time } = require("discord.js");
-const { createCanvas, loadImage, registerFont } = require('canvas');
-const path = require('path');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require("discord.js");
 
-// Font kaydı (opsiyonel - daha iyi görseller için)
-try {
-    registerFont(path.join(__dirname, '../fonts/arial.ttf'), { family: 'Arial' });
-    registerFont(path.join(__dirname, '../fonts/arial-bold.ttf'), { family: 'Arial', weight: 'bold' });
-} catch {}
+// --------------------------------------------------------------------------------------
+// Fonksiyon: Rozetleri (User Flags) Emojilere Çevirir
+// --------------------------------------------------------------------------------------
+function getUserBadges(userFlags) {
+    if (!userFlags || userFlags.length === 0) return 'Yok';
 
-// Seviye sistemi için (örnek - gerçek veritabanı bağlantısı olacak)
-function calculateLevel(xp) {
-    const level = Math.floor(0.1 * Math.sqrt(xp));
-    const currentLevelXP = Math.pow(level / 0.1, 2);
-    const nextLevelXP = Math.pow((level + 1) / 0.1, 2);
-    const progress = ((xp - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100;
-    return { level, progress: Math.min(progress, 100) };
+    const flagMap = {
+        Staff: '⭐', // Discord Ekip Üyesi
+        Partner: '💎', // Discord Partnerı
+        Hypesquad: 'HypeSquad', // HypeSquad Temsilcisi (Rozet yok, sadece metin)
+        BugHunterLevel1: '🐛', // Hata Avcısı Seviye 1
+        BugHunterLevel2: '🐞', // Hata Avcısı Seviye 2
+        PremiumEarlySupporter: '🎁', // Erken Destekçi (2018 Nitro)
+        TeamPseudoUser: 'Takım Üyesi',
+        System: 'Sistem',
+        VerifiedBot: '✅', // Doğrulanmış Bot
+        VerifiedDeveloper: '🛠️', // Erken Onaylanmış Bot Geliştiricisi
+        DiscordCertifiedModerator: '🛡️', // Discord Onaylı Moderatör
+        ActiveDeveloper: '💡', // Aktif Geliştirici
+        // Hypesquad evleri
+        HypeSquadOnlineHouse1: '🏠 **Bravery**',
+        HypeSquadOnlineHouse2: '🏠 **Brilliance**',
+        HypeSquadOnlineHouse3: '🏠 **Balance**'
+    };
+
+    return userFlags.map(flag => flagMap[flag] || flag).join(' ');
 }
 
-// Profil kartı oluşturma (Canvas)
-async function createProfileCard(user, member, badges, levelInfo, rank) {
-    const width = 900;
-    const height = 500;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    // Arkaplan gradient
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#1a1a2e');
-    gradient.addColorStop(0.5, '#16213e');
-    gradient.addColorStop(1, '#0f3460');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    // Sol panel
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.fillRect(30, 30, 300, 440);
-
-    // Sağ panel
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-    ctx.fillRect(350, 30, 520, 440);
-
-    // Avatar yuvarlağı
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(180, 140, 80, 0, Math.PI * 2, true);
-    ctx.closePath();
-    ctx.clip();
+// --------------------------------------------------------------------------------------
+// Fonksiyon: Cihaz Durumunu Kontrol Eder
+// --------------------------------------------------------------------------------------
+function getDeviceStatus(presence) {
+    if (!presence || presence.status === 'offline') return '⚫ Çevrim dışı';
     
-    try {
-        const avatar = await loadImage(user.displayAvatarURL({ extension: 'png', size: 256 }));
-        ctx.drawImage(avatar, 100, 60, 160, 160);
-    } catch {
-        ctx.fillStyle = '#5865F2';
-        ctx.fillRect(100, 60, 160, 160);
-    }
-    ctx.restore();
+    const devices = [];
+    const clientStatus = presence.clientStatus;
 
-    // Avatar çerçevesi
-    ctx.strokeStyle = '#5865F2';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(180, 140, 82, 0, Math.PI * 2);
-    ctx.stroke();
+    if (clientStatus.desktop) devices.push('💻 Masaüstü');
+    if (clientStatus.mobile) devices.push('📱 Mobil');
+    if (clientStatus.web) devices.push('🌐 Web');
 
-    // Banner (eğer varsa)
-    const bannerURL = await user.fetch().then(u => u.bannerURL({ format: 'png', size: 512 }));
-    if (bannerURL) {
-        try {
-            const banner = await loadImage(bannerURL);
-            ctx.drawImage(banner, 350, 30, 520, 150);
-            
-            // Banner overlay
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(350, 30, 520, 150);
-        } catch {}
-    }
-
-    // Kullanıcı adı
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 36px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(user.username, 180, 250);
-
-    // Tag
-    ctx.fillStyle = '#B9BBBE';
-    ctx.font = '24px Arial';
-    ctx.fillText(`#${user.discriminator}`, 180, 285);
-
-    // Seviye çubuğu
-    const levelBarWidth = 250;
-    const levelBarHeight = 20;
-    const levelBarX = 55;
-    const levelBarY = 320;
-    
-    // Seviye bar arkaplan
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.fillRect(levelBarX, levelBarY, levelBarWidth, levelBarHeight);
-    
-    // Seviye bar doluluk
-    const progressWidth = (levelInfo.progress / 100) * levelBarWidth;
-    const levelGradient = ctx.createLinearGradient(levelBarX, levelBarY, levelBarX + levelBarWidth, levelBarY);
-    levelGradient.addColorStop(0, '#5865F2');
-    levelGradient.addColorStop(1, '#9B59B6');
-    ctx.fillStyle = levelGradient;
-    ctx.fillRect(levelBarX, levelBarY, progressWidth, levelBarHeight);
-    
-    // Seviye yazısı
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 18px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Seviye ${levelInfo.level}`, levelBarX + levelBarWidth/2, levelBarY - 10);
-
-    // Rank
-    ctx.fillStyle = '#FEE75C';
-    ctx.font = 'bold 28px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`🏆 #${rank}`, 180, 380);
-
-    // Badge'ler
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('📊 İSTATİSTİKLER', 380, 200);
-
-    // İstatistikler
-    const stats = [
-        { icon: '📅', label: 'Hesap Yaşı', value: calculateAccountAge(user.createdAt) },
-        { icon: '⏱️', label: 'Son Görülme', value: 'Az Önce' },
-        { icon: '🎮', label: 'Aktiflik', value: `${Math.floor(Math.random() * 100)}%` },
-        { icon: '💬', label: 'Mesajlar', value: '1.2K' },
-        { icon: '⭐', label: 'Yıldızlar', value: '45' },
-        { icon: '🏆', label: 'Başarımlar', value: '12/50' }
-    ];
-
-    let statY = 240;
-    stats.forEach((stat, i) => {
-        const column = i % 2;
-        const row = Math.floor(i / 2);
-        const x = 380 + (column * 250);
-        const y = statY + (row * 60);
-
-        ctx.fillStyle = '#5865F2';
-        ctx.font = '24px Arial';
-        ctx.fillText(stat.icon, x, y);
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText(stat.label, x + 35, y);
-        
-        ctx.fillStyle = '#B9BBBE';
-        ctx.font = '14px Arial';
-        ctx.fillText(stat.value, x + 35, y + 20);
-    });
-
-    return new AttachmentBuilder(canvas.toBuffer(), { name: 'profile_card.png' });
+    return devices.length > 0 ? devices.join(' | ') : 'Bilinmiyor';
 }
 
-// Hesap yaşını hesapla
-function calculateAccountAge(createdAt) {
-    const diff = Date.now() - createdAt.getTime();
-    const years = Math.floor(diff / (1000 * 60 * 60 * 24 * 365));
-    const months = Math.floor((diff % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24 * 30));
-    return years > 0 ? `${years}y ${months}m` : `${months}m`;
-}
 
-// Badge'leri al
-function getBadges(user, member) {
-    const badges = [];
-    
-    // Discord Badge'leri
-    if (user.flags) {
-        if (user.flags.has('DISCORD_EMPLOYEE')) badges.push({ emoji: '👨‍💼', name: 'Discord Çalışanı' });
-        if (user.flags.has('PARTNERED_SERVER_OWNER')) badges.push({ emoji: '🤝', name: 'Partner' });
-        if (user.flags.has('HYPESQUAD_EVENTS')) badges.push({ emoji: '🏠', name: 'HypeSquad' });
-        if (user.flags.has('BUGHUNTER_LEVEL_1')) badges.push({ emoji: '🐛', name: 'Bug Hunter' });
-        if (user.flags.has('EARLY_SUPPORTER')) badges.push({ emoji: '🌟', name: 'Early Supporter' });
-        if (user.flags.has('VERIFIED_BOT')) badges.push({ emoji: '🤖', name: 'Verified Bot' });
-    }
-    
-    // Sunucu Badge'leri
-    if (member.premiumSince) badges.push({ emoji: '🚀', name: 'Booster' });
-    if (member.permissions.has('Administrator')) badges.push({ emoji: '👑', name: 'Yönetici' });
-    if (member.permissions.has('ManageMessages')) badges.push({ emoji: '🛡️', name: 'Moderatör' });
-    
-    return badges;
-}
-
-// Ana komut
+// --------------------------------------------------------------------------------------
+// KOMUT İŞLEYİCİ
+// --------------------------------------------------------------------------------------
 module.exports.run = async (client, message, args) => {
-    const startTime = Date.now();
-    
+    // Üye bilgisini alma
     const member =
         message.mentions.members.first() ||
         message.guild.members.cache.get(args[0]) ||
@@ -206,248 +66,127 @@ module.exports.run = async (client, message, args) => {
         });
     }
 
+    // Gerekli verileri çekme
     const user = member.user;
+    const avatar = user.displayAvatarURL({ dynamic: true, size: 1024 });
+    const fetchedUser = await user.fetch(); // Banner ve Flags için API'dan çek
+    const bannerURL = fetchedUser.bannerURL({ dynamic: true, size: 1024 });
     
-    // Kullanıcıyı fetch et (banner için)
-    await user.fetch();
-    
-    // Verileri al
-    const avatar = user.displayAvatarURL({ dynamic: true, size: 4096 });
-    const bannerURL = user.bannerURL({ dynamic: true, size: 4096 });
-    const nickname = member.nickname || "Yok";
-    const joined = member.joinedAt ? time(member.joinedAt, 'R') : "Bilinmiyor";
-    const created = time(user.createdAt, 'R');
-    
-    // Roller
+    // Rolleri sıralama ve listeleme
     const roles = member.roles.cache
         .filter(r => r.id !== message.guild.id)
-        .sort((a, b) => b.position - a.position)
+        .sort((a, b) => b.position - a.position) 
         .map(r => r.toString())
         .join(", ") || "Yok";
+    const rolesValue = roles.length > 1024 ? roles.substring(0, 1000) + '...' : roles;
 
-    // Durum
-    const statusMap = {
-        online: { emoji: "🟢", text: "Çevrim İçi" },
-        idle: { emoji: "🌙", text: "Boşta" },
-        dnd: { emoji: "⛔", text: "Rahatsız Etmeyin" },
-        offline: { emoji: "⚫", text: "Çevrim Dışı" },
-        invisible: { emoji: "⚫", text: "Çevrim Dışı" }
-    };
+    // --- YENİ EKLENEN VERİLER ---
     
-    const status = member.presence?.status || "offline";
-    const statusInfo = statusMap[status];
+    // Kullanıcı Rozetleri (Flags)
+    const userFlags = getUserBadges(fetchedUser.flags.toArray());
+
+    // Cihaz Durumu
+    const deviceStatus = getDeviceStatus(member.presence);
     
-    // Boost
-    const boosting = member.premiumSince 
-        ? time(member.premiumSince, 'R')
+    // Sunucudaki temel yetkiler
+    const memberPermissions = member.permissions.toArray();
+    const importantPermissions = [
+        'Administrator', 'ManageGuild', 'KickMembers', 'BanMembers', 'ManageChannels', 'ManageRoles'
+    ];
+    const majorPermissions = memberPermissions
+        .filter(perm => importantPermissions.includes(perm))
+        .map(perm => perm.replace(/([A-Z])/g, ' $1').trim()) // İzinleri daha okunur yap
+        .join(', ') || 'Yok';
+
+    // Bot ile Yetki Karşılaştırması
+    const clientMember = message.guild.members.cache.get(client.user.id);
+    let hierarchyStatus = '';
+    if (member.id === message.guild.ownerId) {
+        hierarchyStatus = 'Sunucu Sahibi';
+    } else if (member.roles.highest.position >= clientMember.roles.highest.position) {
+        hierarchyStatus = 'Benden daha yüksek/eşit role sahip 🔒';
+    } else {
+        hierarchyStatus = 'Benden daha düşük role sahip ✅';
+    }
+
+
+    // --- TEMEL VERİLER ---
+    const nickname = member.nickname || "Yok";
+    const joined = `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`;
+    const created = `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`;
+    const boosting = member.premiumSince
+        ? `<t:${Math.floor(member.premiumSince.getTime() / 1000)}:R>`
         : "Boost yok";
+    
+    const statusMap = {
+        online: "🟢 Çevrim içi",
+        idle: "🌙 Boşta",
+        dnd: "⛔ Rahatsız Etmeyin",
+        offline: "⚫ Çevrim dışı"
+    };
+    const presenceStatus = member.presence?.status || "offline";
+    const durum = statusMap[presenceStatus];
+    
 
-    // Badge'ler
-    const badges = getBadges(user, member);
-    
-    // Seviye ve rank (örnek veri)
-    const xp = Math.floor(Math.random() * 10000); // DB'den gelecek
-    const levelInfo = calculateLevel(xp);
-    const rank = Math.floor(Math.random() * 100) + 1; // DB'den gelecek
-    
-    // Profil kartı oluştur
-    const profileCard = await createProfileCard(user, member, badges, levelInfo, rank);
-    
-    // Ana embed
     const embed = new EmbedBuilder()
-        .setColor("#5865F2")
-        .setTitle(`👤 ${user.username} • Profil Analizi`)
-        .setDescription(`**${user.tag}** kullanıcısının detaylı profil bilgileri`)
-        .setImage('attachment://profile_card.png')
+        .setColor(member.displayHexColor === '#000000' ? 'Blurple' : member.displayHexColor) // Renk olarak kullanıcının en yüksek rol rengini kullan
+        .setTitle(`👤 ${user.username} Profili`)
+        .setThumbnail(avatar)
         .addFields(
-            {
-                name: `${statusInfo.emoji} **Durum & Aktivite**`,
-                value: `**Durum:** ${statusInfo.text}\n` +
-                       (member.presence?.activities[0] 
-                           ? `**Aktivite:** ${member.presence.activities[0].name}\n`
-                           : '') +
-                       `**Son Görülme:** Az önce`,
-                inline: true
-            },
-            {
-                name: "📊 **İstatistikler**",
-                value: `**Seviye:** ${levelInfo.level}\n` +
-                       `**Rank:** #${rank}\n` +
-                       `**XP:** ${xp.toLocaleString()}\n` +
-                       `**Boost Süresi:** ${boosting}`,
-                inline: true
-            },
-            {
-                name: "🆔 **Kimlik Bilgileri**",
-                value: `**ID:** \`${user.id}\`\n` +
-                       `**Hesap Oluşturulma:** ${created}\n` +
-                       `**Sunucuya Katılma:** ${joined}`,
-                inline: false
-            },
-            {
-                name: "🏷️ **İsimler**",
-                value: `**Kullanıcı Adı:** ${user.tag}\n` +
-                       `**Sunucu Takma Adı:** ${nickname}\n` +
-                       `**Global Ad:** ${user.globalName || 'Yok'}`,
-                inline: false
-            },
-            {
-                name: `🎖️ **Rozetler (${badges.length})**`,
-                value: badges.length > 0 
-                    ? badges.map(b => `${b.emoji} ${b.name}`).join(' • ')
-                    : "Rozet bulunmuyor",
-                inline: false
-            },
-            {
-                name: `👥 **Roller (${member.roles.cache.size - 1})**`,
-                value: roles.length > 1024 
-                    ? roles.substring(0, 1000) + '...'
-                    : roles || "Rol bulunmuyor",
-                inline: false
-            }
+            // Sütun 1: Kimlik & Genel Bilgi
+            { name: "🆔 Kullanıcı ID", value: `\`${user.id}\``, inline: true },
+            { name: "🎭 Kullanıcı Adı", value: user.tag, inline: true },
+            { name: "🏷️ Sunucu Takma Adı", value: nickname, inline: true },
+            
+            // Sütun 2: Zaman & Durum
+            { name: "📅 Hesap Oluşturulma", value: created, inline: true },
+            { name: "📅 Sunucuya Katılım", value: joined, inline: true },
+            { name: "🚀 Boost Başlangıcı", value: boosting, inline: true },
+
+            // Sütun 3: Teknik Bilgiler
+            { name: "💻 Durum (Genel)", value: durum, inline: true },
+            { name: "📱 Cihaz Durumu", value: deviceStatus, inline: true },
+            { name: "🏅 Rozetler (Flags)", value: userFlags, inline: true },
+            
+            // Satır 4: Yetki ve Roller
+            { name: "👑 Hiyerarşi Durumu", value: hierarchyStatus, inline: false },
+            { name: "🛡️ Temel Yetkiler", value: majorPermissions || 'Sadece standart yetkiler', inline: false },
+            { name: "📌 Roller", value: rolesValue, inline: false },
         )
-        .setFooter({ 
-            text: `Profil ID: ${user.id} • İşlem süresi: ${Date.now() - startTime}ms`,
-            iconURL: message.author.displayAvatarURL()
-        })
+        .setFooter({ text: `Bilgileri gösteren: ${message.author.tag}` })
         .setTimestamp();
 
-    // Butonlar
-    const buttons = [];
-    
-    // Avatar butonu
-    buttons.push(
-        new ButtonBuilder()
-            .setCustomId('view_avatar')
-            .setLabel('🖼️ Avatar')
-            .setStyle(ButtonStyle.Primary)
-    );
-    
-    // Banner butonu (eğer varsa)
+        
+    // --- BUTON OLUŞTURMA ---
+    const avatarButton = new ButtonBuilder()
+        .setLabel('Avatarı Gör')
+        .setStyle(ButtonStyle.Link)
+        .setURL(avatar);
+
+    const buttons = [avatarButton];
+
+    // Eğer banner varsa, banner butonu ekle
     if (bannerURL) {
-        buttons.push(
-            new ButtonBuilder()
-                .setCustomId('view_banner')
-                .setLabel('🎨 Banner')
-                .setStyle(ButtonStyle.Primary)
-        );
+        const bannerButton = new ButtonBuilder()
+            .setLabel('Bannerı Gör')
+            .setStyle(ButtonStyle.Link)
+            .setURL(bannerURL);
+        buttons.push(bannerButton);
     }
+
+    const row = new ActionRowBuilder().addComponents(buttons);
     
-    // İstatistik butonu
-    buttons.push(
-        new ButtonBuilder()
-            .setCustomId('view_stats')
-            .setLabel('📈 İstatistikler')
-            .setStyle(ButtonStyle.Secondary)
-    );
-    
-    // Profil kartı butonu
-    buttons.push(
-        new ButtonBuilder()
-            .setCustomId('download_card')
-            .setLabel('💾 Kartı İndir')
-            .setStyle(ButtonStyle.Success)
-    );
-    
-    // Refresh butonu
-    buttons.push(
-        new ButtonBuilder()
-            .setCustomId('refresh_profile')
-            .setLabel('🔄 Yenile')
-            .setStyle(ButtonStyle.Danger)
-    );
-
-    const rows = [
-        new ActionRowBuilder().addComponents(buttons.slice(0, 3)),
-        new ActionRowBuilder().addComponents(buttons.slice(3))
-    ];
-
-    // Mesajı gönder
-    const msg = await message.channel.send({
-        embeds: [embed],
-        files: [profileCard],
-        components: rows
-    });
-
-    // Kolektör
-    const filter = i => i.user.id === message.author.id;
-    const collector = msg.createMessageComponentCollector({ filter, time: 60000 });
-
-    collector.on('collect', async i => {
-        await i.deferUpdate();
-        
-        switch(i.customId) {
-            case 'view_avatar':
-                const avatarEmbed = new EmbedBuilder()
-                    .setColor('#5865F2')
-                    .setTitle(`${user.username} - Avatar`)
-                    .setImage(avatar)
-                    .setFooter({ text: 'Tam boyut için tıklayın' });
-                
-                await i.followUp({ embeds: [avatarEmbed], ephemeral: true });
-                break;
-                
-            case 'view_banner':
-                if (bannerURL) {
-                    const bannerEmbed = new EmbedBuilder()
-                        .setColor('#9B59B6')
-                        .setTitle(`${user.username} - Banner`)
-                        .setImage(bannerURL)
-                        .setFooter({ text: 'Tam boyut için tıklayın' });
-                    
-                    await i.followUp({ embeds: [bannerEmbed], ephemeral: true });
-                }
-                break;
-                
-            case 'view_stats':
-                const statsEmbed = new EmbedBuilder()
-                    .setColor('#2ECC71')
-                    .setTitle(`📊 ${user.username} - Detaylı İstatistikler`)
-                    .addFields(
-                        { name: 'Seviye Sistemi', value: `**Seviye:** ${levelInfo.level}\n**XP:** ${xp}\n**İlerleme:** %${levelInfo.progress.toFixed(1)}`, inline: true },
-                        { name: 'Aktivite', value: `**Son Aktiflik:** Bugün\n**Günlük Ortalama:** 2.5 saat\n**Aktif Gün:** 24/30`, inline: true },
-                        { name: 'Katılım', value: `**Sunucu Sırası:** #${rank}\n**Boost Süresi:** ${boosting}\n**Katılım Sırası:** #${member.guild.members.cache.size}`, inline: true }
-                    )
-                    .setFooter({ text: 'Veriler günlük güncellenir' });
-                
-                await i.followUp({ embeds: [statsEmbed], ephemeral: true });
-                break;
-                
-            case 'download_card':
-                await i.followUp({
-                    content: `📥 ${user.username}'in profil kartını indirmek için:`,
-                    files: [profileCard],
-                    ephemeral: true
-                });
-                break;
-                
-            case 'refresh_profile':
-                await module.exports.run(client, message, args);
-                msg.delete().catch(() => {});
-                break;
-        }
-    });
-
-    collector.on('end', async () => {
-        const disabledRows = rows.map(row => {
-            return new ActionRowBuilder().addComponents(
-                row.components.map(button => 
-                    ButtonBuilder.from(button).setDisabled(true)
-                )
-            );
-        });
-        
-        await msg.edit({ components: disabledRows }).catch(() => {});
-    });
+    // Embed ve Butonları gönder
+    message.channel.send({ embeds: [embed], components: [row] });
 };
 
 module.exports.conf = {
-    aliases: ["profile", "userinfo", "kullanıcıbilgi", "kb", "whois", "user"]
+    aliases: ["kullanıcı", "user", "info", "kb"],
+    permLevel: 0
 };
 
 module.exports.help = {
     name: "profil",
-    description: "Kullanıcının detaylı profil bilgilerini ve özel profil kartını gösterir.",
-    usage: "g!profil [@kullanıcı/ID]",
-    category: "Kullanıcı"
+    description: "Belirtilen kullanıcının profil bilgilerini detaylı şekilde gösterir.",
+    usage: 'g!profil [@Kullanıcı]'
 };
