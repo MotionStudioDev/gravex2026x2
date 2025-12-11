@@ -2,14 +2,15 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsB
 
 // --------------------------------------------------------------------------------------
 // Fonksiyon: Rozetleri (User Flags) Emojilere Çevirir
+// (RangeError [BitFieldInvalid]: Invalid bitfield flag or number: DISCORD_EMPLOYEE hatası çözüldü)
 // --------------------------------------------------------------------------------------
 function getUserBadges(userFlags) {
     if (!userFlags || userFlags.length === 0) return 'Yok';
 
     const flagMap = {
-        Staff: '⭐', // Discord Ekip Üyesi
+        Staff: '⭐', // Discord Ekip Üyesi (DISCORD_EMPLOYEE yerine Staff kullanılır)
         Partner: '💎', // Discord Partnerı
-        Hypesquad: 'HypeSquad', // HypeSquad Temsilcisi (Rozet yok, sadece metin)
+        Hypesquad: 'HypeSquad', // HypeSquad Temsilcisi
         BugHunterLevel1: '🐛', // Hata Avcısı Seviye 1
         BugHunterLevel2: '🐞', // Hata Avcısı Seviye 2
         PremiumEarlySupporter: '🎁', // Erken Destekçi (2018 Nitro)
@@ -93,6 +94,7 @@ module.exports.run = async (client, message, args) => {
     const importantPermissions = [
         'Administrator', 'ManageGuild', 'KickMembers', 'BanMembers', 'ManageChannels', 'ManageRoles'
     ];
+    // Kullanıcının sahip olduğu temel izinleri filtrele
     const majorPermissions = memberPermissions
         .filter(perm => importantPermissions.includes(perm))
         .map(perm => perm.replace(/([A-Z])/g, ' $1').trim()) // İzinleri daha okunur yap
@@ -102,7 +104,7 @@ module.exports.run = async (client, message, args) => {
     const clientMember = message.guild.members.cache.get(client.user.id);
     let hierarchyStatus = '';
     if (member.id === message.guild.ownerId) {
-        hierarchyStatus = 'Sunucu Sahibi';
+        hierarchyStatus = 'Sunucu Sahibi 👑';
     } else if (member.roles.highest.position >= clientMember.roles.highest.position) {
         hierarchyStatus = 'Benden daha yüksek/eşit role sahip 🔒';
     } else {
