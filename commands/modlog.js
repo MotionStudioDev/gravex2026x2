@@ -4,9 +4,8 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     PermissionsBitField, 
-    ModalBuilder, 
-    TextInputBuilder, 
-    TextInputStyle, 
+    ChannelSelectMenuBuilder, 
+    ChannelType,
     ComponentType 
 } = require('discord.js');
 const ModLog = require('../models/modlog');
@@ -22,39 +21,44 @@ module.exports.run = async (client, message, args) => {
     // 2. MEVCUT VERİYİ ÇEK
     let data = await ModLog.findOne({ guildID: message.guild.id });
     
-    // --- YARDIMCI FONKSİYON: Embed ve Butonları Oluşturur ---
+    // --- YARDIMCI FONKSİYON: Dashboard Mesajını Oluşturur ---
     const getDashboard = (currentData) => {
         const currentChannelID = currentData ? currentData.logChannelID : null;
         const currentChannel = currentChannelID ? message.guild.channels.cache.get(currentChannelID) : null;
         
         const statusEmoji = currentChannel ? '🟢' : '🔴';
-        const statusText = currentChannel ? 'Aktif' : 'Devre Dışı';
         const channelText = currentChannel ? `${currentChannel} (\`${currentChannel.id}\`)` : 'Ayarlanmamış';
 
         const embed = new EmbedBuilder()
-            .setColor(currentChannel ? 'Green' : 'Red')
-            .setTitle('🛡️ Mod-Log Kontrol Paneli')
-            .setDescription(`Bu panelden sunucunun denetim kayıtlarının (log) düşeceği kanalı yönetebilirsiniz.`)
+            .setColor(currentChannel ? '#57F287' : '#ED4245')
+            .setTitle('🛡️ Mod-Log Sistemi Yapılandırması')
+            .setThumbnail(message.guild.iconURL({ dynamic: true }))
+            .setDescription('Denetim kayıtlarının gönderileceği kanalı aşağıdaki listeden seçebilirsiniz. Kanallar kategorilere göre listelenmektedir.')
             .addFields(
-                { name: '📊 Sistem Durumu', value: `\` ${statusEmoji} ${statusText} \``, inline: true },
+                { name: '📊 Sistem Durumu', value: `\` ${statusEmoji} ${currentChannel ? 'Aktif' : 'Devre Dışı'} \``, inline: true },
                 { name: '📢 Mevcut Kanal', value: channelText, inline: true }
             )
-            .setFooter({ text: 'Ayarları değiştirmek için aşağıdaki butonları kullanın.' })
+            .setFooter({ text: 'Seçim yapmak için menüyü, ayarları yönetmek için butonları kullanın.' })
             .setTimestamp();
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('btn_modlog_set')
-                .setLabel('Kanal Ayarla (Modal)')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('✏️'),
-            
+        // Kanal Seçme Menüsü
+        const selectMenu = new ActionRowBuilder().addComponents(
+            new ChannelSelectMenuBuilder()
+                .setCustomId('select_modlog_channel')
+                .setPlaceholder('Bir kanal seçin...')
+                .setChannelTypes(ChannelType.GuildText) // Sadece yazı kanallarını gösterir
+                .setMaxValues(1)
+                .setMinValues(1)
+        );
+
+        // Butonlar
+        const buttons = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('btn_modlog_reset')
-                .setLabel('Sıfırla')
+                .setLabel('Sistemi Sıfırla')
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🗑️')
-                .setDisabled(!currentChannel), // Kanal yoksa sıfırla butonu çalışmaz
+                .setDisabled(!currentChannel),
             
             new ButtonBuilder()
                 .setCustomId('btn_modlog_close')
@@ -63,99 +67,63 @@ module.exports.run = async (client, message, args) => {
                 .setEmoji('❌')
         );
 
-        return { embeds: [embed], components: [row] };
+        return { embeds: [embed], components: [selectMenu, buttons] };
     };
 
-    // 3. İLK MESAJI GÖNDER
+    // 3. PANELİ GÖNDER
     const msg = await message.channel.send(getDashboard(data));
 
-    // 4. COLLECTOR (BUTON DİNLEYİCİ)
+    // 4. COLLECTOR (MENÜ VE BUTON DİNLEYİCİ)
     const filter = i => i.user.id === message.author.id;
-    const collector = msg.createMessageComponentCollector({ filter, time: 60000 }); // 60 saniye aktif
+    const collector = msg.createMessageComponentCollector({ filter, time: 120000 }); // 2 dakika aktif
 
     collector.on('collect', async interaction => {
         
-        // --- BUTON: AYARLA (MODAL AÇAR) ---
-        if (interaction.customId === 'btn_modlog_set') {
-            const modal = new ModalBuilder()
-                .setCustomId('modal_modlog_input')
-                .setTitle('Mod-Log Kanal Ayarı');
+        // --- MENÜ: KANAL SEÇİLDİĞİNDE ---
+        if (interaction.customId === 'select_modlog_channel') {
+            const selectedChannelID = interaction.values[0];
+            const targetChannel = message.guild.channels.cache.get(selectedChannelID);
 
-            const channelInput = new TextInputBuilder()
-                .setCustomId('input_channel_id')
-                .setLabel("Kanal ID'si giriniz")
-                .setPlaceholder('Örn: 123456789012345678')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
+            data = await ModLog.findOneAndUpdate(
+                { guildID: message.guild.id },
+                { logChannelID: selectedChannelID },
+                { upsert: true, new: true }
+            );
 
-            const firstActionRow = new ActionRowBuilder().addComponents(channelInput);
-            modal.addComponents(firstActionRow);
-
-            await interaction.showModal(modal);
-
-            // Modal Cevabını Bekle
-            try {
-                const modalSubmit = await interaction.awaitModalSubmit({ 
-                    filter: (i) => i.customId === 'modal_modlog_input' && i.user.id === message.author.id, 
-                    time: 30000 
-                });
-
-                const inputVal = modalSubmit.fields.getTextInputValue('input_channel_id');
-                // Sadece sayıları al (eğer kullanıcı <#123> yazarsa temizler)
-                const cleanID = inputVal.replace(/\D/g, ''); 
-                const targetChannel = message.guild.channels.cache.get(cleanID);
-
-                if (!targetChannel) {
-                    return modalSubmit.reply({ content: '❌ Geçersiz Kanal ID! Lütfen doğru bir ID girdiğinizden emin olun.', ephemeral: true });
-                }
-
-                // Veritabanını Güncelle
-                data = await ModLog.findOneAndUpdate(
-                    { guildID: message.guild.id },
-                    { logChannelID: targetChannel.id },
-                    { upsert: true, new: true }
-                );
-
-                // Paneli Güncelle
-                await modalSubmit.update(getDashboard(data));
-                
-                // Başarı mesajı (geçici)
-                await message.channel.send({ content: `✅ Mod-Log kanalı başarıyla ${targetChannel} olarak ayarlandı!` }).then(m => setTimeout(() => m.delete(), 5000));
-
-            } catch (err) {
-                // Modal zaman aşımı vb.
-            }
+            await interaction.update(getDashboard(data));
+            await message.channel.send({ content: `✅ Mod-Log kanalı ${targetChannel} olarak güncellendi.` }).then(m => setTimeout(() => m.delete(), 4000));
         }
 
         // --- BUTON: SIFIRLA ---
         if (interaction.customId === 'btn_modlog_reset') {
             await ModLog.findOneAndDelete({ guildID: message.guild.id });
-            data = null; // Veriyi yerel olarak da temizle
+            data = null;
             
             await interaction.update(getDashboard(null));
-            await message.channel.send({ content: `🗑️ Mod-Log sistemi sıfırlandı.` }).then(m => setTimeout(() => m.delete(), 5000));
+            await message.channel.send({ content: `🗑️ Mod-Log sistemi bu sunucuda devre dışı bırakıldı.` }).then(m => setTimeout(() => m.delete(), 4000));
         }
 
         // --- BUTON: KAPAT ---
         if (interaction.customId === 'btn_modlog_close') {
-            await interaction.update({ content: '🔒 Panel kapatıldı.', embeds: [], components: [] });
+            await interaction.update({ content: '🔒 Ayarlar kaydedildi ve panel kapatıldı.', embeds: [], components: [] });
             collector.stop();
         }
     });
 
     collector.on('end', async (collected, reason) => {
         if (reason === 'time') {
-            // Süre dolunca butonları devre dışı bırak
-            const disabledRow = new ActionRowBuilder().addComponents(
-                msg.components[0].components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
-            );
-            await msg.edit({ components: [disabledRow] }).catch(() => {});
+            const disabledRows = msg.components.map(row => {
+                const newRow = ActionRowBuilder.from(row);
+                newRow.components.forEach(c => c.setDisabled(true));
+                return newRow;
+            });
+            await msg.edit({ components: disabledRows }).catch(() => {});
         }
     });
 };
 
 module.exports.conf = {
-    aliases: ['modlog-ayarla', 'log-sistemi']
+    aliases: ['log-ayarla', 'mod-log']
 };
 
 module.exports.help = {
