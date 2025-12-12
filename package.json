@@ -28,9 +28,6 @@
     "cheerio": "^1.1.2",
     "os": "^0.1.2",
     "play-dl": "^1.9.7",
-    "ffmpeg-static": "^5.3.0",
-    "libsodium-wrappers": "^0.7.15",
-    "@ffmpeg": "^0.0.4",
     "@discordjs/voice": "^0.19.0",
     "@discordjs/opus": "^0.10.0",
     "@google/genai": "^1.30.0",
@@ -40,7 +37,6 @@
     "mongodb": "^7.0.0",
     "mongoose": "^8.20.1",
     "body-parser": "^2.2.1",
-    "youtube-search": "^1.1.6",
     "orio.db": "^3.1.2"
   },
   "engines": {
