@@ -9,6 +9,7 @@ const { Collection } = require("discord.js");
 const config = require("./config.js");
 const fs = require("fs");
 const db = require("orio.db");
+const ffmpeg = require('ffmpeg-static');
 const Discord = require("discord.js")
 const moment = require('moment')
 require('moment-duration-format')
