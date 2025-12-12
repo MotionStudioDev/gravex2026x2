@@ -226,8 +226,6 @@ client.on('interactionCreate', async interaction => {
     }
 });
 /////// mod log
-const { EmbedBuilder } = require('discord.js');
-// ModLog modelinin doğru yolu burada varsayılmıştır
 const ModLog = require('./models/modlog'); 
 
 // -----------------------------------------------------------------------------------
