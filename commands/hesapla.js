@@ -76,7 +76,7 @@ module.exports.run = async (client, message, args) => {
 
     const embed = new EmbedBuilder()
         .setColor('Aqua')
-        .setTitle('🧮 Ultra Mega Hesap Makinesi')
+        .setTitle('🧮 Grave Hesap Makinesi')
         .setDescription(`\`\`\`\n${display.substring(0, MAX_DIGITS)}\n\`\`\``)
         .setFooter({ text: `Kullanan: ${message.author.tag} | Süre: ${TIME_LIMIT / 1000}s` });
 
