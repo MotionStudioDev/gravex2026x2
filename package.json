@@ -36,6 +36,7 @@
     "mongodb": "^7.0.0",
     "mongoose": "^8.20.1",
     "body-parser": "^2.2.1",
+    "youtube-search": "^1.1.6",
     "orio.db": "^3.1.2"
   },
   "engines": {
