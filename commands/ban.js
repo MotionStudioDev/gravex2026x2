@@ -14,7 +14,7 @@ const DEFAULT_REASON = "Yönetici Kararı (Hızlı Ban)";
 // --- Dinamik Bileşen Oluşturucu ---
 function getComponents(currentDeleteDays, quickBanId, modalBanId, cancelId) {
     
-    // Mesaj Silme Seçeneği (Select Menu)
+    // Mesaj Silme Seçeneği (Select Menu) - Seçime göre default değeri atanarak kalıcılık sağlanır.
     const selectMenu = new StringSelectMenuBuilder()
         .setCustomId('delete_days')
         .setPlaceholder('Silinecek mesaj gün sayısını seçin (Varsayılan: 0 Gün)')
@@ -28,12 +28,12 @@ function getComponents(currentDeleteDays, quickBanId, modalBanId, cancelId) {
     // Butonlar
     const quickBanButton = new ButtonBuilder()
         .setCustomId(quickBanId)
-        .setLabel('Banla')
+        .setLabel('Banla (Varsayılan Sebep)')
         .setStyle(ButtonStyle.Primary);
 
     const modalBanButton = new ButtonBuilder()
         .setCustomId(modalBanId)
-        .setLabel('Sebep İle Banla')
+        .setLabel('Sebeple Banla (Modal)')
         .setStyle(ButtonStyle.Danger);
 
     const cancelButton = new ButtonBuilder()
@@ -130,12 +130,15 @@ module.exports.run = async (client, message, args) => {
                 .setTitle(`${EMOJI.X} HATA: Ban Başarısız`)
                 .setDescription(`Ban işlemi gerçekleştirilemedi. Botun yetkisi yetersiz olabilir veya başka bir hata oluştu. Hata mesajı: \`${err.message}\``);
             
-            // i.update / i.editReply çakışmasını engellemek için try-catch ile tekil güncelleme yapılır.
-            await i.update({ embeds: [errorEmbed], components: [] }).catch(e => {
-                 // Eğer update zaten yapılmışsa, tekrar denemeyi engeller.
-                 console.error("Hata mesajı gönderilemedi:", e);
-            });
-            return; // KRİTİK DÜZELTME: Hata durumunda fonksiyonu sonlandır.
+            // Hata durumunda mesajı i.update veya i.editReply ile güncelle
+            // i.update() başarılı olursa ilk defer/reply işlemi iptal olur.
+            // Başarılı olmazsa (ModalSubmit'ten geliyorsa) deferlenmiş mesajı editReply ile düzenleriz.
+            try {
+                await i.update({ embeds: [errorEmbed], components: [] });
+            } catch (e) {
+                 await i.editReply({ embeds: [errorEmbed], components: [] }).catch(e2 => console.error("Final Error Handling Failed:", e2));
+            }
+            return; // KRİTİK: Hata durumunda fonksiyonu sonlandır.
         }
         
         // --- Buradan sonrası SADECE ban başarılıysa çalışır. ---
@@ -167,8 +170,9 @@ module.exports.run = async (client, message, args) => {
             .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
             .setFooter({ text: `Grave BAN Sistemi | ${tarih} / ${saat}` });
 
-        // KRİTİK: Başarılı mesajı ile güncelleme
-        await i.update({ embeds: [banSuccessEmbed], components: [successRow] });
+        // KRİTİK DÜZELTME: Başarılı güncelleme için i.update() yerine i.editReply() kullanıldı.
+        // Bu, modalInteraction.deferUpdate() veya i.deferUpdate() sonrası hatasız çalışmasını sağlar.
+        await i.editReply({ embeds: [banSuccessEmbed], components: [successRow] });
         
         // Yeni kolektör başlat (Post-Ban Aksiyonları için)
         startPostBanCollector(response, target.id, message.author.id, unbanId, copyId, closeId);
@@ -224,10 +228,9 @@ module.exports.run = async (client, message, args) => {
             deleteMessageDays = parseInt(i.values[0]);
             
             const updatedEmbed = new EmbedBuilder(preBanEmbed).setFooter({ text: `Mesaj Silme Günü: ${deleteMessageDays} gün seçildi. | İşlem süresi ${TIME_LIMIT / 1000} saniyedir.` });
-            
-            // KRİTİK DÜZELTME: Yeni bileşenleri, yeni seçilmiş değerle oluştur
             const newComponents = getComponents(deleteMessageDays, quickBanId, modalBanId, cancelId);
             
+            // Select Menu güncellendiğinde, seçimi kalıcı hale getirmek için update kullanılır.
             await i.update({ embeds: [updatedEmbed], components: newComponents });
             return;
         }
@@ -241,7 +244,7 @@ module.exports.run = async (client, message, args) => {
         
         if (i.customId === quickBanId) {
             collector.stop('quick_ban');
-            await i.deferUpdate(); // Mesaj güncellemesi için defer
+            await i.deferUpdate(); // Ban işleminden önceki mesajı düzenlemeye hazırla
             await executeBan(i, DEFAULT_REASON);
             return;
         }
@@ -268,7 +271,7 @@ module.exports.run = async (client, message, args) => {
                     const reason = modalInteraction.fields.getTextInputValue('ban_reason');
                     const proof = modalInteraction.fields.getTextInputValue('ban_proof') || 'Yok';
                     
-                    await modalInteraction.deferUpdate(); 
+                    await modalInteraction.deferUpdate(); // Ban işleminden önceki mesajı düzenlemeye hazırla
                     await executeBan(modalInteraction, reason, proof);
 
                 })
