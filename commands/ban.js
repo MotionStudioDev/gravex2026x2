@@ -28,7 +28,7 @@ function getComponents(currentDeleteDays, quickBanId, modalBanId, cancelId) {
     // Butonlar
     const quickBanButton = new ButtonBuilder()
         .setCustomId(quickBanId)
-        .setLabel('Banla)')
+        .setLabel('Banla')
         .setStyle(ButtonStyle.Primary);
 
     const modalBanButton = new ButtonBuilder()
@@ -99,9 +99,9 @@ module.exports.run = async (client, message, args) => {
         components: initialComponents
     });
     
-    // ... (executeBan ve startPostBanCollector fonksiyonları, değişmeden aynı kalacak) ...
     // --- ANA BAN İŞLEVİ (Tekrar Kullanılabilir Fonksiyon) ---
     async function executeBan(i, reason, proof = 'Yok') {
+        
         // DM Bildirimi
         const dmEmbed = new EmbedBuilder()
             .setColor('Red')
@@ -130,9 +130,12 @@ module.exports.run = async (client, message, args) => {
                 .setTitle(`${EMOJI.X} HATA: Ban Başarısız`)
                 .setDescription(`Ban işlemi gerçekleştirilemedi. Botun yetkisi yetersiz olabilir veya başka bir hata oluştu. Hata mesajı: \`${err.message}\``);
             
-            // Mesajı hata ile güncelle ve fonksiyonu durdur.
-            await i.update({ embeds: [errorEmbed], components: [] });
-            return; // KRİTİK: Hata durumunda buradan çıkarız.
+            // i.update / i.editReply çakışmasını engellemek için try-catch ile tekil güncelleme yapılır.
+            await i.update({ embeds: [errorEmbed], components: [] }).catch(e => {
+                 // Eğer update zaten yapılmışsa, tekrar denemeyi engeller.
+                 console.error("Hata mesajı gönderilemedi:", e);
+            });
+            return; // KRİTİK DÜZELTME: Hata durumunda fonksiyonu sonlandır.
         }
         
         // --- Buradan sonrası SADECE ban başarılıysa çalışır. ---
@@ -217,7 +220,7 @@ module.exports.run = async (client, message, args) => {
 
     collector.on('collect', async i => {
         if (i.customId === 'delete_days') {
-            // Düzeltilen kısım: Seçimi al ve bileşenleri yeniden oluştur
+            // DÜZELTME: Seçimi al ve bileşenleri yeniden oluştur
             deleteMessageDays = parseInt(i.values[0]);
             
             const updatedEmbed = new EmbedBuilder(preBanEmbed).setFooter({ text: `Mesaj Silme Günü: ${deleteMessageDays} gün seçildi. | İşlem süresi ${TIME_LIMIT / 1000} saniyedir.` });
@@ -238,7 +241,7 @@ module.exports.run = async (client, message, args) => {
         
         if (i.customId === quickBanId) {
             collector.stop('quick_ban');
-            await i.deferUpdate(); 
+            await i.deferUpdate(); // Mesaj güncellemesi için defer
             await executeBan(i, DEFAULT_REASON);
             return;
         }
