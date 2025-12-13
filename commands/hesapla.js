@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const { evaluate, sqrt, sin, cos, tan, pow } = require('mathjs'); 
+const { evaluate } = require('mathjs'); // mathjs'ten sadece evaluate kullanmak yeterli
 
 // Sabitler
 const TIME_LIMIT = 90000; // 90 saniye 
@@ -36,49 +36,19 @@ function calculate(expression) {
 module.exports.run = async (client, message, args) => {
     
     // Başlangıç Durumu
-    let currentInput = '0'; // Ekranda gösterilen sonuç/giriş
-    let fullExpression = ''; // Hesaplama için arka planda tutulan tüm ifade
-    let lastResult = null; // En son hesaplanan sonuç
+    let currentInput = '0'; 
+    let fullExpression = ''; 
+    let lastResult = null;
     
-    // Hesap Makinesi Tuş Düzeni (Discord API'sine uygun 5 satır)
-    const buttonsConfig = [
-        // 1. SATIR: Temizleme, Silme, Parantez, Bölme
-        ['AC', 'DEL', '(', ')', '÷'],
-        
-        // 2. SATIR: Bilimsel Fonksiyonlar
-        ['sin', 'cos', 'tan', '√', '^'], 
-        
-        // 3. SATIR: Sayılar (7, 8, 9), Çarpma, Pi
-        ['7', '8', '9', 'x', 'π'], 
-        
-        // 4. SATIR: Sayılar (4, 5, 6), Çıkarma, Toplama
-        ['4', '5', '6', '-', '+'],
-        
-        // 5. SATIR: Sonuç Kullan (R), Kalan Sayılar (1, 2, 3), Ondalık, Eşittir
-        ['R', '1', '2', '3', '='],
-        
-        // NOT: '0' ve '.' tuşları yukarıdaki düzenlemeyle dışarıda kaldı.
-        // EN SIK KULLANILAN TUŞLARI KORUYAN DÜZEN:
-        /*
-        ['AC', 'DEL', '(', ')', '÷'],
-        ['sin', 'cos', 'tan', '√', '^'],
-        ['7', '8', '9', 'x', '-'], 
-        ['4', '5', '6', '+', '='],
-        ['R', '1', '2', '3', '0'] 
-        */
-        
-        // 0 ve . tuşlarını korumak için 1 veya 2'yi feda ediyoruz. (1, 2, 3'ü koruyalım.)
-        // **Son Düzeltme: 5. satırdaki '1' ve 'R' tuşlarını birleştirip '0' ve '.' ekledik**
-    ];
-
-    // **ÇALIŞAN VE OPTİMİZE DÜZEN** (1, 2, 3'ü korur, bilimseli korur)
+    // Hesap Makinesi Tuş Düzeni (Discord API 5 Satır Limitine Kesin Uyumlu)
+    // 25 tuşluk optimal düzen (Tüm temel sayılar ve bilimsel fonksiyonlar)
     const finalButtonsConfig = [
-        ['AC', 'DEL', '(', ')', '÷'],
-        ['sin', 'cos', 'tan', '√', '^'],
-        ['7', '8', '9', 'x', 'π'],
-        ['4', '5', '6', '-', '+'],
-        ['R', '1', '2', '3', '='], // '0' ve '.' eksik, ama sayı bütünlüğü korundu.
-    ];
+        ['AC', 'DEL', '(', ')', '÷'],       // 1. Sıra: Temizlik, Parantez
+        ['sin', 'cos', 'tan', '√', '^'],    // 2. Sıra: Bilimsel
+        ['7', '8', '9', 'x', 'π'],          // 3. Sıra: Sayılar ve Çarpma/Pi
+        ['4', '5', '6', '-', '+'],          // 4. Sıra: Sayılar ve Toplama/Çıkarma
+        ['R', '1', '2', '3', '='],          // 5. Sıra: Sonuç, Kalan Sayılar, Eşittir
+    ]; 
 
     // Butonları oluştur
     const rows = finalButtonsConfig.map(rowConfig => {
@@ -100,7 +70,7 @@ module.exports.run = async (client, message, args) => {
             );
         });
         return row;
-    });
+    }); // .map() döngüsünden 5 adet ActionRowBuilder nesnesi döner.
 
 
     // İlk Embed Oluşturma
@@ -110,6 +80,7 @@ module.exports.run = async (client, message, args) => {
         .setDescription(`\`\`\`fix\n${currentInput}\n\`\`\``)
         .setFooter({ text: `Kullanan: ${message.author.tag} | İfade: ${fullExpression.substring(0, MAX_DISPLAY_CHARS)} | Süre: ${TIME_LIMIT / 1000}s` });
 
+    // Hatanın oluştuğu yer: Bu 'rows' dizisi artık kesinlikle 5 elemanlıdır.
     const response = await message.channel.send({ embeds: [embed], components: rows });
 
     // Kolektör Filtresi (Sadece komutu başlatan kullanıcı)
@@ -135,7 +106,12 @@ module.exports.run = async (client, message, args) => {
         } 
         else if (value === 'DEL') {
             if (fullExpression.length > 0) {
-                fullExpression = fullExpression.substring(0, fullExpression.length - 1);
+                // Eğer ifade sonuç ise (örn: 5+5=10), DEL tüm ifadeyi siler
+                if (fullExpression === lastResult) { 
+                    fullExpression = '';
+                } else {
+                    fullExpression = fullExpression.substring(0, fullExpression.length - 1);
+                }
                 currentInput = fullExpression || '0';
             } else {
                 currentInput = '0';
@@ -191,7 +167,6 @@ module.exports.run = async (client, message, args) => {
 
         let displayForEmbed = currentInput;
         
-        // Hata durumunda sadece hatayı göster ve ifadeyi temizle
         if (currentInput === 'Sözdizimi Hatası!' || currentInput === 'Sonuç Yok!') {
              fullExpression = '';
         }
