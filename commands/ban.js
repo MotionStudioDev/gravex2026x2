@@ -1,4 +1,4 @@
-const { EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const moment = require('moment');
 moment.locale('tr');
 
@@ -9,8 +9,10 @@ const EMOJI = {
     TIK: '<:tik1:1416526332803809401>'
 };
 
+const TIME_LIMIT = 30000; // 30 saniye onay süresi (Modal süresi 5 dakika)
+
 module.exports.run = async (client, message, args) => {
-    // 1. YETKİ KONTROLÜ (Yetkili)
+    // 1. YETKİ KONTROLÜ
     if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
         const embed = new EmbedBuilder()
             .setColor('Red')
@@ -20,7 +22,6 @@ module.exports.run = async (client, message, args) => {
     }
 
     const target = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
-    const reason = args.slice(1).join(' ') || 'Sebep belirtilmedi';
     const author = message.member;
 
     // 2. HEDEF KONTROLÜ
@@ -32,11 +33,10 @@ module.exports.run = async (client, message, args) => {
         return message.channel.send({ embeds: [embed] });
     }
 
-    // 3. HİYERARŞİ VE KENDİ KENDİNİ BANLAMA KONTROLÜ
+    // 3. HİYERARŞİ VE KONTROLLER
     if (target.id === author.id) {
         return message.channel.send({ embeds: [new EmbedBuilder().setColor('Red').setDescription('Kendini banlayamazsın.')] });
     }
-    // Botun kendi rol kontrolü
     if (target.roles.highest.position >= author.roles.highest.position) {
         return message.channel.send({ embeds: [new EmbedBuilder().setColor('Red').setDescription('Bu kullanıcı seninle aynı veya senden daha yüksek bir role sahip.')] });
     }
@@ -48,14 +48,27 @@ module.exports.run = async (client, message, args) => {
         return message.channel.send({ embeds: [embed] });
     }
 
-    // 4. ONAY MEKANİZMASI BAŞLANGICI
+
+    // --- MESAJ SİLME SEÇENEĞİ (SELECT MENU) ---
     
-    const confirmId = `ban_confirm_${Date.now()}`;
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('delete_days')
+        .setPlaceholder('Silinecek mesaj gün sayısını seçin (Varsayılan: 0 Gün)')
+        .addOptions([
+            { label: 'Mesaj Silme (0 Gün)', value: '0', description: 'Kullanıcının hiç mesajı silinmez.', default: true },
+            { label: 'Son 1 Gün', value: '1', description: 'Son 24 saatteki mesajlar silinir.' },
+            { label: 'Son 7 Gün (Maksimum)', value: '7', description: 'Son 7 gündeki mesajlar silinir.' },
+        ]);
+
+    const selectRow = new ActionRowBuilder().addComponents(selectMenu);
+
+    // 4. MODAL BAŞLATMA BUTONU
+    const startModalId = `ban_start_${Date.now()}`;
     const cancelId = `ban_cancel_${Date.now()}`;
 
-    const confirmButton = new ButtonBuilder()
-        .setCustomId(confirmId)
-        .setLabel('Onayla (Ban)')
+    const startModalButton = new ButtonBuilder()
+        .setCustomId(startModalId)
+        .setLabel('Sebep Gir ve Banla')
         .setStyle(ButtonStyle.Danger);
 
     const cancelButton = new ButtonBuilder()
@@ -63,86 +76,195 @@ module.exports.run = async (client, message, args) => {
         .setLabel('İptal Et')
         .setStyle(ButtonStyle.Secondary);
 
-    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+    const buttonRow = new ActionRowBuilder().addComponents(startModalButton, cancelButton);
     
+    // --- ÖN BİLGİ EMBEDİ ---
     const preBanEmbed = new EmbedBuilder()
         .setColor('Orange')
-        .setTitle('⚠️ Ban Onayı Gerekiyor')
-        .setDescription(`**${target.user.tag}** kullanıcısını banlamak istediğinden emin misin?`)
+        .setTitle('🛠️ Yasaklama Ayarları')
+        .setDescription(`**${target.user.tag}** kullanıcısını yasaklamak için lütfen aşağıdaki ayarları seçin ve **Sebep Gir ve Banla** butonuna basın.`)
         .addFields(
-            { name: 'Sebep', value: reason, inline: false },
-            { name: 'Onaylayan Yetkili', value: author.user.tag, inline: false }
+            { name: 'Kullanıcı', value: `${target.user.tag} (${target.id})`, inline: false },
+            { name: 'Yasaklayan Yetkili', value: author.user.tag, inline: false }
         )
-        .setFooter({ text: 'Bu işlem 10 saniye içinde onaylanmalıdır.' });
+        .setFooter({ text: `Banlama işlemi, Modal açıldıktan sonra devam edecektir.` });
 
     const response = await message.channel.send({
         embeds: [preBanEmbed],
-        components: [row]
+        components: [selectRow, buttonRow]
     });
 
-    // 5. ONAY KOLEKTÖRÜ
-    const filter = (i) => i.customId === confirmId || i.customId === cancelId;
+    // 5. KOLEKTÖR (Sadece başlatma ve iptal butonu/select menu için)
+    const filter = (i) => (i.customId === startModalId || i.customId === cancelId || i.customId === 'delete_days') && i.user.id === message.author.id;
     
-    // 10 saniye bekle
-    const collector = response.createMessageComponentCollector({ filter, time: 10000, max: 1, componentType: ComponentType.Button });
+    let deleteMessageDays = 0; // Başlangıçta 0 gün
+
+    const collector = response.createMessageComponentCollector({ filter, time: TIME_LIMIT, componentType: ComponentType.MessageComponent });
+    
+    // MODAL ID'leri dinamik olarak oluşturulmalı
+    const modalCustomId = `ban_modal_${target.id}_${Date.now()}`;
+
 
     collector.on('collect', async i => {
-        // Sadece komutu başlatan kişinin onaylamasını sağla
         if (i.user.id !== message.author.id) {
-            return i.reply({ content: 'Bu butonu sadece komutu başlatan yetkili kullanabilir.', ephemeral: true });
+            return i.reply({ content: 'Bu interaktif öğeyi sadece komutu başlatan yetkili kullanabilir.', ephemeral: true });
         }
 
-        if (i.customId === confirmId) {
-            // Ban İşlemi
-            await target.ban({ reason }).catch(err => {
-                console.error(err);
-                return i.update({ embeds: [new EmbedBuilder().setColor('Red').setTitle(`${EMOJI.X} HATA`).setDescription(`Ban işlemi başarısız oldu: \`${err.message}\``)], components: [] });
-            });
+        if (i.customId === 'delete_days') {
+            // Select Menu Etkileşimi: Gün sayısını güncelle
+            deleteMessageDays = parseInt(i.values[0]);
             
-            const tarih = moment().format('DD.MM.YYYY');
-            const saat = moment().format('HH:mm:ss');
+            // Embedin sadece footer kısmını güncelleyerek seçimin yapıldığını belirt
+            const updatedEmbed = new EmbedBuilder(preBanEmbed)
+                .setFooter({ text: `Mesaj Silme Günü: ${deleteMessageDays} gün seçildi.` });
+                
+            await i.update({ embeds: [updatedEmbed] });
+            return;
+        }
 
-            const banSuccessEmbed = new EmbedBuilder()
-                .setColor('Green')
-                .setTitle(`${EMOJI.TIK} | Ban Başarılı`)
-                .addFields(
-                    { name: 'Kullanıcı', value: `${target.user.tag} (${target.id})`, inline: false },
-                    { name: 'Yetkili', value: `${message.author.tag} (${message.author.id})`, inline: false },
-                    { name: 'Sebep', value: reason, inline: false },
-                    { name: 'Tarih / Saat', value: `${tarih} / ${saat}`, inline: true }
-                )
-                .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
-                .setFooter({ text: 'Grave BAN Sistemi' });
-
-            await i.update({ embeds: [banSuccessEmbed], components: [] });
-
-        } else if (i.customId === cancelId) {
+        if (i.customId === cancelId) {
             // İptal İşlemi
+            collector.stop('cancelled');
             const cancelEmbed = new EmbedBuilder()
                 .setColor('Yellow')
                 .setTitle('❌ İşlem İptal Edildi')
                 .setDescription(`\`${target.user.tag}\` kullanıcısını banlama işlemi yetkili tarafından iptal edildi.`);
             
             await i.update({ embeds: [cancelEmbed], components: [] });
+            return;
+        }
+        
+        if (i.customId === startModalId) {
+            // --- MODAL OLUŞTURMA ---
+            
+            // Sebep Metin Kutusu (ZORUNLU)
+            const reasonInput = new TextInputBuilder()
+                .setCustomId('ban_reason')
+                .setLabel("Yasaklama Sebebi (Zorunlu)")
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true)
+                .setMinLength(5)
+                .setPlaceholder('Örn: Küfürlü konuşma, reklam vb.');
+
+            // Kanıt Metin Kutusu (OPSİYONEL)
+            const proofInput = new TextInputBuilder()
+                .setCustomId('ban_proof')
+                .setLabel("Kanıt Linki (Opsiyonel)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setPlaceholder('Örn: https://kanitim.com/resim.png');
+
+            const modal = new ModalBuilder()
+                .setCustomId(modalCustomId) // Dinamik ID
+                .setTitle(`Yasaklama: ${target.user.tag}`)
+                .addComponents(
+                    new ActionRowBuilder().addComponents(reasonInput),
+                    new ActionRowBuilder().addComponents(proofInput)
+                );
+
+            // Modalı aç
+            await i.showModal(modal);
+            
+            // Modal açıldıktan sonra collector'ı durdurmuyoruz, Modal Submit'i bekleyeceğiz.
+            // Sadece bu butonu devre dışı bırakıp iptal butonunu bırakabiliriz.
+            const disabledStartRow = new ActionRowBuilder().addComponents(
+                startModalButton.setDisabled(true),
+                cancelButton
+            );
+            await response.edit({ components: [selectRow, disabledStartRow] }).catch(() => {});
+            
+            
+            // 6. MODAL SUBMIT İŞLEMCİSİ
+            
+            const modalFilter = (modalInteraction) => modalInteraction.customId === modalCustomId && modalInteraction.user.id === message.author.id;
+            
+            // 5 dakikalık modal süresi
+            i.awaitModalSubmit({ filter: modalFilter, time: 5 * 60000 }) 
+                .then(async modalInteraction => {
+                    
+                    collector.stop('modal_submitted'); // Ana kolektörü durdur
+
+                    const reason = modalInteraction.fields.getTextInputValue('ban_reason');
+                    const proof = modalInteraction.fields.getTextInputValue('ban_proof') || 'Yok';
+
+                    // --- DM BİLDİRİMİ GÖNDERME GİRİŞİMİ ---
+                    const dmEmbed = new EmbedBuilder()
+                        .setColor('Red')
+                        .setTitle(`Sunucudan Yasaklandın (${message.guild.name})`)
+                        .setDescription(`**${message.guild.name}** sunucusundan yasaklandın.`)
+                        .addFields(
+                            { name: 'Yasaklayan Yetkili', value: message.author.tag, inline: false },
+                            { name: 'Sebep', value: reason, inline: false },
+                            { name: 'Kanıt', value: proof, inline: false },
+                            { name: 'Silinen Mesaj', value: `${deleteMessageDays} gün`, inline: false }
+                        )
+                        .setTimestamp();
+                    
+                    await target.send({ embeds: [dmEmbed] }).catch(() => {});
+
+                    // --- Ban İşlemi ---
+                    await target.ban({ 
+                        reason: `${reason} | Kanıt: ${proof} | Yetkili: ${message.author.tag}`,
+                        deleteMessageSeconds: deleteMessageDays * 24 * 60 * 60
+                    }).catch(err => {
+                        console.error(err);
+                        return modalInteraction.reply({ embeds: [new EmbedBuilder().setColor('Red').setTitle(`${EMOJI.X} HATA`).setDescription(`Ban işlemi başarısız oldu: \`${err.message}\``)], ephemeral: true });
+                    });
+                    
+                    // --- Başarı Mesajı ---
+                    const tarih = moment().format('DD.MM.YYYY');
+                    const saat = moment().format('HH:mm:ss');
+
+                    const banSuccessEmbed = new EmbedBuilder()
+                        .setColor('Green')
+                        .setTitle(`${EMOJI.TIK} | Ban Başarılı`)
+                        .addFields(
+                            { name: 'Kullanıcı', value: `${target.user.tag} (${target.id})`, inline: false },
+                            { name: 'Yetkili', value: `${message.author.tag} (${message.author.id})`, inline: false },
+                            { name: 'Sebep', value: reason, inline: true },
+                            { name: 'Silinen Mesaj', value: `${deleteMessageDays} gün`, inline: true },
+                            { name: 'Kanıt Linki', value: proof, inline: false }
+                        )
+                        .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
+                        .setFooter({ text: `Grave BAN Sistemi | ${tarih} / ${saat}` });
+
+                    // Mesajı güncelle
+                    await modalInteraction.update({ embeds: [banSuccessEmbed], components: [] });
+
+                })
+                .catch(async (err) => {
+                    // Modal süresi doldu veya hata oluştu
+                    if (err.code === 'InteractionCollectorError') { 
+                        // Süre dolduysa, ana mesajı güncelleyelim.
+                        collector.stop('modal_timeout');
+                    } else {
+                         // Diğer hatalar
+                         console.error("Modal Submit Hata:", err);
+                         
+                    }
+                });
         }
     });
 
     collector.on('end', async (collected, reason) => {
-        // Süre dolduğunda butonu devre dışı bırak ve mesajı güncelle
-        if (reason === 'time' && collected.size === 0) {
-            const timeOutEmbed = new EmbedBuilder(preBanEmbed) // Eski embedi al
+        // Süre dolduğunda veya modal süresi dolduğunda butonu devre dışı bırak
+        if (reason === 'time' || reason === 'modal_timeout') {
+            const timeOutEmbed = new EmbedBuilder(preBanEmbed) 
                 .setColor('Grey')
                 .setTitle('⏳ İşlem Süresi Doldu')
-                .setDescription('Onay süresi dolduğu için banlama işlemi otomatik olarak iptal edildi.');
+                .setDescription('İşlem süresi dolduğu için banlama süreci otomatik olarak iptal edildi.');
 
             const disabledRow = new ActionRowBuilder().addComponents(
-                confirmButton.setDisabled(true),
-                cancelButton.setDisabled(true).setLabel('Süre Doldu')
+                startModalButton.setDisabled(true).setLabel('Süre Doldu'),
+                cancelButton.setDisabled(true)
+            );
+            const disabledSelectRow = new ActionRowBuilder().addComponents(
+                selectMenu.setDisabled(true)
             );
 
-            await response.edit({ embeds: [timeOutEmbed], components: [disabledRow] }).catch(err => console.error("Timeout Edit Hata:", err));
+            await response.edit({ embeds: [timeOutEmbed], components: [disabledSelectRow, disabledRow] }).catch(() => {});
         }
-        // Eğer zaten butona basılmışsa, mesajı tekrar düzenlemeye gerek yok.
+        // Eğer 'cancelled' veya 'modal_submitted' ise zaten güncellenmiştir.
     });
 };
 
@@ -153,6 +275,6 @@ module.exports.conf = {
 
 module.exports.help = {
     name: 'ban',
-    description: 'Üyeleri onay ile sunucudan yasaklar.',
-    usage: 'g!ban @Kullanıcı [Sebep]'
+    description: 'Üyeleri Modal ile sebep girerek sunucudan yasaklar.',
+    usage: 'g!ban @Kullanıcı'
 };
