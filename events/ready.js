@@ -8,7 +8,7 @@ client.on("ready", () => {
   console.log(`${client.user.tag} Aktif!`);
 
   let x = [
-    `g!yardım - Bakım Aktif - Grave v1.0.6`
+    `g!yardım | g!davet | v1.0.9 | Kesintisiz Hizmet!`
   ];
   let q = x[Math.floor(Math.random() * x.length)];
 
