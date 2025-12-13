@@ -28,12 +28,12 @@ function getComponents(currentDeleteDays, quickBanId, modalBanId, cancelId) {
     // Butonlar
     const quickBanButton = new ButtonBuilder()
         .setCustomId(quickBanId)
-        .setLabel('Banla (Varsayılan Sebep)')
+        .setLabel('Banla')
         .setStyle(ButtonStyle.Primary);
 
     const modalBanButton = new ButtonBuilder()
         .setCustomId(modalBanId)
-        .setLabel('Sebeple Banla (Modal)')
+        .setLabel('Sebep İle Banla')
         .setStyle(ButtonStyle.Danger);
 
     const cancelButton = new ButtonBuilder()
