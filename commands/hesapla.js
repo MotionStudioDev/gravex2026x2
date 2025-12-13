@@ -1,35 +1,37 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const { evaluate } = require('mathjs'); // Gelişmiş matematik işlemleri için mathjs kullanabilirsiniz (npm install mathjs)
-
-// Eğer mathjs kurmak istemiyorsanız, basit eval() kullanabilir veya kendi fonksiyonunuzu yazabilirsiniz.
-// NOT: eval() kullanmak güvenlik riskleri taşıyabilir, bu yüzden burada evaluate() kullanacağız.
+const { evaluate, sqrt, sin, cos, tan, pow } = require('mathjs'); 
 
 // Sabitler
-const TIME_LIMIT = 60000; // 60 saniye boyunca aktif kalır
-const MAX_DIGITS = 15; // Gösterilebilecek maksimum basamak sayısı
+const TIME_LIMIT = 90000; // 90 saniye (Daha uzun kullanım süresi)
+const MAX_DISPLAY_CHARS = 30; // Gösterilebilecek maksimum karakter sayısı
 
 /**
  * MathJS ile ifadeyi güvenli bir şekilde değerlendirir ve sonucu döndürür.
  * Hata durumunda hata mesajı döner.
  */
 function calculate(expression) {
-    // İfadeyi temizleme (çift operatörleri tek yapma, vs.)
+    // MathJS'in anlayacağı formata çevirme (x -> *, ÷ -> /)
     expression = expression.replace(/x/g, '*').replace(/÷/g, '/');
+    
+    // Pi ve Üs (^) sembollerini MathJS fonksiyonlarına çevirme
+    expression = expression.replace(/π/g, 'pi');
+    expression = expression.replace(/\^/g, '^'); 
 
     try {
         let result = evaluate(expression);
         
-        // Çok büyük/küçük sayıları veya ondalık hassasiyeti kontrol et
         if (typeof result === 'number') {
-             // Çok uzun ondalık sayıları kısaltma
-            if (result.toString().length > MAX_DIGITS) {
-                result = parseFloat(result.toFixed(8)); // 8 ondalık basamağa yuvarla
+            // Büyük/küçük sayıları veya ondalık hassasiyeti kontrol et
+            if (result.toString().length > MAX_DISPLAY_CHARS) {
+                // Bilimsel gösterim veya yuvarlama
+                result = parseFloat(result.toPrecision(10)); 
             }
         }
         
         return result.toString();
     } catch (error) {
-        return 'Hata';
+        // SyntaxError veya diğer hatalar için
+        return 'Sözdizimi Hatası!';
     }
 }
 
@@ -39,17 +41,19 @@ function calculate(expression) {
 module.exports.run = async (client, message, args) => {
     
     // Başlangıç Durumu
-    let display = '0';
-    let expression = ''; // Hesaplama için arka planda tutulan ifade
+    let currentInput = '0'; // Sadece son girilen sayıyı/fonksiyonu gösterir
+    let fullExpression = ''; // Hesaplama için arka planda tutulan tüm ifade
     let lastResult = null; // En son hesaplanan sonuç
     
-    // Hesap Makinesi Tuş Düzeni
+    // Hesap Makinesi Tuş Düzeni (5 satırdan 6 satıra çıktı)
+    // Yeni tuşlar: DEL, sin, cos, tan, √, ^, π
     const buttonsConfig = [
-        ['AC', '(', ')', '÷'],
-        ['7', '8', '9', 'x'],
+        ['AC', 'DEL', '(', ')', '÷'],
+        ['sin', 'cos', 'tan', '√', '^'], // Yeni Trigonometri/Kök/Üs
+        ['7', '8', '9', 'x', 'π'],      // Yeni Pi
         ['4', '5', '6', '-'],
         ['1', '2', '3', '+'],
-        ['0', '.', 'R', '='] // R: Last Result (Sonuç)
+        ['R', '0', '.', '=']             // R: Last Result (Sonuç)
     ];
 
     // Butonları oluştur
@@ -61,24 +65,32 @@ module.exports.run = async (client, message, args) => {
             
             // Özel stiller
             if (label === '=') style = ButtonStyle.Success;
-            else if (['AC', 'R'].includes(label)) style = ButtonStyle.Danger;
-            else if (['÷', 'x', '-', '+'].includes(label)) style = ButtonStyle.Primary;
+            else if (['AC', 'DEL'].includes(label)) style = ButtonStyle.Danger;
+            else if (['R', 'π', '√', '^', 'sin', 'cos', 'tan'].includes(label)) style = ButtonStyle.Primary; // Fonksiyonlar ve R
+            else if (['÷', 'x', '-', '+'].includes(label)) style = ButtonStyle.Primary; 
             
-            row.addComponents(
-                new ButtonBuilder()
-                    .setCustomId(customId)
-                    .setLabel(label)
-                    .setStyle(style)
-            );
+            // Eğer row 4'ten kısaysa (4. ve 5. sıra) buton eklemeden geç
+            if (rowConfig.length < 5 && row.components.length >= 4) { 
+                // Bu tuşları sadece 4. ve 5. satırlarda 4 butondan sonra eklememek için kontrol
+            } else {
+                 row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(customId)
+                        .setLabel(label)
+                        .setStyle(style)
+                );
+            }
         });
         return row;
-    });
+    }).filter(row => row.components.length > 0); // Boş satırları atla (Çoklu satır ekleme sorununu çözmek için)
 
+
+    // İlk Embed Oluşturma
     const embed = new EmbedBuilder()
         .setColor('Aqua')
-        .setTitle('🧮 Grave Hesap Makinesi')
-        .setDescription(`\`\`\`\n${display.substring(0, MAX_DIGITS)}\n\`\`\``)
-        .setFooter({ text: `Kullanan: ${message.author.tag} | Süre: ${TIME_LIMIT / 1000}s` });
+        .setTitle('🧠 Ultra Gelişmiş Hesap Makinesi')
+        .setDescription(`\`\`\`fix\n${currentInput}\n\`\`\``) // FIX rengi ile daha dikkat çekici
+        .setFooter({ text: `Kullanan: ${message.author.tag} | İfade: ${fullExpression.substring(0, MAX_DISPLAY_CHARS)} | Süre: ${TIME_LIMIT / 1000}s` });
 
     const response = await message.channel.send({ embeds: [embed], components: rows });
 
@@ -94,77 +106,108 @@ module.exports.run = async (client, message, args) => {
     collector.on('collect', async i => {
         const value = i.customId.split('_')[1];
         
-        // Kullanıcının butona basma tepkisine hızlı yanıt verme
         await i.deferUpdate();
 
         // --- İŞLEM MANTIKLARI ---
-        
+
+        // Helper: Son karakterin operatör olup olmadığını kontrol et
+        const isOperator = (char) => ['÷', 'x', '-', '+', '(', 'sin', 'cos', 'tan', '√', '^'].some(op => fullExpression.endsWith(op));
+
         if (value === 'AC') {
             // Tamamen temizle
-            display = '0';
-            expression = '';
+            currentInput = '0';
+            fullExpression = '';
             lastResult = null;
         } 
+        else if (value === 'DEL') {
+            // Geri al/Sil
+            if (fullExpression.length > 0) {
+                fullExpression = fullExpression.substring(0, fullExpression.length - 1);
+                currentInput = fullExpression || '0';
+            } else {
+                currentInput = '0';
+            }
+        }
         else if (value === '=') {
             // Hesapla
-            if (expression === '') {
-                 // Eğer sadece '0' varsa, boş hesaplama yapma
-                 display = '0';
+            if (fullExpression === '') {
+                 currentInput = '0';
             } else {
-                const result = calculate(expression);
-                display = result;
-                expression = result === 'Hata' ? '' : result; // Hata varsa ifadeyi de temizle
+                const result = calculate(fullExpression);
+                currentInput = result; // Ekranda sonucu göster
+                fullExpression = (result === 'Sözdizimi Hatası!') ? '' : result; // Hata varsa sıfırla, yoksa sonuçla başla
                 lastResult = result;
             }
         }
         else if (value === 'R') {
             // Sonucu (Last Result) ifadeye ekle
-            if (lastResult && lastResult !== 'Hata') {
-                 // Eğer display '0' ise değiştir, aksi takdirde ekle
-                if (display === '0' || ['Hata'].includes(display)) {
-                    display = lastResult;
-                    expression = lastResult;
-                } else {
-                    display += lastResult;
-                    expression += lastResult;
-                }
+            if (lastResult && lastResult !== 'Sözdizimi Hatası!') {
+                fullExpression += `(${lastResult})`; // Sonucu parantez içinde ekleyerek işlem önceliğini koru
+                currentInput = fullExpression;
             } else {
-                // R butonu için geçici bir mesaj göster
-                display = 'Önce Hesapla!';
+                currentInput = 'Sonuç Yok!';
             }
         }
         else {
-            // Sayı, ondalık nokta veya operatör ekle
-            if (display === '0' || ['Hata', 'Önce Hesapla!'].includes(display)) {
-                // Eğer ekran sıfırsa veya hata varsa, yeni girişle değiştir
-                display = value;
-                expression = value;
+            // Sayı, ondalık nokta veya operatör/fonksiyon ekle
+            
+            let appendValue = value;
+
+            // Fonksiyonları MathJS formatına çevirme
+            if (value === '√') appendValue = 'sqrt(';
+            else if (value === '^') appendValue = '^';
+            else if (['sin', 'cos', 'tan'].includes(value)) appendValue = `${value}(`;
+            else if (value === 'π') appendValue = 'pi'; 
+
+            // Eğer ekran sıfırsa veya hata varsa, yeni girişle değiştir
+            if (currentInput === '0' || ['Sözdizimi Hatası!', 'Sonuç Yok!'].includes(currentInput) || fullExpression === lastResult) {
+                
+                // Eğer yeni giriş bir operatör değilse, ekranı sıfırla
+                if (!['÷', 'x', '-', '+', ')', '.'].includes(value)) {
+                    fullExpression = appendValue;
+                } else {
+                    fullExpression += appendValue; // Operatörü eklemeye izin ver (örn: '5' çıkan sonuca '+3' eklemek gibi)
+                }
+                currentInput = fullExpression;
+
             } else {
                 // Normal ekleme
-                display += value;
-                expression += value;
+                fullExpression += appendValue;
+                currentInput = fullExpression;
             }
         }
         
-        // Maksimum basamak kontrolü (Sadece display için)
-        if (display.length > MAX_DIGITS && display !== 'Hata' && display !== 'Önce Hesapla!') {
-            display = display.substring(0, MAX_DIGITS);
+        // --- Ekran Güncellemesi ---
+
+        // Gösterim alanını temiz ve kısa tut
+        let displayForEmbed = fullExpression;
+        if (displayForEmbed.length > MAX_DISPLAY_CHARS) {
+            displayForEmbed = '...' + displayForEmbed.substring(displayForEmbed.length - MAX_DISPLAY_CHARS);
         }
         
+        // Hata durumunda sadece hatayı göster
+        if (currentInput === 'Sözdizimi Hatası!' || currentInput === 'Sonuç Yok!') {
+             displayForEmbed = currentInput;
+             fullExpression = ''; // İfadeyi temizle
+        }
+
         // Yeni Embed oluştur ve güncelle
         const updatedEmbed = new EmbedBuilder(embed)
-            .setDescription(`\`\`\`\n${display}\n\`\`\``);
+            .setDescription(`\`\`\`fix\n${currentInput}\n\`\`\``) // Son sonucu/girişi göster
+            .setFooter({ text: `Kullanan: ${message.author.tag} | İfade: ${fullExpression.substring(0, MAX_DISPLAY_CHARS)} | Süre: ${TIME_LIMIT / 1000}s` });
 
         await response.edit({ embeds: [updatedEmbed], components: rows });
     });
 
+    // ... (collector.on('end') kısmı önceki kodla aynı kalabilir) ...
+
     collector.on('end', async (collected, reason) => {
-        // Süre dolduğunda veya sonlandırıldığında butonları devre dışı bırak
         if (reason === 'time') {
+            const finalDisplay = currentInput === 'Sözdizimi Hatası!' ? 'Hata' : currentInput;
             const timeOutEmbed = new EmbedBuilder(embed)
                 .setColor('Grey')
                 .setTitle('⏳ Hesap Makinesi Kapandı')
-                .setDescription(`Süre dolduğu için hesap makinesi kapatıldı. Sonuç: \`${display}\``);
+                .setDescription(`Süre dolduğu için hesap makinesi kapatıldı. Sonuç: \`${finalDisplay}\``);
 
             // Tüm butonları devre dışı bırak
             const disabledRows = rows.map(row => 
@@ -179,12 +222,12 @@ module.exports.run = async (client, message, args) => {
 };
 
 module.exports.conf = {
-    aliases: ['hesapla', 'calc', 'calculator'],
+    aliases: ['hesapla', 'calc', 'calculator', 'hsm'],
     permLevel: 0
 };
 
 module.exports.help = {
     name: 'hesapmakinesi',
-    description: 'Discord üzerinde interaktif bir hesap makinesi başlatır.',
+    description: 'Discord üzerinde interaktif ve gelişmiş bir bilimsel hesap makinesi başlatır.',
     usage: 'g!hesapmakinesi'
 };
