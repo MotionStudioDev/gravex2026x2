@@ -1,8 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
-// ⬇️ SON GÖRÜLME MODELİNİ İÇERİ AL
-const LastSeen = require('../models/sonGorulme'); // Dosya yolunun doğru olduğundan emin olun!
-// ⬆️ SON GÖRÜLME MODELİNİ İÇERİ AL
 
 module.exports = async (member) => {
   const client = member.client;
@@ -12,20 +9,6 @@ module.exports = async (member) => {
   // Sunucu ayarlarını DB’den çek
   const settings = await GuildSettings.findOne({ guildId });
   if (!settings) return;
-
-  // 👑 SON GÖRÜLME (LAST SEEN) KAYDI ENTEGRASYONU
-  try {
-      await LastSeen.findOneAndUpdate(
-          { guildID: guildId, userID: user.id },
-          { $set: { lastJoin: Date.now() } }, // Son giriş zamanını kaydet
-          { upsert: true, new: true } // Veri yoksa oluştur, varsa güncelle
-      );
-      // console.log(`${user.tag} sunucuya giriş yaptı, lastJoin güncellendi.`);
-  } catch (error) {
-      console.error("Giriş verisi güncellenirken hata oluştu:", error);
-  }
-  // 👑 SON GÖRÜLME (LAST SEEN) KAYDI BİTİŞ
-
   // ✅ KAYIT SİSTEMİ (dokunmadım)
   if (settings.kayıtAktif && settings.kayıtKanal) {
     const kanal = member.guild.channels.cache.get(settings.kayıtKanal);
