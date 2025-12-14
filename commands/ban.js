@@ -28,7 +28,7 @@ function getComponents(currentDeleteDays, quickBanId, modalBanId, cancelId) {
     // Butonlar
     const quickBanButton = new ButtonBuilder()
         .setCustomId(quickBanId)
-        .setLabel('Banla')
+        .setLabel('<:ban23:1449794687153209424>')
         .setStyle(ButtonStyle.Primary);
 
     const modalBanButton = new ButtonBuilder()
