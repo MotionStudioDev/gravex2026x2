@@ -1,26 +1,60 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, Presence } = require("discord.js");
+const moment = require("moment");
+moment.locale('tr');
+
+// --- Haritalar ve Çeviriler ---
+const PERMISSION_MAP = {
+    Administrator: "Yönetici",
+    ManageGuild: "Sunucu Yönet",
+    KickMembers: "Üye At",
+    BanMembers: "Üye Yasakla",
+    ManageChannels: "Kanalları Yönet",
+    ManageRoles: "Rolleri Yönet",
+    ManageMessages: "Mesajları Yönet",
+    ViewAuditLog: "Denetim Kaydını Gör",
+    // Ek izinler
+    MentionEveryone: "@everyone ve @here At",
+    SendMessages: "Mesaj Gönder",
+    AttachFiles: "Dosya Ekle",
+    Stream: "Yayın Yap",
+    ViewChannel: "Kanalları Gör"
+};
+
+const STATUS_MAP = {
+    online: "🟢 Çevrim içi",
+    idle: "🌙 Boşta",
+    dnd: "⛔ Rahatsız Etmeyin",
+    offline: "⚫ Çevrim dışı"
+};
+
+const ACTIVITY_TYPE_MAP = {
+    0: "Oynuyor",
+    1: "Yayın Yapıyor",
+    2: "Dinliyor",
+    3: "İzliyor",
+    4: "Özel Durum",
+    5: "Yarışıyor"
+};
 
 // --------------------------------------------------------------------------------------
 // Fonksiyon: Rozetleri (User Flags) Emojilere Çevirir
-// (RangeError [BitFieldInvalid]: Invalid bitfield flag or number: DISCORD_EMPLOYEE hatası çözüldü)
 // --------------------------------------------------------------------------------------
 function getUserBadges(userFlags) {
     if (!userFlags || userFlags.length === 0) return 'Yok';
 
     const flagMap = {
-        Staff: '⭐', // Discord Ekip Üyesi (DISCORD_EMPLOYEE yerine Staff kullanılır)
+        Staff: '⭐', // Discord Ekip Üyesi
         Partner: '💎', // Discord Partnerı
         Hypesquad: 'HypeSquad', // HypeSquad Temsilcisi
         BugHunterLevel1: '🐛', // Hata Avcısı Seviye 1
         BugHunterLevel2: '🐞', // Hata Avcısı Seviye 2
-        PremiumEarlySupporter: '🎁', // Erken Destekçi (2018 Nitro)
+        PremiumEarlySupporter: '🎁', // Erken Destekçi
         TeamPseudoUser: 'Takım Üyesi',
         System: 'Sistem',
         VerifiedBot: '✅', // Doğrulanmış Bot
         VerifiedDeveloper: '🛠️', // Erken Onaylanmış Bot Geliştiricisi
         DiscordCertifiedModerator: '🛡️', // Discord Onaylı Moderatör
         ActiveDeveloper: '💡', // Aktif Geliştirici
-        // Hypesquad evleri
         HypeSquadOnlineHouse1: '🏠 **Bravery**',
         HypeSquadOnlineHouse2: '🏠 **Brilliance**',
         HypeSquadOnlineHouse3: '🏠 **Balance**'
@@ -33,7 +67,7 @@ function getUserBadges(userFlags) {
 // Fonksiyon: Cihaz Durumunu Kontrol Eder
 // --------------------------------------------------------------------------------------
 function getDeviceStatus(presence) {
-    if (!presence || presence.status === 'offline') return '⚫ Çevrim dışı';
+    if (!presence || presence.status === 'offline') return '⚫ Yok';
     
     const devices = [];
     const clientStatus = presence.clientStatus;
@@ -45,12 +79,35 @@ function getDeviceStatus(presence) {
     return devices.length > 0 ? devices.join(' | ') : 'Bilinmiyor';
 }
 
+// --------------------------------------------------------------------------------------
+// Fonksiyon: Kullanıcının Aktivitesini Alır
+// --------------------------------------------------------------------------------------
+function getActivityInfo(presence) {
+    if (!presence || !presence.activities || presence.activities.length === 0) return 'Yok';
+
+    const mainActivity = presence.activities.find(a => a.type !== 4); // Özel Durum olmayan ana aktiviteyi bul
+    if (!mainActivity) return 'Yok';
+
+    let info = `**${ACTIVITY_TYPE_MAP[mainActivity.type]}**`;
+
+    if (mainActivity.name) {
+        info += `: ${mainActivity.name}`;
+    }
+    
+    // Yayın detayını ekle
+    if (mainActivity.type === 1 && mainActivity.url) {
+        info += ` [*(Yayın izle)*](${mainActivity.url})`;
+    }
+
+    return info;
+}
+
 
 // --------------------------------------------------------------------------------------
 // KOMUT İŞLEYİCİ
 // --------------------------------------------------------------------------------------
 module.exports.run = async (client, message, args) => {
-    // Üye bilgisini alma
+    
     const member =
         message.mentions.members.first() ||
         message.guild.members.cache.get(args[0]) ||
@@ -70,8 +127,10 @@ module.exports.run = async (client, message, args) => {
     // Gerekli verileri çekme
     const user = member.user;
     const avatar = user.displayAvatarURL({ dynamic: true, size: 1024 });
-    const fetchedUser = await user.fetch(); // Banner ve Flags için API'dan çek
+    const fetchedUser = await user.fetch(); 
     const bannerURL = fetchedUser.bannerURL({ dynamic: true, size: 1024 });
+    const memberColor = member.displayHexColor === '#000000' ? '#5865F2' : member.displayHexColor; // Varsayılan rengi Blurple yap
+
     
     // Rolleri sıralama ve listeleme
     const roles = member.roles.cache
@@ -81,26 +140,18 @@ module.exports.run = async (client, message, args) => {
         .join(", ") || "Yok";
     const rolesValue = roles.length > 1024 ? roles.substring(0, 1000) + '...' : roles;
 
-    // --- YENİ EKLENEN VERİLER ---
+    // --- YENİ GELİŞMİŞ VERİLER ---
     
     // Kullanıcı Rozetleri (Flags)
     const userFlags = getUserBadges(fetchedUser.flags.toArray());
 
-    // Cihaz Durumu
+    // Durum ve Cihaz Bilgisi
+    const presenceStatus = member.presence?.status || "offline";
+    const durum = STATUS_MAP[presenceStatus];
     const deviceStatus = getDeviceStatus(member.presence);
-    
-    // Sunucudaki temel yetkiler
-    const memberPermissions = member.permissions.toArray();
-    const importantPermissions = [
-        'Administrator', 'ManageGuild', 'KickMembers', 'BanMembers', 'ManageChannels', 'ManageRoles'
-    ];
-    // Kullanıcının sahip olduğu temel izinleri filtrele
-    const majorPermissions = memberPermissions
-        .filter(perm => importantPermissions.includes(perm))
-        .map(perm => perm.replace(/([A-Z])/g, ' $1').trim()) // İzinleri daha okunur yap
-        .join(', ') || 'Yok';
+    const activityInfo = getActivityInfo(member.presence);
 
-    // Bot ile Yetki Karşılaştırması
+    // Yetki Karşılaştırması ve İzinler
     const clientMember = message.guild.members.cache.get(client.user.id);
     let hierarchyStatus = '';
     if (member.id === message.guild.ownerId) {
@@ -110,50 +161,58 @@ module.exports.run = async (client, message, args) => {
     } else {
         hierarchyStatus = 'Benden daha düşük role sahip ✅';
     }
+    
+    // Önemli Yetkiler (Türkçeleştirilmiş)
+    const memberPermissions = member.permissions.toArray();
+    const importantPermissionsKeys = [
+        'Administrator', 'ManageGuild', 'BanMembers', 'KickMembers', 'ManageRoles', 'ManageChannels'
+    ];
 
+    const majorPermissions = memberPermissions
+        .filter(perm => importantPermissionsKeys.includes(perm))
+        .map(perm => PERMISSION_MAP[perm] || perm) 
+        .join(', ') || 'Yok';
 
-    // --- TEMEL VERİLER ---
+    // --- TEMEL ZAMAN & NICKNAME VERİLERİ ---
     const nickname = member.nickname || "Yok";
-    const joined = `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`;
-    const created = `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`;
+    const joined = `<t:${Math.floor(member.joinedTimestamp / 1000)}:f> (<t:${Math.floor(member.joinedTimestamp / 1000)}:R>)`;
+    const created = `<t:${Math.floor(user.createdTimestamp / 1000)}:f> (<t:${Math.floor(user.createdTimestamp / 1000)}:R>)`;
     const boosting = member.premiumSince
         ? `<t:${Math.floor(member.premiumSince.getTime() / 1000)}:R>`
         : "Boost yok";
     
-    const statusMap = {
-        online: "🟢 Çevrim içi",
-        idle: "🌙 Boşta",
-        dnd: "⛔ Rahatsız Etmeyin",
-        offline: "⚫ Çevrim dışı"
-    };
-    const presenceStatus = member.presence?.status || "offline";
-    const durum = statusMap[presenceStatus];
-    
+    // --- BOT KONTROLÜ ---
+    const botDetail = user.bot ? 'Evet (Doğrulanmış Bot: ' + (user.flags.has(PermissionsBitField.Flags.VerifiedBot) ? '✅' : '❌') + ')' : 'Hayır';
 
+    
+    // --- EMBED OLUŞTURMA ---
     const embed = new EmbedBuilder()
-        .setColor(member.displayHexColor === '#000000' ? 'Blurple' : member.displayHexColor) // Renk olarak kullanıcının en yüksek rol rengini kullan
+        .setColor(memberColor) 
         .setTitle(`👤 ${user.username} Profili`)
         .setThumbnail(avatar)
         .addFields(
-            // Sütun 1: Kimlik & Genel Bilgi
+            // Sütun 1: Kimlik & Durum
             { name: "🆔 Kullanıcı ID", value: `\`${user.id}\``, inline: true },
-            { name: "🎭 Kullanıcı Adı", value: user.tag, inline: true },
             { name: "🏷️ Sunucu Takma Adı", value: nickname, inline: true },
+            { name: "🤖 Bot Mu?", value: botDetail, inline: true },
             
-            // Sütun 2: Zaman & Durum
-            { name: "📅 Hesap Oluşturulma", value: created, inline: true },
-            { name: "📅 Sunucuya Katılım", value: joined, inline: true },
+            // Sütun 2: Bağlantı ve Zaman
+            { name: "📅 Hesap Oluşturulma", value: created, inline: false },
+            { name: "📅 Sunucuya Katılım", value: joined, inline: false },
             { name: "🚀 Boost Başlangıcı", value: boosting, inline: true },
-
-            // Sütun 3: Teknik Bilgiler
-            { name: "💻 Durum (Genel)", value: durum, inline: true },
-            { name: "📱 Cihaz Durumu", value: deviceStatus, inline: true },
-            { name: "🏅 Rozetler (Flags)", value: userFlags, inline: true },
             
-            // Satır 4: Yetki ve Roller
+            // Sütun 3: Durum ve Aktiflik
+            { name: "💻 Genel Durum", value: durum, inline: true },
+            { name: "📱 Aktif Cihazlar", value: deviceStatus, inline: true },
+            { name: "🎮 Aktivite", value: activityInfo, inline: false },
+            
+            // Sütun 4: Yetki ve Rozetler
+            { name: "🏅 Rozetler (Flags)", value: userFlags, inline: false },
             { name: "👑 Hiyerarşi Durumu", value: hierarchyStatus, inline: false },
-            { name: "🛡️ Temel Yetkiler", value: majorPermissions || 'Sadece standart yetkiler', inline: false },
-            { name: "📌 Roller", value: rolesValue, inline: false },
+            { name: "🛡️ Yönetici Yetkileri", value: majorPermissions || 'Sadece standart yetkiler', inline: false },
+            
+            // Satır 5: Roller
+            { name: `📌 Roller (${member.roles.cache.size - 1})`, value: rolesValue, inline: false },
         )
         .setFooter({ text: `Bilgileri gösteren: ${message.author.tag}` })
         .setTimestamp();
@@ -174,6 +233,7 @@ module.exports.run = async (client, message, args) => {
             .setStyle(ButtonStyle.Link)
             .setURL(bannerURL);
         buttons.push(bannerButton);
+        embed.setImage(bannerURL); // Embed'in altına bannerı büyükçe yerleştir
     }
 
     const row = new ActionRowBuilder().addComponents(buttons);
@@ -189,6 +249,6 @@ module.exports.conf = {
 
 module.exports.help = {
     name: "profil",
-    description: "Belirtilen kullanıcının profil bilgilerini detaylı şekilde gösterir.",
+    description: "Belirtilen kullanıcının profil bilgilerini en detaylı şekilde gösterir.",
     usage: 'g!profil [@Kullanıcı]'
 };
