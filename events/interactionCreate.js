@@ -15,17 +15,116 @@ const TicketSettings = require('../models/TicketSettings');
 const BotModel = require('../models/Bot');
 const BotlistSettings = require('../models/BotlistSettings');
 
+// Otomatik kapanma süresi: 15 dakika
+const AUTO_CLOSE_TIMEOUT = 15 * 60 * 1000;
+
 module.exports = async (client, interaction) => {
-    // 🛡️ GÜVENLİK KONTROLÜ
     if (interaction.replied || interaction.deferred) return;
-    // Sadece Buton ve Modal işlemlerini dinle
     if (!interaction.isButton() && interaction.type !== InteractionType.ModalSubmit) return;
+
+    // =========================================================
+    // YETKİLİ ROL KONTROL FONKSİYONU
+    // =========================================================
+    const getStaffRoleCheck = async () => {
+        const settings = await TicketSettings.findOne({ guildId: interaction.guildId });
+        if (!settings?.staffRoleId) return { allowed: false, message: '❌ Sistem ayarları eksik: Yetkili rol tanımlanmamış.', settings: null };
+        const hasRole = interaction.member.roles.cache.has(settings.staffRoleId);
+        return { allowed: hasRole, settings };
+    };
+
+    // =========================================================
+    // TICKET KAPATMA FONKSİYONU (LOG + TRANSCRIPT + SİLME)
+    // =========================================================
+    const closeTicket = async (channel, reason = 'Manuel kapatılma', closer = null) => {
+        const ticketData = await TicketModel.findOne({ channelId: channel.id });
+        if (!ticketData) return;
+
+        await TicketModel.updateOne({ channelId: channel.id }, { status: 'closed' });
+
+        // Timer'ı temizle
+        if (client.ticketTimeouts && client.ticketTimeouts[channel.id]) {
+            clearTimeout(client.ticketTimeouts[channel.id]);
+            delete client.ticketTimeouts[channel.id];
+        }
+
+        const settings = await TicketSettings.findOne({ guildId: channel.guild.id });
+        const logChannel = settings?.logChannelId ? channel.guild.channels.cache.get(settings.logChannelId) : null;
+
+        // Son 20 mesajı transcript olarak al
+        const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+        let transcript = 'Mesaj bulunamadı.';
+        if (messages) {
+            const relevant = messages
+                .filter(m => !m.author.bot || m.author.id === client.user.id)
+                .reverse()
+                .first(20);
+            transcript = relevant.map(m =>
+                `[${new Date(m.createdTimestamp).toLocaleString('tr-TR')}] ${m.author.tag}: ${m.content || '(Medya/Dosya)'}${m.attachments.size > 0 ? ' [Dosya]' : ''}`
+            ).join('\n');
+            if (transcript.length > 1000) transcript = transcript.substring(0, 1000) + '\n... (devamı kesildi)';
+        }
+
+        const closeEmbed = new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('🔒 Ticket Kapatıldı')
+            .addFields(
+                { name: 'Kullanıcı', value: `<@${ticketData.userId}> (${ticketData.userId})`, inline: true },
+                { name: 'Konu', value: ticketData.topic || 'Belirtilmemiş', inline: true },
+                { name: 'Kapatılma Nedeni', value: reason, inline: false },
+                { name: 'Tarih', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+            )
+            .setFooter({ text: 'Grave Ticket Sistemi' })
+            .setTimestamp();
+
+        if (closer) closeEmbed.addFields({ name: 'Kapatmayı Gerçekleştiren', value: `${closer}`, inline: true });
+
+        if (logChannel) {
+            await logChannel.send({
+                embeds: [closeEmbed],
+                content: transcript ? '**Son Mesajlar:**\n```' + transcript + '```' : null
+            }).catch(() => console.log('Log gönderilemedi.'));
+        }
+
+        await channel.send('🔒 Bu ticket 5 saniye içinde silinecek...').catch(() => {});
+
+        setTimeout(async () => {
+            try {
+                const parentId = channel.parentId;
+                let voiceChannelToDelete = null;
+
+                if (ticketData.userId) {
+                    const ticketOwner = await client.users.fetch(ticketData.userId).catch(() => null);
+                    const usernameLower = ticketOwner?.username.toLowerCase();
+                    if (usernameLower) {
+                        voiceChannelToDelete = channel.guild.channels.cache.find(c =>
+                            c.type === ChannelType.GuildVoice &&
+                            c.parentId === parentId &&
+                            c.name === `🔊-${usernameLower}`
+                        );
+                    }
+                }
+
+                if (!voiceChannelToDelete) {
+                    const fallbackName = channel.name.replace(/^talep-/, '🔊-').toLowerCase();
+                    voiceChannelToDelete = channel.guild.channels.cache.find(c =>
+                        c.type === ChannelType.GuildVoice &&
+                        c.parentId === parentId &&
+                        c.name.toLowerCase() === fallbackName
+                    );
+                }
+
+                if (voiceChannelToDelete) await voiceChannelToDelete.delete().catch(() => {});
+                await channel.delete().catch(() => {});
+            } catch (err) {
+                console.log("Kapatma sırasında hata:", err);
+            }
+        }, 5000);
+    };
 
     // =========================================================
     // 1. TICKET SİSTEMİ: BUTON İŞLEMLERİ
     // =========================================================
 
-    // Ticket Açma Modalı
     if (interaction.isButton() && interaction.customId === 'open_ticket_modal') {
         const modal = new ModalBuilder()
             .setCustomId('submit_ticket_modal')
@@ -57,13 +156,15 @@ module.exports = async (client, interaction) => {
         return;
     }
 
-    // Ticket Üstlenme (Claim)
+    // Üstlen - Sadece Yetkili
     if (interaction.isButton() && interaction.customId === 'claim_ticket') {
-        const ticketData = await TicketModel.findOne({ channelId: interaction.channelId });
-       
-        if (!ticketData) {
-            return interaction.reply({ content: '❌ Bu bilet veritabanında bulunamadı.', ephemeral: true });
+        const check = await getStaffRoleCheck();
+        if (!check.allowed) {
+            return interaction.reply({ content: '❌ Bu butonu sadece **destek ekibi** kullanabilir!', ephemeral: true });
         }
+
+        const ticketData = await TicketModel.findOne({ channelId: interaction.channelId });
+        if (!ticketData) return interaction.reply({ content: '❌ Bu bilet veritabanında bulunamadı.', ephemeral: true });
 
         const currentEmbed = interaction.message.embeds[0];
         const newEmbed = EmbedBuilder.from(currentEmbed)
@@ -72,18 +173,16 @@ module.exports = async (client, interaction) => {
 
         const oldRow = interaction.message.components[0];
         const newRow = ActionRowBuilder.from(oldRow);
-       
-        // Üstlen butonunu devre dışı bırak
         newRow.components[0].setDisabled(true).setLabel('Üstlenildi').setStyle(ButtonStyle.Secondary);
 
         await interaction.update({ embeds: [newEmbed], components: [newRow] });
-        return interaction.followUp({ content: `🔔 **${interaction.user.tag}** adlı yetkili bu talebi devraldı.` });
+        await interaction.followUp({ content: `🔔 **${interaction.user.tag}** adlı yetkili bu talebi devraldı.` });
+        return;
     }
 
-    // Sesli Destek Kanalı Oluşturma
+    // Sesli Kanal Oluştur
     if (interaction.isButton() && interaction.customId === 'voice_support') {
         await interaction.deferReply({ ephemeral: true });
-       
         try {
             const voiceChannel = await interaction.guild.channels.create({
                 name: `🔊-${interaction.user.username}`,
@@ -91,7 +190,6 @@ module.exports = async (client, interaction) => {
                 parent: interaction.channel.parentId,
                 permissionOverwrites: interaction.channel.permissionOverwrites.cache.map(p => p)
             });
-
             return interaction.editReply({ content: `✅ Sesli kanal başarıyla oluşturuldu: ${voiceChannel}` });
         } catch (e) {
             console.error(e);
@@ -99,64 +197,20 @@ module.exports = async (client, interaction) => {
         }
     }
 
-    // Ticket Kapatma (Sesli Kanal Dahil Her Şeyi Silen Kısım) - DÜZELTİLDİ
+    // Kapat - Sadece Yetkili
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
-        await interaction.reply('🔒 Talep sonlandırılıyor, bağlı tüm kanallar 5 saniye içinde silinecek...');
+        const check = await getStaffRoleCheck();
+        if (!check.allowed) {
+            return interaction.reply({ content: '❌ Bu butonu sadece **destek ekibi** kullanabilir!', ephemeral: true });
+        }
 
-        const currentChannel = interaction.channel;
-        const parentId = currentChannel.parentId;
-
-        // Ticket verisini çek (userId burada önemli)
-        const ticketData = await TicketModel.findOne({ channelId: currentChannel.id });
-
-        await TicketModel.updateOne({ channelId: currentChannel.id }, { status: 'closed' });
-
-        setTimeout(async () => {
-            try {
-                let voiceChannelToDelete = null;
-
-                if (ticketData && ticketData.userId) {
-                    // Ticket sahibinin güncel username'ini al
-                    const ticketOwner = await client.users.fetch(ticketData.userId).catch(() => null);
-                    const usernameLower = ticketOwner ? ticketOwner.username.toLowerCase() : null;
-
-                    if (usernameLower) {
-                        voiceChannelToDelete = interaction.guild.channels.cache.find(c =>
-                            c.type === ChannelType.GuildVoice &&
-                            c.parentId === parentId &&
-                            c.name === `🔊-${usernameLower}` // Discord kanal isimlerini lowercase + tire ile saklar
-                        );
-                    }
-                }
-
-                // Eğer hala bulamadıysa fallback: kanal adından tahmin et
-                if (!voiceChannelToDelete) {
-                    const fallbackName = currentChannel.name.replace(/^talep-/, '🔊-').toLowerCase();
-                    voiceChannelToDelete = interaction.guild.channels.cache.find(c =>
-                        c.type === ChannelType.GuildVoice &&
-                        c.parentId === parentId &&
-                        c.name.toLowerCase() === fallbackName
-                    );
-                }
-
-                if (voiceChannelToDelete) {
-                    await voiceChannelToDelete.delete().catch(err => console.log('Sesli kanal silinirken hata:', err));
-                    console.log(`Sesli kanal silindi: ${voiceChannelToDelete.name} (${voiceChannelToDelete.id})`);
-                } else {
-                    console.log('Sesli kanal bulunamadı veya zaten yok.');
-                }
-
-                await currentChannel.delete().catch(err => console.log('Text kanal silinirken hata:', err));
-            } catch (err) {
-                console.log("Kanal Silme Hatası:", err);
-            }
-        }, 5000);
-
+        await interaction.reply('🔒 Talep sonlandırılıyor...');
+        await closeTicket(interaction.channel, 'Yetkili tarafından manuel kapatıldı', interaction.user);
         return;
     }
 
     // =========================================================
-    // 2. TICKET SİSTEMİ: FORM GÖNDERİMİ (MODAL SUBMIT)
+    // 2. TICKET MODAL SUBMIT
     // =========================================================
 
     if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'submit_ticket_modal') {
@@ -166,7 +220,7 @@ module.exports = async (client, interaction) => {
 
         try {
             const settings = await TicketSettings.findOne({ guildId: interaction.guildId });
-           
+
             const ticketChannel = await interaction.guild.channels.create({
                 name: `talep-${interaction.user.username}`,
                 type: ChannelType.GuildText,
@@ -184,7 +238,8 @@ module.exports = async (client, interaction) => {
                 userId: interaction.user.id,
                 topic: topic,
                 description: desc,
-                status: 'open'
+                status: 'open',
+                lastActivity: Date.now()
             });
 
             const ticketEmbed = new EmbedBuilder()
@@ -206,7 +261,17 @@ module.exports = async (client, interaction) => {
 
             const staffMention = settings?.staffRoleId ? `<@&${settings.staffRoleId}>` : '@everyone';
             await ticketChannel.send({ content: `${interaction.user} | ${staffMention}`, embeds: [ticketEmbed], components: [actionRow] });
-           
+
+            // Otomatik kapanma timer'ı
+            if (!client.ticketTimeouts) client.ticketTimeouts = {};
+            client.ticketTimeouts[ticketChannel.id] = setTimeout(async () => {
+                const stillOpen = await TicketModel.findOne({ channelId: ticketChannel.id, status: 'open' });
+                if (stillOpen && ticketChannel.deletable) {
+                    await ticketChannel.send('⏰ Uzun süredir yanıt gelmediği için bu ticket otomatik olarak kapatılıyor...');
+                    await closeTicket(ticketChannel, 'Otomatik kapanma: 15 dakika yanıt gelmedi');
+                }
+            }, AUTO_CLOSE_TIMEOUT);
+
             return interaction.editReply({ content: `✅ Talebiniz başarıyla açıldı: ${ticketChannel}` });
         } catch (error) {
             console.error(error);
@@ -215,13 +280,12 @@ module.exports = async (client, interaction) => {
     }
 
     // =========================================================
-    // 3. BOTLİST SİSTEMİ: BAŞVURU MODALI VE FORM GÖNDERİMİ
+    // 3. BOTLİST SİSTEMİ: BAŞVURU MODALI VE SUBMIT
     // =========================================================
-   
-    // Bot Başvuru Modalı Açılışı
+
     if (interaction.isButton() && interaction.customId === 'open_bot_submit_modal') {
         const botModal = new ModalBuilder().setCustomId('submit_bot_modal').setTitle('🤖 Bot Başvuru Formu');
-       
+
         const bId = new TextInputBuilder().setCustomId('bot_id').setLabel('Bot ID').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(17).setMaxLength(20);
         const bPre = new TextInputBuilder().setCustomId('bot_prefix').setLabel('Prefix').setStyle(TextInputStyle.Short).setRequired(true);
         const bDesc = new TextInputBuilder().setCustomId('bot_short_desc').setLabel('Kısa Açıklama').setStyle(TextInputStyle.Short).setRequired(true);
@@ -238,7 +302,6 @@ module.exports = async (client, interaction) => {
         return;
     }
 
-    // Bot Başvuru Formu Submit
     if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'submit_bot_modal') {
         await interaction.deferReply({ ephemeral: true });
         const botId = interaction.fields.getTextInputValue('bot_id');
@@ -289,10 +352,9 @@ module.exports = async (client, interaction) => {
     }
 
     // =========================================================
-    // 4. BOT ONAY / RED VE MANUEL KİLİT SİSTEMİ
+    // 4. BOT ONAY / REDDET VE MANUEL KİLİT AÇMA
     // =========================================================
-   
-    // Bot Onayla veya Reddet Butonları
+
     if (interaction.isButton() && (interaction.customId.startsWith('approve_') || interaction.customId.startsWith('deny_'))) {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return interaction.reply({ content: '❌ Bu işlemi sadece yöneticiler yapabilir.', ephemeral: true });
@@ -300,7 +362,7 @@ module.exports = async (client, interaction) => {
 
         const [actionType, targetBotId] = interaction.customId.split('_');
         const dbBot = await BotModel.findOne({ botId: targetBotId });
-       
+
         if (!dbBot) return interaction.reply({ content: '❌ Bu botun verileri bulunamadı.', ephemeral: true });
 
         const botAccount = await client.users.fetch(targetBotId).catch(() => null);
@@ -319,7 +381,7 @@ module.exports = async (client, interaction) => {
         }
     }
 
-    // Manuel Kanal Kilidi Açma Butonu
+    // Manuel Kanal Kilidi Açma
     if (interaction.isButton() && interaction.customId.startsWith('unlock_manual_')) {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
             return interaction.reply({ content: '❌ Yetkiniz yetersiz.', ephemeral: true });
@@ -330,7 +392,10 @@ module.exports = async (client, interaction) => {
 
         if (targetChannel) {
             await targetChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true });
-            const successEmbed = new EmbedBuilder().setColor('Blue').setTitle('🔓 Kanal Kilidi Açıldı').setDescription(`Bu kanal ${interaction.user} tarafından tekrar açıldı.`);
+            const successEmbed = new EmbedBuilder()
+                .setColor('Blue')
+                .setTitle('🔓 Kanal Kilidi Açıldı')
+                .setDescription(`Bu kanal ${interaction.user} tarafından tekrar açıldı.`);
             await interaction.update({ embeds: [successEmbed], components: [] });
         } else {
             return interaction.reply({ content: '❌ Kanal bulunamadı veya silinmiş.', ephemeral: true });
