@@ -1,123 +1,86 @@
-const { 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    RoleSelectMenuBuilder, 
-    ChannelType, 
-    ComponentType, 
-    PermissionsBitField 
-} = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 const TicketSettings = require('../models/TicketSettings');
 
 module.exports.run = async (client, message, args) => {
-    
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply("❌ Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın.");
+        return message.reply('❌ Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısın.');
     }
 
-    // --- ADIM 1: BAŞLANGIÇ PANELİ (Görseldeki Tasarım) ---
-    const startEmbed = new EmbedBuilder()
-        .setColor('#0099ff')
-        .setTitle('🎫 Grave Ticket Sistemi Kurulumu')
-        .setDescription('Sistemi kurmak için aşağıdaki adımları izleyin.');
+    const existingSettings = await TicketSettings.findOne({ guildId: message.guildId });
 
-    const startRow = new ActionRowBuilder().addComponents(
+    if (existingSettings) {
+        return message.reply({
+            embeds: [new EmbedBuilder()
+                .setColor('Orange')
+                .setTitle('⚠️ Bilet Sistemi Zaten Kurulu!')
+                .setDescription(
+                    'Bu sunucuda bilet sistemi zaten aktif.\n\n' +
+                    'Yeni bir panel kurmak istiyorsanız önce mevcut sistemi sıfırlamalısınız.\n\n' +
+                    '**Sıfırlamak için:** `g!ticket-sıfırla`'
+                )
+                .addFields(
+                    { name: 'Mevcut Kategori', value: `<#${existingSettings.categoryId}>`, inline: true },
+                    { name: 'Yetkili Rol', value: `<@&${existingSettings.staffRoleId}>`, inline: true },
+                    { name: 'Panel Kanalı', value: `<#${existingSettings.channelId}>`, inline: false }
+                )
+            ]
+        });
+    }
+
+    const categoryId = args[0];
+    const staffRoleId = args[1];
+
+    if (!categoryId || !staffRoleId) {
+        return message.reply({
+            embeds: [new EmbedBuilder()
+                .setColor('Red')
+                .setDescription('❌ Kullanım: `!ticket-sistemi <kategoriID> <yetkiliRolID>`\n\nÖrnek: `!ticket-sistemi 123456789012345678 987654321098765432`')
+            ]
+        });
+    }
+
+    if (isNaN(categoryId) || isNaN(staffRoleId)) {
+        return message.reply('❌ Lütfen geçerli ID numaraları girin.');
+    }
+
+    const loadingEmbed = new EmbedBuilder()
+        .setColor('Yellow')
+        .setDescription('⏳ Bilet paneli oluşturuluyor...');
+
+    const msg = await message.channel.send({ embeds: [loadingEmbed] });
+
+    const resultEmbed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('🎫 Destek Sistemi')
+        .setDescription('Destek talebi oluşturmak için aşağıdaki butona tıklayınız.\n\n**Kurallar:**\n- Gereksiz talep açmak yasaktır.\n- Yetkilileri gereksiz yere etiketlemeyin.\n- Sabırlı olun, en kısa sürede ilgilenilecektir.')
+        .setFooter({ text: 'Grave Ticket Sistemi' })
+        .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId('start_setup_auto')
-            .setLabel('Sistemi Aktif Et')
-            .setStyle(ButtonStyle.Success)
+            .setCustomId('open_ticket_modal')
+            .setLabel('Bilet Aç')
+            .setEmoji('🎫')
+            .setStyle(ButtonStyle.Primary)
     );
 
-    const mainMsg = await message.channel.send({ embeds: [startEmbed], components: [startRow] });
+    await msg.edit({ embeds: [resultEmbed], components: [row] });
 
-    const collector = mainMsg.createMessageComponentCollector({ 
-        filter: (i) => i.user.id === message.author.id,
-        time: 120000 
+    await TicketSettings.create({
+        guildId: message.guildId,
+        categoryId,
+        staffRoleId,
+        messageId: msg.id,
+        channelId: message.channel.id
     });
 
-    collector.on('collect', async (i) => {
-        
-        // --- ADIM 2: BUTONA BASILDIĞINDA KATEGORİ OLUŞTUR VE ROL SOR ---
-        if (i.customId === 'start_setup_auto') {
-            await i.deferUpdate();
-
-            try {
-                // Kategoriyi otomatik oluştur/bul
-                let category = i.guild.channels.cache.find(c => c.name === "GRAVE TICKETS" && c.type === ChannelType.GuildCategory);
-                if (!category) {
-                    category = await i.guild.channels.create({
-                        name: "GRAVE TICKETS",
-                        type: ChannelType.GuildCategory,
-                        permissionOverwrites: [{ id: i.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }]
-                    });
-                }
-
-                // Rol seçim menüsünü gönder
-                const roleEmbed = new EmbedBuilder()
-                    .setColor('Yellow')
-                    .setTitle('📍 Adım 2: Yetkili Rolü Seçimi')
-                    .setDescription('✅ Kategori oluşturuldu.\n\nŞimdi biletleri yönetecek **Yetkili Rolünü** aşağıdan seçin.');
-
-                const roleMenu = new RoleSelectMenuBuilder()
-                    .setCustomId('setup_role_select')
-                    .setPlaceholder('Bir rol seçiniz...');
-
-                await i.editReply({ 
-                    embeds: [roleEmbed], 
-                    components: [new ActionRowBuilder().addComponents(roleMenu)] 
-                });
-
-            } catch (err) {
-                console.error(err);
-                await i.followUp({ content: '❌ Kategori oluşturulurken hata oluştu!', ephemeral: true });
-            }
-        }
-
-        // --- ADIM 3: ROL SEÇİLDİĞİNDE KAYDET VE BİTİR ---
-        if (i.isRoleSelectMenu() && i.customId === 'setup_role_select') {
-            await i.deferUpdate();
-
-            const selectedRoleId = i.values[0];
-            const category = i.guild.channels.cache.find(c => c.name === "GRAVE TICKETS");
-
-            // Veritabanına hem kategoriyi hem rolü kaydet
-            await TicketSettings.findOneAndUpdate(
-                { guildId: i.guildId },
-                { 
-                    categoryId: category.id,
-                    staffRoleId: selectedRoleId 
-                },
-                { upsert: true }
-            );
-
-            // Başarı mesajı
-            await i.editReply({ 
-                content: '✅ **Kurulum Tamamlandı!** Kategori ve Yetkili Rolü ayarlandı.', 
-                embeds: [], 
-                components: [] 
-            });
-
-            // --- FİNAL: BİLET PANELİ ---
-            const panelEmbed = new EmbedBuilder()
-                .setColor('Red')
-                .setTitle('🎫 Destek Talebi')
-                .setDescription('Yetkili ekibimizle iletişime geçmek için butona tıklayın.')
-                .setFooter({ text: 'Grave Ticket Sistemi' });
-
-            const panelRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('open_ticket_modal')
-                    .setLabel('Talep Oluştur')
-                    .setEmoji('📩')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-            await i.channel.send({ embeds: [panelEmbed], components: [panelRow] });
-            collector.stop();
-        }
+    await message.reply({
+        embeds: [new EmbedBuilder()
+            .setColor('Green')
+            .setDescription('✅ **Bilet sistemi başarıyla kuruldu!**\nArtık kullanıcılar bilet açabilir.')
+        ]
     });
 };
 
-module.exports.conf = { aliases: ['setup', 'kur'] };
+module.exports.conf = { aliases: ['ticket-kur', 'ticket-setup'] };
 module.exports.help = { name: 'ticket-sistemi' };
