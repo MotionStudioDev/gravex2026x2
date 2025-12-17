@@ -11,7 +11,6 @@ const {
     InteractionType 
 } = require('discord.js');
 
-const TicketModel = require('../models/Ticket'); 
 const TicketSettings = require('../models/TicketSettings'); 
 const BotModel = require('../models/Bot');
 const BotlistSettings = require('../models/BotlistSettings');
