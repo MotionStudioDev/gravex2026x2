@@ -18,17 +18,17 @@ const BotlistSettings = require('../models/BotlistSettings');
 
 module.exports = async (client, interaction) => {
 
-    // 🛡️ GÜVENLİK KONTROLÜ: Eğer etkileşime zaten cevap verilmişse kodu durdur.
+    // 🛡️ GÜVENLİK KONTROLÜ
     if (interaction.replied || interaction.deferred) return;
 
     // Sadece Buton ve Modal işlemlerini dinle
     if (!interaction.isButton() && interaction.type !== InteractionType.ModalSubmit) return;
 
     // =========================================================
-    // 1. TICKET SİSTEMİ: BUTONLAR
+    // 1. TICKET SİSTEMİ: BUTON İŞLEMLERİ
     // =========================================================
 
-    // Ticket Açma Butonu (Modal Gösterir)
+    // Ticket Açma Modalı
     if (interaction.isButton() && interaction.customId === 'open_ticket_modal') {
         const modal = new ModalBuilder()
             .setCustomId('submit_ticket_modal')
@@ -39,6 +39,7 @@ module.exports = async (client, interaction) => {
             .setLabel('Konu Başlığı')
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
+            .setPlaceholder('Örn: Şikayet, Öneri, Teknik Destek')
             .setMaxLength(100);
 
         const descriptionInput = new TextInputBuilder()
@@ -46,6 +47,7 @@ module.exports = async (client, interaction) => {
             .setLabel('Detaylı Açıklama')
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true)
+            .setPlaceholder('Lütfen sorununuzu detaylıca açıklayın...')
             .setMinLength(10)
             .setMaxLength(1000);
 
@@ -54,35 +56,34 @@ module.exports = async (client, interaction) => {
             new ActionRowBuilder().addComponents(descriptionInput)
         );
 
-        // Modal gösterirken deferReply/reply KULLANILMAZ. Direkt gösteriyoruz.
-        await interaction.showModal(modal).catch(e => console.log('Modal hatası:', e));
+        await interaction.showModal(modal).catch(e => console.log('Modal Hatası:', e));
         return; 
     }
 
-    // Ticket Üstlenme Butonu
+    // Ticket Üstlenme (Claim)
     if (interaction.isButton() && interaction.customId === 'claim_ticket') {
-        // Butona basılan mesajı GÜNCELLEMEK için 'update' kullanıyoruz. Bu sayede hata almazsın.
         const ticketData = await TicketModel.findOne({ channelId: interaction.channelId });
         
         if (!ticketData) {
             return interaction.reply({ content: '❌ Bu bilet veritabanında bulunamadı.', ephemeral: true });
         }
 
-        const newEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-            .addFields({ name: '✅ Yetkili', value: `${interaction.user}`, inline: false })
+        const currentEmbed = interaction.message.embeds[0];
+        const newEmbed = EmbedBuilder.from(currentEmbed)
+            .addFields({ name: '✅ Üstlenen Yetkili', value: `${interaction.user}`, inline: false })
             .setColor('Blue');
 
-        const newRow = ActionRowBuilder.from(interaction.message.components[0]);
+        const oldRow = interaction.message.components[0];
+        const newRow = ActionRowBuilder.from(oldRow);
+        
+        // Üstlen butonunu devre dışı bırak
         newRow.components[0].setDisabled(true).setLabel('Üstlenildi').setStyle(ButtonStyle.Secondary);
 
-        // ÖNCE mesajı güncelle (Interaction acknowledged olur)
         await interaction.update({ embeds: [newEmbed], components: [newRow] });
-        
-        // SONRA bilgilendirme mesajı at (FollowUp kullanıyoruz)
-        return interaction.followUp({ content: `🔔 **${interaction.user.tag}** talebi devraldı.` });
+        return interaction.followUp({ content: `🔔 **${interaction.user.tag}** adlı yetkili bu talebi devraldı.` });
     }
 
-    // Sesli Destek Butonu
+    // Sesli Destek Kanalı Oluşturma
     if (interaction.isButton() && interaction.customId === 'voice_support') {
         await interaction.deferReply({ ephemeral: true });
         
@@ -93,27 +94,43 @@ module.exports = async (client, interaction) => {
                 parent: interaction.channel.parentId,
                 permissionOverwrites: interaction.channel.permissionOverwrites.cache.map(p => p)
             });
-            return interaction.editReply({ content: `✅ Sesli kanal oluşturuldu: ${voiceChannel}` });
+            return interaction.editReply({ content: `✅ Sesli kanal başarıyla oluşturuldu: ${voiceChannel}` });
         } catch (e) {
-            return interaction.editReply({ content: '❌ Sesli kanal oluşturulurken hata oluştu.' });
+            console.error(e);
+            return interaction.editReply({ content: '❌ Sesli kanal oluşturulurken bir yetki hatası oluştu.' });
         }
     }
 
-    // Ticket Kapatma Butonu
+    // Ticket Kapatma (Sesli Kanal Dahil Her Şeyi Silen Kısım)
     if (interaction.isButton() && interaction.customId === 'close_ticket') {
-        // Önce cevap veriyoruz
-        await interaction.reply('🔒 Talep sonlandırılıyor, kanal birazdan silinecek...');
+        await interaction.reply('🔒 Talep sonlandırılıyor, bağlı tüm kanallar 5 saniye içinde silinecek...');
         
+        const currentChannel = interaction.channel;
+        const parentId = currentChannel.parentId;
+        const voiceChannelName = currentChannel.name.replace('talep-', '🔊-');
+
         await TicketModel.updateOne({ channelId: interaction.channelId }, { status: 'closed' });
         
         setTimeout(async () => {
-            if (interaction.channel) await interaction.channel.delete().catch(() => {});
+            try {
+                // Aynı kategorideki ilgili sesli kanalı bul ve sil
+                const targetVoice = interaction.guild.channels.cache.find(c => 
+                    c.name === voiceChannelName && 
+                    c.type === ChannelType.GuildVoice && 
+                    c.parentId === parentId
+                );
+                
+                if (targetVoice) await targetVoice.delete().catch(() => {});
+                if (currentChannel) await currentChannel.delete().catch(() => {});
+            } catch (err) {
+                console.log("Kanal Silme Hatası:", err);
+            }
         }, 5000);
         return;
     }
 
     // =========================================================
-    // 2. TICKET SİSTEMİ: FORM GÖNDERİMİ (SUBMIT)
+    // 2. TICKET SİSTEMİ: FORM GÖNDERİMİ (MODAL SUBMIT)
     // =========================================================
     if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'submit_ticket_modal') {
         await interaction.deferReply({ ephemeral: true });
@@ -124,183 +141,175 @@ module.exports = async (client, interaction) => {
         try {
             const settings = await TicketSettings.findOne({ guildId: interaction.guildId });
             
-            const channel = await interaction.guild.channels.create({
+            const ticketChannel = await interaction.guild.channels.create({
                 name: `talep-${interaction.user.username}`,
                 type: ChannelType.GuildText,
                 parent: settings?.categoryId || null,
                 permissionOverwrites: [
                     { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+                    { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles] },
                     { id: settings?.staffRoleId || interaction.guild.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
                 ]
             });
 
             await TicketModel.create({
                 guildId: interaction.guildId,
-                channelId: channel.id,
+                channelId: ticketChannel.id,
                 userId: interaction.user.id,
                 topic: topic,
                 description: desc,
                 status: 'open'
             });
 
-            const embed = new EmbedBuilder()
+            const ticketEmbed = new EmbedBuilder()
                 .setColor('Green')
                 .setTitle(`📝 Yeni Destek Talebi: ${topic}`)
-                .setDescription(`**Kullanıcı:** ${interaction.user}\n**Açıklama:** ${desc}`)
+                .addFields(
+                    { name: 'Kullanıcı', value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: true },
+                    { name: 'Konu', value: topic, inline: true },
+                    { name: 'Açıklama', value: desc }
+                )
                 .setFooter({ text: 'Grave Destek Sistemi' })
                 .setTimestamp();
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('claim_ticket').setLabel('Üstlen').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('voice_support').setLabel('Sesli').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('close_ticket').setLabel('Kapat').setStyle(ButtonStyle.Danger)
+            const actionRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('claim_ticket').setLabel('Üstlen').setStyle(ButtonStyle.Success).setEmoji('✅'),
+                new ButtonBuilder().setCustomId('voice_support').setLabel('Sesli').setStyle(ButtonStyle.Primary).setEmoji('🔊'),
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('Kapat').setStyle(ButtonStyle.Danger).setEmoji('🔒')
             );
 
-            await channel.send({ content: `${interaction.user} | <@&${settings?.staffRoleId || interaction.guild.id}>`, embeds: [embed], components: [row] });
+            const staffMention = settings?.staffRoleId ? `<@&${settings.staffRoleId}>` : '@everyone';
+            await ticketChannel.send({ content: `${interaction.user} | ${staffMention}`, embeds: [ticketEmbed], components: [actionRow] });
             
-            return interaction.editReply({ content: `✅ Talebiniz başarıyla açıldı: ${channel}` });
+            return interaction.editReply({ content: `✅ Talebiniz başarıyla açıldı: ${ticketChannel}` });
 
         } catch (error) {
             console.error(error);
-            return interaction.editReply({ content: '❌ Bilet oluşturulurken bir hata meydana geldi.' });
+            return interaction.editReply({ content: '❌ Bilet oluşturulurken teknik bir hata meydana geldi.' });
         }
     }
 
     // =========================================================
-    // 3. BOTLİST SİSTEMİ: BAŞVURU MODALI
+    // 3. BOTLİST SİSTEMİ: BAŞVURU MODALI VE FORM GÖNDERİMİ
     // =========================================================
+    
+    // Bot Başvuru Modalı Açılışı
     if (interaction.isButton() && interaction.customId === 'open_bot_submit_modal') {
-        const modal = new ModalBuilder().setCustomId('submit_bot_modal').setTitle('🤖 Bot Başvuru Formu');
+        const botModal = new ModalBuilder().setCustomId('submit_bot_modal').setTitle('🤖 Bot Başvuru Formu');
         
-        const bId = new TextInputBuilder().setCustomId('bot_id').setLabel('Bot ID').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(17);
+        const bId = new TextInputBuilder().setCustomId('bot_id').setLabel('Bot ID').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(17).setMaxLength(20);
         const bPre = new TextInputBuilder().setCustomId('bot_prefix').setLabel('Prefix').setStyle(TextInputStyle.Short).setRequired(true);
         const bDesc = new TextInputBuilder().setCustomId('bot_short_desc').setLabel('Kısa Açıklama').setStyle(TextInputStyle.Short).setRequired(true);
-        const bInv = new TextInputBuilder().setCustomId('bot_invite_url').setLabel('Davet Linki').setStyle(TextInputStyle.Short).setRequired(true);
+        const bInv = new TextInputBuilder().setCustomId('bot_invite_url').setLabel('Davet Linki (0 Perm)').setStyle(TextInputStyle.Short).setRequired(true);
 
-        modal.addComponents(
+        botModal.addComponents(
             new ActionRowBuilder().addComponents(bId),
             new ActionRowBuilder().addComponents(bPre),
             new ActionRowBuilder().addComponents(bDesc),
             new ActionRowBuilder().addComponents(bInv)
         );
 
-        // Modal açılışında deferReply/update kullanılmaz.
-        await interaction.showModal(modal).catch(e => console.log('BotModal hatası:', e));
+        await interaction.showModal(botModal).catch(e => console.log('BotModal Hatası:', e));
         return;
     }
 
-    // =========================================================
-    // 4. BOTLİST SİSTEMİ: FORM GÖNDERİMİ
-    // =========================================================
+    // Bot Başvuru Formu Submit
     if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'submit_bot_modal') {
         await interaction.deferReply({ ephemeral: true });
 
-        const bId = interaction.fields.getTextInputValue('bot_id');
-        const bPre = interaction.fields.getTextInputValue('bot_prefix');
-        const bDesc = interaction.fields.getTextInputValue('bot_short_desc');
-        const bInv = interaction.fields.getTextInputValue('bot_invite_url');
+        const botId = interaction.fields.getTextInputValue('bot_id');
+        const botPrefix = interaction.fields.getTextInputValue('bot_prefix');
+        const botDesc = interaction.fields.getTextInputValue('bot_short_desc');
+        const botInvite = interaction.fields.getTextInputValue('bot_invite_url');
 
         try {
-            const botUser = await client.users.fetch(bId).catch(() => null);
-            if (!botUser || !botUser.bot) {
-                return interaction.editReply('❌ Geçersiz ID. Lütfen doğru bir Bot ID giriniz.');
-            }
+            const fetchedBot = await client.users.fetch(botId).catch(() => null);
+            if (!fetchedBot || !fetchedBot.bot) return interaction.editReply('❌ Girdiğiniz ID bir bot hesabı değil.');
 
             await BotModel.findOneAndUpdate(
-                { botId: bId },
-                { ownerId: interaction.user.id, prefix: bPre, shortDescription: bDesc, inviteUrl: bInv, status: 'Pending', addedAt: Date.now() },
+                { botId: botId },
+                { ownerId: interaction.user.id, prefix: botPrefix, shortDescription: botDesc, inviteUrl: botInvite, status: 'Pending', addedAt: Date.now() },
                 { upsert: true }
             );
 
-            const settings = await BotlistSettings.findOne({ guildId: interaction.guildId });
-            const logCh = client.channels.cache.get(settings?.logChannelId);
+            const botSettings = await BotlistSettings.findOne({ guildId: interaction.guildId });
+            const logChannel = client.channels.cache.get(botSettings?.logChannelId);
 
-            if (logCh) {
-                const embed = new EmbedBuilder()
+            if (logChannel) {
+                const logEmbed = new EmbedBuilder()
                     .setColor('Yellow')
                     .setTitle('🚨 Yeni Bot Başvurusu')
-                    .setThumbnail(botUser.displayAvatarURL())
+                    .setThumbnail(fetchedBot.displayAvatarURL())
                     .addFields(
-                        { name: 'Bot', value: `${botUser.tag} (\`${bId}\`)`, inline: true },
+                        { name: 'Bot Bilgisi', value: `${fetchedBot.tag} (\`${botId}\`)`, inline: true },
                         { name: 'Sahip', value: `${interaction.user}`, inline: true },
-                        { name: 'Prefix', value: bPre, inline: true },
-                        { name: 'Açıklama', value: bDesc }
-                    );
+                        { name: 'Prefix', value: `\`${botPrefix}\``, inline: true },
+                        { name: 'Açıklama', value: botDesc }
+                    )
+                    .setTimestamp();
 
-                const btns = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`approve_${bId}`).setLabel('Onayla').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`deny_${bId}`).setLabel('Reddet').setStyle(ButtonStyle.Danger)
+                const logButtons = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`approve_${botId}`).setLabel('Onayla').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`deny_${botId}`).setLabel('Reddet').setStyle(ButtonStyle.Danger)
                 );
 
-                await logCh.send({ embeds: [embed], components: [btns] });
-                return interaction.editReply('✅ Başvurunuz başarıyla yetkililere iletildi.');
+                await logChannel.send({ embeds: [logEmbed], components: [logButtons] });
+                return interaction.editReply('✅ Başvurunuz başarıyla kaydedildi ve yetkililere iletildi.');
             } else {
-                return interaction.editReply('❌ Sistem hatası: Log kanalı bulunamadı.');
+                return interaction.editReply('❌ Sistem hatası: Log kanalı ayarlanmamış.');
             }
-
         } catch (err) {
             console.error(err);
-            return interaction.editReply('❌ Beklenmedik bir hata oluştu.');
+            return interaction.editReply('❌ Başvuru sırasında bir hata oluştu.');
         }
     }
 
     // =========================================================
-    // 5. BOT ONAY / RED SİSTEMİ (EN ÇOK HATA BURADAN ÇIKIYORDU)
+    // 4. BOT ONAY / RED VE MANUEL KİLİT SİSTEMİ
     // =========================================================
+    
+    // Bot Onayla veya Reddet Butonları
     if (interaction.isButton() && (interaction.customId.startsWith('approve_') || interaction.customId.startsWith('deny_'))) {
-        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) return interaction.reply({ content: '❌ Yetkiniz yok.', ephemeral: true });
-
-        // DİKKAT: deferReply yerine update kullanıyoruz.
-        // update() -> Butonun olduğu mesajı günceller ve etkileşimi tamamlar.
-        
-        const action = interaction.customId.split('_')[0];
-        const botId = interaction.customId.split('_')[1];
-
-        const botData = await BotModel.findOne({ botId });
-        if (!botData) return interaction.reply({ content: '❌ Veri bulunamadı.', ephemeral: true });
-
-        const botUser = await client.users.fetch(botId).catch(() => null);
-        const owner = await client.users.fetch(botData.ownerId).catch(() => null);
-
-        let statusMsg = "";
-        
-        if (action === 'approve') {
-            botData.status = 'Approved';
-            await botData.save();
-            if (owner) owner.send(`✅ **${botUser?.tag}** onaylandı.`).catch(() => {});
-            statusMsg = `✅ Onaylandı: ${botUser?.tag} - Yetkili: ${interaction.user}`;
-        } else {
-            botData.status = 'Denied';
-            await botData.save();
-            if (owner) owner.send(`❌ **${botUser?.tag}** reddedildi.`).catch(() => {});
-            statusMsg = `❌ Reddedildi: ${botUser?.tag} - Yetkili: ${interaction.user}`;
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return interaction.reply({ content: '❌ Bu işlemi sadece yöneticiler yapabilir.', ephemeral: true });
         }
 
-        // ÖNCE Mesajı güncelle (butonları kaldır)
-        await interaction.update({ content: statusMsg, components: [], embeds: [] });
+        const [actionType, targetBotId] = interaction.customId.split('_');
+        const dbBot = await BotModel.findOne({ botId: targetBotId });
         
-        // İşlem tamam, başka bir şey yapmaya gerek yok.
-        return;
+        if (!dbBot) return interaction.reply({ content: '❌ Bu botun verileri bulunamadı.', ephemeral: true });
+
+        const botAccount = await client.users.fetch(targetBotId).catch(() => null);
+        const botOwner = await client.users.fetch(dbBot.ownerId).catch(() => null);
+
+        if (actionType === 'approve') {
+            dbBot.status = 'Approved';
+            await dbBot.save();
+            if (botOwner) botOwner.send(`✅ Tebrikler! **${botAccount?.tag || 'Botunuz'}** sunucumuzda onaylandı.`).catch(() => {});
+            await interaction.update({ content: `✅ **${botAccount?.tag}** başarıyla onaylandı. Onaylayan: ${interaction.user}`, components: [], embeds: [] });
+        } else {
+            dbBot.status = 'Denied';
+            await dbBot.save();
+            if (botOwner) botOwner.send(`❌ Üzgünüz, **${botAccount?.tag || 'Botunuz'}** başvurusu reddedildi.`).catch(() => {});
+            await interaction.update({ content: `❌ **${botAccount?.tag}** başvurusu reddedildi. Reddeden: ${interaction.user}`, components: [], embeds: [] });
+        }
     }
 
-    // =========================================================
-    // 6. MANUEL KİLİT SİSTEMİ
-    // =========================================================
+    // Manuel Kanal Kilidi Açma Butonu
     if (interaction.isButton() && interaction.customId.startsWith('unlock_manual_')) {
-        if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) return interaction.reply({ content: '❌ Yetkiniz yok.', ephemeral: true });
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+            return interaction.reply({ content: '❌ Yetkiniz yetersiz.', ephemeral: true });
+        }
 
-        const chId = interaction.customId.split('_')[2];
-        const channel = interaction.guild.channels.cache.get(chId);
+        const targetChannelId = interaction.customId.split('_')[2];
+        const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
 
-        if (channel) {
-            await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true });
-            const embed = new EmbedBuilder().setColor('Blue').setTitle('🔓 Kanal Açıldı').setDescription(`Kanal ${interaction.user} tarafından açıldı.`);
-            
-            // deferReply yerine update kullanıyoruz çünkü mesajı değiştiriyoruz.
-            await interaction.update({ embeds: [embed], components: [] });
+        if (targetChannel) {
+            await targetChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: true });
+            const successEmbed = new EmbedBuilder().setColor('Blue').setTitle('🔓 Kanal Kilidi Açıldı').setDescription(`Bu kanal ${interaction.user} tarafından tekrar açıldı.`);
+            await interaction.update({ embeds: [successEmbed], components: [] });
         } else {
-            return interaction.reply({ content: '❌ Kanal bulunamadı.', ephemeral: true });
+            return interaction.reply({ content: '❌ Kanal bulunamadı veya silinmiş.', ephemeral: true });
         }
     }
 };
