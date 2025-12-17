@@ -1,10 +1,11 @@
-const { 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    PermissionsBitField, 
-    ChannelType 
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    StringSelectMenuBuilder,
+    PermissionsBitField,
+    ChannelType
 } = require('discord.js');
 const TicketSettings = require('../models/TicketSettings');
 
@@ -18,222 +19,179 @@ module.exports.run = async (client, message, args) => {
     if (existing) {
         const embed = new EmbedBuilder()
             .setColor('Orange')
-            .setTitle('⚠️ Bilet Sistemi Zaten Var!')
-            .setDescription('Sunucunda zaten bir bilet sistemi kurulu. Yeniden kurmak istersen onay ver, yoksa iptal et.')
-            .addFields(
-                { name: 'Kategori', value: `<#${existing.categoryId}>`, inline: true },
-                { name: 'Yetkili Rol', value: `<@&${existing.staffRoleId}>`, inline: true },
-                { name: 'Log Kanalı', value: existing.logChannelId ? `<#${existing.logChannelId}>` : 'Yok', inline: true }
-            );
+            .setTitle('⚠️ Bilet Sistemi Zaten Kurulu')
+            .setDescription('Yeniden kurmak istersen mevcut ayarlar silinecek.');
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('reinstall_yes').setLabel('Yeniden Kur').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('reinstall_no').setLabel('İptal').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('reinstall_yes').setLabel('Yeniden Kur').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('reinstall_no').setLabel('İptal').setStyle(ButtonStyle.Secondary)
         );
 
-        const confirmMsg = await message.reply({ embeds: [embed], components: [row] });
+        const msg = await message.reply({ embeds: [embed], components: [row] });
 
-        const filter = i => i.user.id === message.author.id;
-        const collector = confirmMsg.createMessageComponentCollector({ filter, time: 60000 });
+        const collector = msg.createMessageComponentCollector({ time: 60000 });
 
         collector.on('collect', async i => {
+            if (i.user.id !== message.author.id) return i.reply({ content: 'Bu buton sana ait değil!', ephemeral: true });
+
             if (i.customId === 'reinstall_no') {
-                await i.update({ embeds: [new EmbedBuilder().setColor('Grey').setDescription('❌ Yeniden kurulum iptal edildi.')], components: [] });
+                await i.update({ embeds: [new EmbedBuilder().setColor('Grey').setDescription('❌ İşlem iptal edildi.')], components: [] });
             } else {
                 await i.deferUpdate();
                 await TicketSettings.deleteOne({ guildId: message.guildId });
-                await startWizard(i);
+                await startSelectWizard(i);
             }
             collector.stop();
         });
 
-        collector.on('end', collected => {
-            if (collected.size === 0) {
-                confirmMsg.edit({ embeds: [new EmbedBuilder().setColor('Orange').setDescription('⏰ Süre doldu, işlem iptal edildi.')], components: [] }).catch(() => {});
-            }
-        });
         return;
     }
 
-    // Yeni kurulum
-    await startWizard(message);
+    await startSelectWizard(message);
 };
 
-async function startWizard(msgOrInt) {
-    const isInt = msgOrInt.deferred !== undefined;
-    const replyFunc = async (content) => isInt ? await msgOrInt.editReply(content) : await msgOrInt.reply(content);
+async function startSelectWizard(interactionOrMessage) {
+    const isInteraction = !!interactionOrMessage.deferred;
+    const reply = async (content) => isInteraction ? await interactionOrMessage.editReply(content) : await interactionOrMessage.reply(content);
 
-    let categoryId, staffRoleId, logChannelId = null;
+    let categoryId = null;
+    let staffRoleId = null;
+    let logChannelId = null;
 
-    const startEmbed = new EmbedBuilder()
-        .setColor('Blurple')
-        .setTitle('🎫 Bilet Sistemi Kurulum Sihirbazı')
-        .setDescription(
-            '**Adım adım ayarları yapalım!**\n\n' +
-            '1️⃣ Önce **talep kategorisi ID**\'sini gönder (talepler bu kategoride açılacak)\n' +
-            '2️⃣ Sonra **yetkili rol ID**\'sini gönder (üstlenip kapatabilecek rol)\n' +
-            '3️⃣ En son **log kanalı ID**\'sini gönder (kapanan ticketler buraya düşecek - isteğe bağlı, geçmek için "yok" yaz)\n\n' +
-            '**İptal etmek için alttaki butona basabilirsin.**'
-        );
+    // Adım 1: Kategori Seç
+    const categories = interactionOrMessage.guild.channels.cache
+        .filter(c => c.type === ChannelType.GuildCategory)
+        .map(c => ({ label: c.name, value: c.id }));
+
+    if (categories.length === 0) {
+        return reply({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Sunucuda hiç kategori bulunamadı!')] });
+    }
+
+    const categoryMenu = new StringSelectMenuBuilder()
+        .setCustomId('select_category')
+        .setPlaceholder('Talep kategorisini seç...')
+        .addOptions(categories.slice(0, 25)); // Max 25
 
     const cancelRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('wizard_cancel')
-            .setLabel('Kurulumu İptal Et')
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('❌')
+        new ButtonBuilder().setCustomId('wizard_cancel').setLabel('İptal').setStyle(ButtonStyle.Danger)
     );
 
-    const wizardMsg = await replyFunc({ embeds: [startEmbed], components: [cancelRow] });
-
-    const filter = m => m.author.id === msgOrInt.author.id;
-    const collector = msgOrInt.channel.createMessageCollector({ filter, time: 300000, max: 3 });
-
-    // İptal butonu
-    const buttonCollector = wizardMsg.createMessageComponentCollector({ time: 300000 });
-    buttonCollector.on('collect', async i => {
-        if (i.customId === 'wizard_cancel' && i.user.id === msgOrInt.author.id) {
-            await i.update({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Kurulum iptal edildi.')], components: [] });
-            collector.stop();
-            buttonCollector.stop();
-        }
+    const step1 = await reply({
+        embeds: [new EmbedBuilder()
+            .setColor('Blurple')
+            .setTitle('1️⃣ Talep Kategorisi Seç')
+            .setDescription('Ticket\'ların açılacağı kategoriyi aşağıdan seç.')
+        ],
+        components: [new ActionRowBuilder().addComponents(categoryMenu), cancelRow]
     });
 
-    collector.on('collect', async m => {
-        await m.delete().catch(() => {});
+    const collector = step1.createMessageComponentCollector({ time: 300000 });
 
-        if (collector.collected.size === 1) {
-            // Kategori ID
-            const id = m.content.trim();
-            if (!/^\d{17,19}$/.test(id)) {
-                await m.channel.send('❌ Geçersiz kategori ID. Lütfen doğru bir ID gir.').then(x => setTimeout(() => x.delete().catch(() => {}), 5000));
-                collector.stop();
-                return;
-            }
-            try {
-                const channel = await m.guild.channels.fetch(id);
-                if (channel.type !== ChannelType.GuildCategory) throw new Error();
-                categoryId = id;
-                await m.channel.send(`✅ Kategori ayarlandı: <#${id}>\nŞimdi **yetkili rol ID**'sini gönder.`);
-            } catch {
-                await m.channel.send('❌ Bu ID bir kategori değil veya bulunamadı. Kurulum iptal edildi.').then(x => setTimeout(() => x.delete().catch(() => {}), 5000));
-                collector.stop();
-            }
-        } else if (collector.collected.size === 2) {
-            // Yetkili Rol ID
-            const id = m.content.trim();
-            if (!/^\d{17,19}$/.test(id)) {
-                await m.channel.send('❌ Geçersiz rol ID.').then(x => setTimeout(() => x.delete().catch(() => {}), 5000));
-                collector.stop();
-                return;
-            }
-            try {
-                const role = await m.guild.roles.fetch(id);
-                staffRoleId = id;
-                await m.channel.send(`✅ Yetkili rol ayarlandı: <@&${id}>\nSon olarak **log kanalı ID**'sini gönder (isteğe bağlı, geçmek için "yok" yaz).`);
-            } catch {
-                await m.channel.send('❌ Bu rol bulunamadı. Kurulum iptal edildi.').then(x => setTimeout(() => x.delete().catch(() => {}), 5000));
-                collector.stop();
-            }
-        } else if (collector.collected.size === 3) {
-            // Log Kanalı
-            const input = m.content.trim().toLowerCase();
-            if (input !== 'yok' && input !== 'geç' && input !== 'atla') {
-                if (!/^\d{17,19}$/.test(input)) {
-                    await m.channel.send('❌ Geçersiz kanal ID, log kanalı atlandı.');
-                } else {
-                    try {
-                        const channel = await m.guild.channels.fetch(input);
-                        if (channel.type === ChannelType.GuildText) {
-                            logChannelId = input;
-                            await m.channel.send(`✅ Log kanalı ayarlandı: <#${input}>`);
-                        } else {
-                            await m.channel.send('❌ Bu bir metin kanalı değil, log atlandı.');
-                        }
-                    } catch {
-                        await m.channel.send('❌ Kanal bulunamadı, log atlandı.');
-                    }
-                }
-            } else {
-                await m.channel.send('ℹ️ Log kanalı ayarlanmadı.');
-            }
+    collector.on('collect', async i => {
+        if (i.user.id !== interactionOrMessage.author.id) return i.reply({ content: 'Bu menü sana ait değil!', ephemeral: true });
 
-            // Özet ve onay
-            const summaryEmbed = new EmbedBuilder()
+        if (i.customId === 'wizard_cancel') {
+            await i.update({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Kurulum iptal edildi.')], components: [] });
+            return collector.stop();
+        }
+
+        if (i.customId === 'select_category') {
+            categoryId = i.values[0];
+            await i.update({ embeds: [new EmbedBuilder().setColor('Green').setDescription(`✅ Kategori seçildi: <#${categoryId}>\nŞimdi yetkili rolü seç.`)] });
+
+            // Adım 2: Rol Seç
+            const roles = interactionOrMessage.guild.roles.cache
+                .filter(r => r.name !== '@everyone' && r.position < interactionOrMessage.guild.members.me.roles.highest.position)
+                .sort((a, b) => b.position - a.position)
+                .map(r => ({ label: r.name, value: r.id }));
+
+            const roleMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_role')
+                .setPlaceholder('Yetkili rolü seç...')
+                .addOptions(roles.slice(0, 25));
+
+            await i.followUp({
+                embeds: [new EmbedBuilder().setColor('Blurple').setTitle('2️⃣ Yetkili Rol Seç').setDescription('Ticket\'ları üstlenecek ve kapatacak rolü seç.')],
+                components: [new ActionRowBuilder().addComponents(roleMenu), cancelRow],
+                ephemeral: true
+            });
+
+            collector.resetTimer();
+        } else if (i.customId === 'select_role') {
+            staffRoleId = i.values[0];
+            await i.update({ embeds: [new EmbedBuilder().setColor('Green').setDescription(`✅ Yetkili rol seçildi: <@&${staffRoleId}>\nŞimdi log kanalı seç (isteğe bağlı).`)] });
+
+            // Adım 3: Log Kanalı (İsteğe bağlı)
+            const textChannels = interactionOrMessage.guild.channels.cache
+                .filter(c => c.type === ChannelType.GuildText)
+                .map(c => ({ label: c.name, value: c.id }));
+
+            const logMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_log')
+                .setPlaceholder('Log kanalı seç (atlamak için "Yok" seç)')
+                .addOptions([
+                    { label: 'Log Kanalı Ayarlama', value: 'none', description: 'Log gönderme' },
+                    ...textChannels.slice(0, 24)
+                ]);
+
+            await i.followUp({
+                embeds: [new EmbedBuilder().setColor('Blurple').setTitle('3️⃣ Log Kanalı Seç').setDescription('Kapanan ticket logları buraya düşecek (isteğe bağlı).')],
+                components: [new ActionRowBuilder().addComponents(logMenu), cancelRow],
+                ephemeral: true
+            });
+
+            collector.resetTimer();
+        } else if (i.customId === 'select_log') {
+            if (i.values[0] !== 'none') logChannelId = i.values[0];
+
+            // Özet ve Onay
+            const summary = new EmbedBuilder()
                 .setColor('Green')
-                .setTitle('✅ Ayarlar Tamamlandı!')
-                .setDescription('Tüm ayarlar hazır. Paneli oluşturmak için onay ver.')
+                .setTitle('✅ Tüm Ayarlar Tamam!')
                 .addFields(
-                    { name: 'Talep Kategorisi', value: `<#${categoryId}>`, inline: true },
-                    { name: 'Yetkili Rol', value: `<@&${staffRoleId}>`, inline: true },
-                    { name: 'Log Kanalı', value: logChannelId ? `<#${logChannelId}>` : 'Yok', inline: true }
-                );
+                    { name: 'Kategori', value: `<#${categoryId}>` },
+                    { name: 'Yetkili Rol', value: `<@&${staffRoleId}>` },
+                    { name: 'Log Kanalı', value: logChannelId ? `<#${logChannelId}>` : 'Yok' }
+                )
+                .setFooter({ text: 'Onayla ve paneli oluştur!' });
 
             const finalRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('final_yes').setLabel('Kur ve Panel Oluştur').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('final_no').setLabel('İptal').setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId('final_confirm').setLabel('Kur ve Panel Oluştur').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('final_cancel').setLabel('İptal').setStyle(ButtonStyle.Danger)
             );
 
-            await m.channel.send({ embeds: [summaryEmbed], components: [finalRow] });
+            await i.update({ embeds: [summary], components: [finalRow] });
             collector.stop();
-        }
-    });
+        } else if (i.customId === 'final_confirm') {
+            await i.deferUpdate();
 
-    // Final onay butonları (event ile yakala)
-    const finalCollector = msgOrInt.channel.createMessageComponentCollector({ time: 300000 });
-    finalCollector.on('collect', async i => {
-        if (!['final_yes', 'final_no'].includes(i.customId)) return;
-        if (i.user.id !== msgOrInt.author.id) return i.reply({ content: 'Bu buton sana ait değil!', ephemeral: true });
+            const loading = await i.editReply({ embeds: [new EmbedBuilder().setColor('Yellow').setDescription('⏳ Panel oluşturuluyor...')], components: [] });
 
-        if (i.customId === 'final_no') {
-            return i.update({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Kurulum iptal edildi.')], components: [] });
-        }
-
-        // ONAY VERİLDİ → PANEL OLUŞTUR
-        await i.deferUpdate();
-        const loadingEmbed = new EmbedBuilder().setColor('Yellow').setDescription('⏳ Panel oluşturuluyor, lütfen bekle...');
-        const loadingMsg = await i.editReply({ embeds: [loadingEmbed], components: [] });
-
-        const panelEmbed = new EmbedBuilder()
-            .setColor('Green')
-            .setTitle('🎫 Destek Sistemi')
-            .setDescription(
-                'Destek talebi oluşturmak için aşağıdaki butona tıklayın.\n\n' +
-                '**Kurallar:**\n' +
-                '• Gereksiz bilet açmak yasaktır\n' +
-                '• Yetkilileri gereksiz etiketlemeyin\n' +
-                '• Sabırlı olun, en kısa sürede dönüş yapılacaktır'
-            )
-            .setFooter({ text: 'Grave Ticket Sistemi' })
-            .setTimestamp();
-
-        const panelRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('open_ticket_modal')
-                .setLabel('Bilet Aç')
-                .setEmoji('🎫')
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        await loadingMsg.edit({ embeds: [panelEmbed], components: [panelRow] });
-
-        // Veritabanına kaydet
-        await TicketSettings.create({
-            guildId: message.guildId,
-            categoryId,
-            staffRoleId,
-            logChannelId,
-            messageId: loadingMsg.id,
-            channelId: i.channel.id
-        });
-
-        await i.followUp({
-            embeds: [new EmbedBuilder()
+            const panelEmbed = new EmbedBuilder()
                 .setColor('Green')
-                .setDescription('✅ **Bilet sistemi başarıyla kuruldu!**\nArtık üyeler bilet açabilir.')
-            ],
-            ephemeral: true
-        });
+                .setTitle('🎫 Destek Sistemi')
+                .setDescription('Destek talebi oluşturmak için aşağıdaki butona tıklayın.\n\n**Kurallar:**\n• Gereksiz bilet açmak yasaktır\n• Yetkilileri gereksiz etiketlemeyin')
+                .setFooter({ text: 'Grave Ticket Sistemi' });
+
+            const panelRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('open_ticket_modal').setLabel('Bilet Aç').setEmoji('🎫').setStyle(ButtonStyle.Primary)
+            );
+
+            await loading.edit({ embeds: [panelEmbed], components: [panelRow] });
+
+            await TicketSettings.create({
+                guildId: interactionOrMessage.guildId,
+                categoryId,
+                staffRoleId,
+                logChannelId: logChannelId || null,
+                messageId: loading.id,
+                channelId: loading.channel.id
+            });
+
+            await i.followUp({ embeds: [new EmbedBuilder().setColor('Green').setDescription('✅ **Bilet sistemi başarıyla kuruldu!**')], ephemeral: true });
+        } else if (i.customId === 'final_cancel') {
+            await i.update({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Kurulum iptal edildi.')], components: [] });
+        }
     });
 }
 
