@@ -5,7 +5,7 @@ module.exports.run = async (client, message, args) => {
         return message.channel.send({
             embeds: [new EmbedBuilder()
                 .setColor("Red")
-                .setTitle("❌ Yetki Yetersiz")
+                .setTitle("Yetki Yetersiz")
                 .setDescription("Bu komutu kullanmak için **Mesajları Yönet** yetkisine sahip olmalısın.")]
         });
     }
@@ -14,7 +14,6 @@ module.exports.run = async (client, message, args) => {
     let user = null;
     let onlyBots = false;
 
-    // Argümanları parse et
     if (args[0] === "bot" || args[0] === "bots") {
         onlyBots = true;
         miktar = parseInt(args[1]);
@@ -32,18 +31,18 @@ module.exports.run = async (client, message, args) => {
         return message.channel.send({
             embeds: [new EmbedBuilder()
                 .setColor("Red")
-                .setTitle("❌ Geçersiz Sayı")
-                .setDescription("Lütfen **1-100** arasında bir sayı gir.\n\n**Kullanım örnekleri:**\n`g!temizle 50`\n`g!temizle 30 @kullanıcı`\n`g!temizle bot 75`")]
+                .setTitle("Geçersiz Sayı")
+                .setDescription("Lütfen **1-100** arasında bir sayı gir.\n\nKullanım örnekleri:\n`g!temizle 50`\n`g!temizle 30 @kullanıcı`\n`g!temizle bot 75`")]
         });
     }
 
     const confirmEmbed = new EmbedBuilder()
         .setColor("Orange")
-        .setTitle("🧹 Mesaj Temizleme Onayı")
+        .setTitle("Mesaj Temizleme Onayı")
         .setDescription([
-            `**${miktar}** mesaj silinecek.`,
-            user ? `Sadece **${user.tag}**'ın mesajları silinecek.` : "",
-            onlyBots ? "Sadece **bot mesajları** silinecek." : "",
+            miktar + " mesaj silinecek.",
+            user ? "Sadece " + user.tag + "'ın mesajları silinecek." : "",
+            onlyBots ? "Sadece bot mesajları silinecek." : "",
             "\nOnaylıyor musun?"
         ].filter(Boolean).join("\n"))
         .setFooter({ text: "15 saniye içinde onay vermezsen işlem iptal olur." });
@@ -63,7 +62,7 @@ module.exports.run = async (client, message, args) => {
     collector.on("collect", async i => {
         if (i.customId === "hayir") {
             await i.update({
-                embeds: [new EmbedBuilder().setColor("Red").setTitle("❌ İşlem İptal Edildi").setDescription("Mesaj temizleme iptal edildi.")],
+                embeds: [new EmbedBuilder().setColor("Red").setTitle("İşlem İptal Edildi").setDescription("Mesaj temizleme iptal edildi.")],
                 components: []
             });
             collector.stop();
@@ -72,7 +71,7 @@ module.exports.run = async (client, message, args) => {
 
         if (i.customId === "evet") {
             await i.update({
-                embeds: [new EmbedBuilder().setColor("Blurple").setTitle("⏳ Siliniyor...").setDescription("Mesajlar siliniyor, lütfen bekle.")],
+                embeds: [new EmbedBuilder().setColor("Blurple").setTitle("Siliniyor...").setDescription("Mesajlar siliniyor, lütfen bekle.")],
                 components: []
             });
 
@@ -87,10 +86,9 @@ module.exports.run = async (client, message, args) => {
                     if (user) toDelete = toDelete.filter(m => m.author.id === user.id);
                     if (onlyBots) toDelete = toDelete.filter(m => m.author.bot);
 
-                    // 14 günden eski mesajları filtrele (bulkDelete sadece 14 gün içindekileri siler)
                     toDelete = toDelete.filter(m => Date.now() - m.createdTimestamp < 14 * 24 * 60 * 60 * 1000);
 
-                    if (toDelete.size === 0) break; // ← BURASI DÜZELTİLDİ! Kari değil, 0
+                    if (toDelete.size === 0) break;
 
                     const deleted = await message.channel.bulkDelete(toDelete, true);
                     deletedCount += deleted.size;
@@ -98,7 +96,6 @@ module.exports.run = async (client, message, args) => {
                     if (deletedCount >= miktar) break;
                 } while (fetched.size === 100 && deletedCount < miktar);
 
-                // Kalan mesajları (14 günden eski olanlar dahil) tek tek sil
                 if (deletedCount < miktar) {
                     const remaining = miktar - deletedCount;
                     const remainingMessages = (await message.channel.messages.fetch({ limit: remaining })).filter(m => {
@@ -116,9 +113,9 @@ module.exports.run = async (client, message, args) => {
 
                 const successEmbed = new EmbedBuilder()
                     .setColor("Green")
-                    .setTitle("✅ Temizleme Tamamlandı")
-                    .setDescription(`Toplam **${deletedCount}** mesaj başarıyla silindi.`)
-                    .setFooter({ text: `Yetkili: ${message.author.tag}` });
+                    .setTitle("Temizleme Tamamlandı")
+                    .setDescription("Toplam " + deletedCount + " mesaj başarıyla silindi.")
+                    .setFooter({ text: "Yetkili: " + message.author.tag });
 
                 if (confirmMsg.deleted) {
                     await message.channel.send({ embeds: [successEmbed] });
@@ -130,7 +127,7 @@ module.exports.run = async (client, message, args) => {
                 console.error("Temizleme hatası:", err);
                 const errorEmbed = new EmbedBuilder()
                     .setColor("Red")
-                    .setTitle("❌ Hata Oluştu")
+                    .setTitle("Hata Oluştu")
                     .setDescription("Mesajlar silinirken bir sorun oluştu. Yetkileri kontrol et.");
 
                 try {
@@ -149,7 +146,7 @@ module.exports.run = async (client, message, args) => {
     collector.on("end", collected => {
         if (collected.size === 0 && !confirmMsg.deleted) {
             confirmMsg.edit({
-                embeds: [new EmbedBuilder().setColor("Grey").setTitle("⏰ Zaman Aşımı").setDescription("Onay verilmedi, işlem iptal edildi.")],
+                embeds: [new EmbedBuilder().setColor("Grey").setTitle("Zaman Aşımı").setDescription("Onay verilmedi, işlem iptal edildi.")],
                 components: []
             }).catch(() => {});
         }
