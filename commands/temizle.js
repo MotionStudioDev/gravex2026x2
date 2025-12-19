@@ -19,7 +19,7 @@ module.exports.run = async (client, message, args) => {
         onlyBots = true;
         miktar = parseInt(args[1]);
     } else {
-        const mentionedUser = message.mentions.members.first();
+        const mentionedUser = message.mentions.members?.first();
         if (mentionedUser) {
             user = mentionedUser.user;
             miktar = parseInt(args[1]) || parseInt(args[0]);
@@ -87,10 +87,10 @@ module.exports.run = async (client, message, args) => {
                     if (user) toDelete = toDelete.filter(m => m.author.id === user.id);
                     if (onlyBots) toDelete = toDelete.filter(m => m.author.bot);
 
-                    // 14 günden eski mesajları çıkar (Discord kısıtlaması)
+                    // 14 günden eski mesajları filtrele (bulkDelete sadece 14 gün içindekileri siler)
                     toDelete = toDelete.filter(m => Date.now() - m.createdTimestamp < 14 * 24 * 60 * 60 * 1000);
 
-                    **if (toDelete.size === 0) break;**  // ← SYNTAX HATASI BURASI DÜZELTİLDİ
+                    if (toDelete.size === 0) break; // ← BURASI DÜZELTİLDİ! Kari değil, 0
 
                     const deleted = await message.channel.bulkDelete(toDelete, true);
                     deletedCount += deleted.size;
@@ -98,16 +98,16 @@ module.exports.run = async (client, message, args) => {
                     if (deletedCount >= miktar) break;
                 } while (fetched.size === 100 && deletedCount < miktar);
 
-                // Geriye kalanları tek tek sil
+                // Kalan mesajları (14 günden eski olanlar dahil) tek tek sil
                 if (deletedCount < miktar) {
                     const remaining = miktar - deletedCount;
-                    const remainingMessages = await message.channel.messages.fetch({ limit: remaining });
-                    let filtered = remainingMessages;
+                    const remainingMessages = (await message.channel.messages.fetch({ limit: remaining })).filter(m => {
+                        if (user && m.author.id !== user.id) return false;
+                        if (onlyBots && !m.author.bot) return false;
+                        return true;
+                    });
 
-                    if (user) filtered = filtered.filter(m => m.author.id === user.id);
-                    if (onlyBots) filtered = filtered.filter(m => m.author.bot);
-
-                    for (const msg of filtered.values()) {
+                    for (const msg of remainingMessages.values()) {
                         await msg.delete().catch(() => {});
                         deletedCount++;
                         if (deletedCount >= miktar) break;
@@ -133,11 +133,13 @@ module.exports.run = async (client, message, args) => {
                     .setTitle("❌ Hata Oluştu")
                     .setDescription("Mesajlar silinirken bir sorun oluştu. Yetkileri kontrol et.");
 
-                if (!confirmMsg.deleted) {
-                    await confirmMsg.edit({ embeds: [errorEmbed], components: [] });
-                } else {
-                    await message.channel.send({ embeds: [errorEmbed] });
-                }
+                try {
+                    if (!confirmMsg.deleted) {
+                        await confirmMsg.edit({ embeds: [errorEmbed], components: [] });
+                    } else {
+                        await message.channel.send({ embeds: [errorEmbed] });
+                    }
+                } catch {}
             }
 
             collector.stop();
