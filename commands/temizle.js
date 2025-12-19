@@ -90,7 +90,7 @@ module.exports.run = async (client, message, args) => {
                     // 14 günden eski mesajları çıkar (Discord kısıtlaması)
                     toDelete = toDelete.filter(m => Date.now() - m.createdTimestamp < 14 * 24 * 60 * 60 * 1000);
 
-                    if (toDelete.size === Kari 0) break;
+                    **if (toDelete.size === 0) break;**  // ← SYNTAX HATASI BURASI DÜZELTİLDİ
 
                     const deleted = await message.channel.bulkDelete(toDelete, true);
                     deletedCount += deleted.size;
@@ -98,7 +98,7 @@ module.exports.run = async (client, message, args) => {
                     if (deletedCount >= miktar) break;
                 } while (fetched.size === 100 && deletedCount < miktar);
 
-                // Geriye kalanları tek tek sil (eğer 14 günden eskiyse bulkDelete çalışmaz)
+                // Geriye kalanları tek tek sil
                 if (deletedCount < miktar) {
                     const remaining = miktar - deletedCount;
                     const remainingMessages = await message.channel.messages.fetch({ limit: remaining });
@@ -120,7 +120,6 @@ module.exports.run = async (client, message, args) => {
                     .setDescription(`Toplam **${deletedCount}** mesaj başarıyla silindi.`)
                     .setFooter({ text: `Yetkili: ${message.author.tag}` });
 
-                // Onay mesajı silindiyse yeni mesaj gönder
                 if (confirmMsg.deleted) {
                     await message.channel.send({ embeds: [successEmbed] });
                 } else {
