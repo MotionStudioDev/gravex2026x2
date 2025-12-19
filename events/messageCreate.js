@@ -1,6 +1,7 @@
 const { EmbedBuilder, PermissionsBitField, ChannelType } = require("discord.js");
 const GuildSettings = require("../models/GuildSettings");
-const TicketModel = require("../models/Ticket"); // Ticket otomatik kapanma için gerekli
+const TicketModel = require("../models/Ticket");
+const AfkModel = require("../models/Afk"); // <--- AFK MODEL EKLENDİ
 
 // Otomatik kapanma süresi (interactionCreate'de de aynı olmalı!)
 const AUTO_CLOSE_TIMEOUT = 15 * 60 * 1000; // 15 dakika
@@ -27,7 +28,6 @@ const kelimeSınırKontrol = (text, word) => {
 
 module.exports = async (message) => {
   if (!message.guild || message.author.bot) return;
-
   const client = message.client;
   const içerik = message.content.toLowerCase().replace(/[^a-zğüşıöç0-9\s]/g, " ");
   const tamİçerik = message.content;
@@ -43,7 +43,6 @@ module.exports = async (message) => {
       .setDescription("Beni etiketledin! Komutlar için `g!yardım` yazabilirsin.\nSunucunda küfür/reklam koruması ve selam sistemi aktif olabilir.")
       .setFooter({ text: "GraveBOT • 2026" })
       .setTimestamp();
-
     return message.channel.send({ embeds: [embed] }).catch(() => {});
   }
 
@@ -54,41 +53,62 @@ module.exports = async (message) => {
   if (!settings) return;
 
   // =========================================================
+  // 1. AFK BOZMA KONTROLÜ (Kullanıcı mesaj yazınca AFK kalkar)
+  // =========================================================
+  const afkData = await AfkModel.findOne({ guildId: message.guildId, userId: message.author.id });
+  if (afkData) {
+    await AfkModel.deleteOne({ guildId: message.guildId, userId: message.author.id });
+
+    if (message.member.manageable) {
+      await message.member.setNickname(afkData.oldNickname).catch(() => {});
+    }
+
+    const hoşgeldin = await message.reply(`Hoş geldin **${message.author.username}**! AFK modundan çıkarıldın.`);
+    setTimeout(() => hoşgeldin.delete().catch(() => {}), 5000);
+    // AFK kalktığı için diğer kontrolleri atla (küfür/reklam vs. mesajı silinmesin)
+    return;
+  }
+
+  // =========================================================
+  // 2. ETİKETLENEN KİŞİ AFK MI KONTROLÜ
+  // =========================================================
+  if (message.mentions.users.size > 0) {
+    for (const user of message.mentions.users.values()) {
+      if (user.id === message.author.id) continue; // Kendini etiketlerse atla
+      const data = await AfkModel.findOne({ guildId: message.guildId, userId: user.id });
+      if (data) {
+        const süre = `<t:${Math.floor(data.timestamp / 1000)}:R>`;
+        message.reply(`🛑 **${user.username}** şu an AFK!\n**Sebep:** ${data.reason}\n**AFK Olma Süresi:** ${süre}`)
+          .then(m => setTimeout(() => m.delete().catch(() => {}), 10000));
+      }
+    }
+  }
+
+  // =========================================================
   // TICKET OTOMATİK KAPANMA TIMER SIFIRLAMA
   // =========================================================
-  const ticketData = await TicketModel.findOne({ 
-    channelId: message.channel.id, 
-    status: 'open' 
+  const ticketData = await TicketModel.findOne({
+    channelId: message.channel.id,
+    status: 'open'
   });
-
   if (ticketData) {
-    // Son aktiviteyi güncelle
     await TicketModel.updateOne(
       { channelId: message.channel.id },
       { lastActivity: Date.now() }
     );
-
-    // Eski timer varsa temizle
     if (client.ticketTimeouts && client.ticketTimeouts[message.channel.id]) {
       clearTimeout(client.ticketTimeouts[message.channel.id]);
     }
-
-    // Yeni timer başlat
     if (!client.ticketTimeouts) client.ticketTimeouts = {};
-
     client.ticketTimeouts[message.channel.id] = setTimeout(async () => {
-      const stillOpen = await TicketModel.findOne({ 
-        channelId: message.channel.id, 
-        status: 'open' 
+      const stillOpen = await TicketModel.findOne({
+        channelId: message.channel.id,
+        status: 'open'
       });
-
       if (stillOpen && message.channel.deletable) {
         await message.channel.send('⏰ Uzun süredir yeni mesaj gelmediği için bu ticket otomatik olarak kapatılıyor...');
-
-        // interactionCreate'deki closeTicket fonksiyonu yerine basit silme (veya aynı mantık)
         setTimeout(async () => {
           try {
-            // Sesli kanal bul ve sil
             const parentId = message.channel.parentId;
             const voiceChannel = message.guild.channels.cache.find(c =>
               c.type === ChannelType.GuildVoice &&
@@ -96,7 +116,6 @@ module.exports = async (message) => {
               c.name.startsWith('🔊-')
             );
             if (voiceChannel) await voiceChannel.delete().catch(() => {});
-
             await message.channel.delete().catch(() => {});
           } catch (e) {
             console.log("Otomatik kapatma silme hatası:", e);
@@ -110,14 +129,12 @@ module.exports = async (message) => {
   // KÜFÜR ENGELLEME
   // =========================================================
   if (settings.kufurEngel) {
-    const tespitEdilen = küfürler.find(k => 
+    const tespitEdilen = küfürler.find(k =>
       içerik.includes(k) || kelimeSınırKontrol(tamİçerik, k)
     );
-
     if (tespitEdilen) {
       try {
         await message.delete();
-
         const uyarı = await message.channel.send({
           embeds: [new EmbedBuilder()
             .setColor("Red")
@@ -125,7 +142,6 @@ module.exports = async (message) => {
           ]
         });
         setTimeout(() => uyarı.delete().catch(() => {}), 5000);
-
         if (settings.kufurLog) {
           const logKanal = message.guild.channels.cache.get(settings.kufurLog);
           if (logKanal && logKanal.permissionsFor(client.user).has(PermissionsBitField.Flags.SendMessages)) {
@@ -140,7 +156,6 @@ module.exports = async (message) => {
                 { name: "Zaman", value: `<t:${Math.floor(Date.now() / 1000)}:F>` }
               )
               .setThumbnail(message.author.displayAvatarURL());
-
             logKanal.send({ embeds: [logEmbed] }).catch(() => {});
           }
         }
@@ -156,15 +171,12 @@ module.exports = async (message) => {
   // =========================================================
   if (settings.reklamEngel) {
     const reklamVar = reklamlar.some(r => içerik.includes(r));
-
     if (reklamVar) {
       try {
         await message.delete();
-
-        const logKanal = settings.reklamLog 
+        const logKanal = settings.reklamLog
           ? message.guild.channels.cache.get(settings.reklamLog)
           : message.channel;
-
         if (logKanal && logKanal.permissionsFor(client.user).has(PermissionsBitField.Flags.SendMessages)) {
           const embed = new EmbedBuilder()
             .setColor("Orange")
@@ -176,10 +188,8 @@ module.exports = async (message) => {
               { name: "Zaman", value: `<t:${Math.floor(Date.now() / 1000)}:F>` }
             )
             .setThumbnail(message.author.displayAvatarURL());
-
           await logKanal.send({ embeds: [embed] });
         }
-
         if (!settings.reklamLog) {
           message.channel.send({
             embeds: [new EmbedBuilder()
@@ -200,13 +210,12 @@ module.exports = async (message) => {
   // =========================================================
   if (settings.saasAktif) {
     const selamlar = ["sa", "selam", "selamün aleyküm", "selamun aleyküm", "sea", "s.a", "selamun aleykum"];
-    const selamVerildi = selamlar.some(s => 
-      içerik === s || 
-      içerik.startsWith(s + " ") || 
+    const selamVerildi = selamlar.some(s =>
+      içerik === s ||
+      içerik.startsWith(s + " ") ||
       içerik.startsWith(s + ",") ||
       içerik.startsWith(s + ".")
     );
-
     if (selamVerildi) {
       const yanıtlar = [
         "Aleyküm selam, hoş geldin! 👋",
@@ -216,7 +225,6 @@ module.exports = async (message) => {
         "Sa kanka, iyi misin? 🔥",
         "Aleyküm selam, ne haber? 🌟"
       ];
-
       const rastgele = yanıtlar[Math.floor(Math.random() * yanıtlar.length)];
       message.reply(rastgele).catch(() => {});
     }
