@@ -19,10 +19,7 @@ const BotlistSettings = require('../models/BotlistSettings');
 const AUTO_CLOSE_TIMEOUT = 15 * 60 * 1000;
 
 module.exports = async (client, interaction) => {
-    // Zaten cevap verilmişse çık
     if (interaction.replied || interaction.deferred) return;
-
-    // Sadece button ve modal submit kabul et
     if (!interaction.isButton() && interaction.type !== InteractionType.ModalSubmit) return;
 
     try {
@@ -37,7 +34,7 @@ module.exports = async (client, interaction) => {
         };
 
         // =========================================================
-        // TICKET KAPATMA FONKSİYONU (transcript fixlendi)
+        // TICKET KAPATMA FONKSİYONU
         // =========================================================
         const closeTicket = async (channel, reason = 'Manuel kapatılma', closer = null) => {
             const ticketData = await TicketModel.findOne({ channelId: channel.id });
@@ -53,7 +50,6 @@ module.exports = async (client, interaction) => {
             const settings = await TicketSettings.findOne({ guildId: channel.guild.id });
             const logChannel = settings?.logChannelId ? channel.guild.channels.cache.get(settings.logChannelId) : null;
 
-            // Transcript FIX: .first(20) doğru metod, reverse sonra
             let transcript = 'Mesaj bulunamadı.';
             const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
             if (messages && messages.size > 0) {
@@ -111,7 +107,7 @@ module.exports = async (client, interaction) => {
         };
 
         // =========================================================
-        // 1. TICKET MODAL AÇMA
+        // 1. TICKET MODAL AÇMA (textInputs hatası düzeltildi)
         // =========================================================
         if (interaction.isButton() && interaction.customId === 'open_ticket_modal') {
             const modal = new ModalBuilder()
@@ -136,7 +132,7 @@ module.exports = async (client, interaction) => {
                 .setMaxLength(1000);
 
             modal.addComponents(
-                new ActionRowBuilder().textInputs(topicInput),
+                new ActionRowBuilder().addComponents(topicInput),
                 new ActionRowBuilder().addComponents(descriptionInput)
             );
 
@@ -188,7 +184,7 @@ module.exports = async (client, interaction) => {
             const check = await getStaffRoleCheck();
             if (!check.allowed) return interaction.reply({ content: '❌ Bu butonu sadece **destek ekibi** kullanabilir!', flags: 64 });
 
-            await interaction.reply('🔒 Talep sonlandırılıyor...');
+            await interaction.reply({ content: '🔒 Talep sonlandırılıyor...' });
             await closeTicket(interaction.channel, 'Yetkili tarafından manuel kapatıldı', interaction.user);
             return;
         }
@@ -377,7 +373,6 @@ module.exports = async (client, interaction) => {
             return;
         }
 
-        // Manuel kanal kilidi açma
         if (interaction.isButton() && interaction.customId.startsWith('unlock_manual_')) {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
                 return interaction.reply({ content: '❌ Yetkiniz yetersiz.', flags: 64 });
@@ -400,9 +395,8 @@ module.exports = async (client, interaction) => {
         }
 
     } catch (error) {
-        // DiscordAPIError 40060 ve 10062 hatalarını yut (eski interaction'lar)
         if (error.code === 40060 || error.code === 10062) {
-            console.log('Eski interaction hatası yutuldu (normal):', error.message);
+            console.log('Eski interaction hatası yutuldu:', error.message);
             return;
         }
         console.error('Bilinmeyen interaction hatası:', error);
