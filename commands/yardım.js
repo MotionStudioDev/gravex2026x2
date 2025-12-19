@@ -17,7 +17,7 @@ module.exports.run = async (client, message) => {
     // Komut kategorileri
     const commandLists = {
       'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yardım'],
-      'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'çeviri', 'emojiler', 'steam', 'songörülme', 'emoji-bilgi'],
+      'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'emoji-bilgi'],
       'moderasyon': ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
       'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'botlist-kur', 'botlist-ayarla', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'ticket-sistemi', 'ticket-sıfırla', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'modlog', 'slowmode'],
       'sahip': ['reload', 'mesaj-gönder'],
