@@ -4,7 +4,7 @@ module.exports.run = async (client, message, args) => {
     const target = message.mentions.users.first() || client.users.cache.get(args[0]) || message.author;
     const member = message.guild.members.cache.get(target.id);
 
-    // Avatar ve banner URL'leri
+    // Avatar ve banner
     const getAvatar = (size = 1024, format = 'png', server = false) => {
         if (server && member?.avatar) {
             return member.displayAvatarURL({ size, format, dynamic: true });
@@ -14,8 +14,9 @@ module.exports.run = async (client, message, args) => {
 
     const banner = target.bannerURL({ size: 1024, dynamic: true });
 
-    // Nitro kontrolü
-    const hasNitro = target.banner || target.displayAvatarURL().endsWith('.gif') || target.flags?.toArray().some(f => f.includes('Premium'));
+    // Nitro kontrolü (daha doğru)
+    const avatarIsGif = target.displayAvatarURL({ dynamic: true }).endsWith('.gif');
+    const hasNitro = !!banner || avatarIsGif || !!target.banner || !!target.flags?.has('Premium');
 
     let current = {
         category: member?.avatar ? 'server' : 'global',
@@ -29,7 +30,7 @@ module.exports.run = async (client, message, args) => {
         const url = isBanner ? banner : getAvatar(current.size, current.format, isServer);
 
         const title = isBanner ? '🎨 Banner' : isServer ? '🏠 Sunucu Avatarı' : '🌐 Genel Avatar';
-        const desc = isBanner ? 'Kullanıcının profil bannerı (Nitro gerektirir)' :
+        const desc = isBanner ? 'Profil bannerı (Nitro gerektirir)' :
                      isServer ? 'Bu sunucudaki özel avatar' : 'Discord genelindeki avatar';
 
         return new EmbedBuilder()
@@ -45,41 +46,39 @@ module.exports.run = async (client, message, args) => {
                     `**ID:** \`${target.id}\``
                 ].join('\n'), inline: true }
             )
-            .setFooter({ text: `g!avatar • ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
+            .setFooter({ text: `Bu pp ne la qardeş • ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
     };
 
-    // Kategori menüsü
+    // Kategori menüsü (seçiliyi vurgula)
     const categoryMenu = new StringSelectMenuBuilder()
         .setCustomId('category')
         .setPlaceholder('Kategori seç...')
         .addOptions([
-            { label: 'Genel Avatar', value: 'global', emoji: '🌐' },
-            ...(member?.avatar ? [{ label: 'Sunucu Avatarı', value: 'server', emoji: '🏠' }] : []),
-            ...(banner ? [{ label: 'Banner', value: 'banner', emoji: '🎨' }] : [])
+            { label: 'Genel Avatar', value: 'global', emoji: '🌐', default: current.category === 'global' },
+            ...(member?.avatar ? [{ label: 'Sunucu Avatarı', value: 'server', emoji: '🏠', default: current.category === 'server' }] : []),
+            ...(banner ? [{ label: 'Banner', value: 'banner', emoji: '🎨', default: current.category === 'banner' }] : [])
         ]);
 
     // Boyut menüsü
     const sizeMenu = new StringSelectMenuBuilder()
         .setCustomId('size')
         .setPlaceholder('Boyut seç...')
-        .addOptions([
-            { label: '128x128', value: '128' },
-            { label: '256x256', value: '256' },
-            { label: '512x512', value: '512' },
-            { label: '1024x1024', value: '1024' },
-            { label: '2048x2048', value: '2048' },
-            { label: '4096x4096', value: '4096', emoji: '🔥' }
-        ]);
+        .addOptions([128, 256, 512, 1024, 2048, 4096].map(s => ({
+            label: `${s}x${s}`,
+            value: s.toString(),
+            default: current.size === s,
+            emoji: s === 4096 ? '🔥' : s >= 2048 ? '⚡' : undefined
+        })));
 
     // Format menüsü
     const formatMenu = new StringSelectMenuBuilder()
         .setCustomId('format')
         .setPlaceholder('Format seç...')
         .addOptions([
-            { label: 'PNG', value: 'png', emoji: '🖼️' },
-            { label: 'JPG', value: 'jpg' },
-            { label: 'WEBP', value: 'webp' },
-            ...(target.displayAvatarURL().endsWith('.gif') ? [{ label: 'GIF', value: 'gif', emoji: '🎞️' }] : [])
+            { label: 'PNG', value: 'png', emoji: '🖼️', default: current.format === 'png' },
+            { label: 'JPG', value: 'jpg', default: current.format === 'jpg' },
+            { label: 'WEBP', value: 'webp', default: current.format === 'webp' },
+            ...(avatarIsGif ? [{ label: 'GIF', value: 'gif', emoji: '🎞️', default: current.format === 'gif' }] : [])
         ]);
 
     // Butonlar
@@ -125,6 +124,16 @@ module.exports.run = async (client, message, args) => {
             current.format = i.values[0];
         }
 
+        // Menüleri güncelle (seçili seçenek vurgulanır)
+        const updatedCategoryMenu = StringSelectMenuBuilder.from(categoryMenu)
+            .setOptions(categoryMenu.options.map(opt => ({ ...opt.data, default: opt.data.value === current.category })));
+
+        const updatedSizeMenu = StringSelectMenuBuilder.from(sizeMenu)
+            .setOptions(sizeMenu.options.map(opt => ({ ...opt.data, default: parseInt(opt.data.value) === current.size })));
+
+        const updatedFormatMenu = StringSelectMenuBuilder.from(formatMenu)
+            .setOptions(formatMenu.options.map(opt => ({ ...opt.data, default: opt.data.value === current.format })));
+
         // Buton linklerini güncelle
         const updatedButtons = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setLabel('PNG İndir').setStyle(ButtonStyle.Link).setURL(getAvatar(current.size, 'png', current.category === 'server')),
@@ -136,9 +145,9 @@ module.exports.run = async (client, message, args) => {
         await i.update({
             embeds: [createEmbed()],
             components: [
-                new ActionRowBuilder().addComponents(categoryMenu.setOptions(categoryMenu.options.map(opt => opt.setDefault(opt.data.value === current.category)))),
-                new ActionRowBuilder().addComponents(sizeMenu.setOptions(sizeMenu.options.map(opt => opt.setDefault(opt.data.value == current.size)))),
-                new ActionRowBuilder().addComponents(formatMenu.setOptions(formatMenu.options.map(opt => opt.setDefault(opt.data.value === current.format)))),
+                new ActionRowBuilder().addComponents(updatedCategoryMenu),
+                new ActionRowBuilder().addComponents(updatedSizeMenu),
+                new ActionRowBuilder().addComponents(updatedFormatMenu),
                 updatedButtons
             ]
         });
@@ -155,5 +164,5 @@ module.exports.conf = {
 
 module.exports.help = {
     name: 'avatar',
-    description: 'Gelişmiş avatar görüntüleme sistemi (kategori, boyut, format seçimi, banner desteği)'
+    description: 'Gelişmiş avatar görüntüleme sistemi (kategori, boyut, format, banner, nitro kontrolü)'
 };
