@@ -14,9 +14,9 @@ module.exports.run = async (client, message, args) => {
 
     const banner = target.bannerURL({ size: 1024, dynamic: true });
 
-    // Nitro kontrolü (daha doğru)
+    // Nitro kontrolü (GÜVENLİ ve DOĞRU yöntem)
     const avatarIsGif = target.displayAvatarURL({ dynamic: true }).endsWith('.gif');
-    const hasNitro = !!banner || avatarIsGif || !!target.banner || !!target.flags?.has('Premium');
+    const hasNitro = !!banner || avatarIsGif;
 
     let current = {
         category: member?.avatar ? 'server' : 'global',
@@ -46,17 +46,17 @@ module.exports.run = async (client, message, args) => {
                     `**ID:** \`${target.id}\``
                 ].join('\n'), inline: true }
             )
-            .setFooter({ text: `Bu pp ne la qardeş • ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
+            .setFooter({ text: `g!avatar • ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
     };
 
-    // Kategori menüsü (seçiliyi vurgula)
+    // Kategori menüsü
     const categoryMenu = new StringSelectMenuBuilder()
         .setCustomId('category')
         .setPlaceholder('Kategori seç...')
         .addOptions([
-            { label: 'Genel Avatar', value: 'global', emoji: '🌐', default: current.category === 'global' },
-            ...(member?.avatar ? [{ label: 'Sunucu Avatarı', value: 'server', emoji: '🏠', default: current.category === 'server' }] : []),
-            ...(banner ? [{ label: 'Banner', value: 'banner', emoji: '🎨', default: current.category === 'banner' }] : [])
+            { label: 'Genel Avatar', value: 'global', emoji: '🌐' },
+            ...(member?.avatar ? [{ label: 'Sunucu Avatarı', value: 'server', emoji: '🏠' }] : []),
+            ...(banner ? [{ label: 'Banner', value: 'banner', emoji: '🎨' }] : [])
         ]);
 
     // Boyut menüsü
@@ -66,7 +66,6 @@ module.exports.run = async (client, message, args) => {
         .addOptions([128, 256, 512, 1024, 2048, 4096].map(s => ({
             label: `${s}x${s}`,
             value: s.toString(),
-            default: current.size === s,
             emoji: s === 4096 ? '🔥' : s >= 2048 ? '⚡' : undefined
         })));
 
@@ -75,10 +74,10 @@ module.exports.run = async (client, message, args) => {
         .setCustomId('format')
         .setPlaceholder('Format seç...')
         .addOptions([
-            { label: 'PNG', value: 'png', emoji: '🖼️', default: current.format === 'png' },
-            { label: 'JPG', value: 'jpg', default: current.format === 'jpg' },
-            { label: 'WEBP', value: 'webp', default: current.format === 'webp' },
-            ...(avatarIsGif ? [{ label: 'GIF', value: 'gif', emoji: '🎞️', default: current.format === 'gif' }] : [])
+            { label: 'PNG', value: 'png', emoji: '🖼️' },
+            { label: 'JPG', value: 'jpg' },
+            { label: 'WEBP', value: 'webp' },
+            ...(avatarIsGif ? [{ label: 'GIF', value: 'gif', emoji: '🎞️' }] : [])
         ]);
 
     // Butonlar
@@ -124,14 +123,14 @@ module.exports.run = async (client, message, args) => {
             current.format = i.values[0];
         }
 
-        // Menüleri güncelle (seçili seçenek vurgulanır)
-        const updatedCategoryMenu = StringSelectMenuBuilder.from(categoryMenu)
+        // Menüleri güncelle (seçili vurgulanır)
+        const updatedCategory = StringSelectMenuBuilder.from(categoryMenu)
             .setOptions(categoryMenu.options.map(opt => ({ ...opt.data, default: opt.data.value === current.category })));
 
-        const updatedSizeMenu = StringSelectMenuBuilder.from(sizeMenu)
+        const updatedSize = StringSelectMenuBuilder.from(sizeMenu)
             .setOptions(sizeMenu.options.map(opt => ({ ...opt.data, default: parseInt(opt.data.value) === current.size })));
 
-        const updatedFormatMenu = StringSelectMenuBuilder.from(formatMenu)
+        const updatedFormat = StringSelectMenuBuilder.from(formatMenu)
             .setOptions(formatMenu.options.map(opt => ({ ...opt.data, default: opt.data.value === current.format })));
 
         // Buton linklerini güncelle
@@ -145,9 +144,9 @@ module.exports.run = async (client, message, args) => {
         await i.update({
             embeds: [createEmbed()],
             components: [
-                new ActionRowBuilder().addComponents(updatedCategoryMenu),
-                new ActionRowBuilder().addComponents(updatedSizeMenu),
-                new ActionRowBuilder().addComponents(updatedFormatMenu),
+                new ActionRowBuilder().addComponents(updatedCategory),
+                new ActionRowBuilder().addComponents(updatedSize),
+                new ActionRowBuilder().addComponents(updatedFormat),
                 updatedButtons
             ]
         });
@@ -164,5 +163,5 @@ module.exports.conf = {
 
 module.exports.help = {
     name: 'avatar',
-    description: 'Gelişmiş avatar görüntüleme sistemi (kategori, boyut, format, banner, nitro kontrolü)'
+    description: 'Gelişmiş avatar görüntüleme sistemi'
 };
