@@ -2,75 +2,77 @@ const { EmbedBuilder } = require('discord.js');
 const { OpenAI } = require('openai');
 
 const openai = new OpenAI({
-  apiKey: 'cc25c34d20b54b2eb76fb7795fc7d20b',
-  baseURL: 'https://api.aimlapi.com',
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: "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",
+  defaultHeaders: {
+    "HTTP-Referer": "https://grave-bot.com",
+    "X-Title": "Grave Bot",
+  }
 });
 
 module.exports.run = async (client, message, args) => {
   const prompt = args.join(' ');
-  if (!prompt) return message.reply('❌ **Hey!** Bana bir şeyler sorman gerekiyor. Örn: `!sor Discord botu nasıl yapılır?`');
+  if (!prompt) return message.reply('❌ **Hata:** Analiz etmem için bir soru sorman gerekiyor!');
 
-  // 1. Bekleme Embed'i
+  // Başlangıç Yükleme Embed'i (Senin istediğin stil)
   const loadingEmbed = new EmbedBuilder()
-    .setColor('Orange')
-    .setAuthor({ name: 'Zihin Okunuyor...', iconURL: 'https://i.getlyrical.com/i/loading_ai.gif' }) // Varsa bir loading animasyonu
-    .setDescription('⏳ Veriler işleniyor ve en iyi yanıt hazırlanıyor...');
+    .setColor('Yellow')
+    .setDescription('⏳ **MotionAI** verileri analiz ediyor... Lütfen bekleyin.');
 
   const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
-  // Discord'da "Bot Yazıyor..." simgesini başlat
+  // Discord "Yazıyor..." efekti
   await message.channel.sendTyping();
+
+  const startTime = Date.now();
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', 
+      // Senin istediğin özel ücretsiz model
+      model: "tngtech/deepseek-r1t2-chimera:free", 
       messages: [
         { 
-          role: 'system', 
-          content: 'Sen "Grave" isimli gelişmiş bir Discord asistanısın. Yardımsever, zeki ve bazen hafif esprili bir dil kullanmalısın. Yanıtlarını Markdown kullanarak (kalın yazı, listeler vb.) süsle.' 
+          role: "system", 
+          content: "Sen Grave asistanısın. DeepSeek Chimera altyapısını kullanan, mantıksal ve teknik bir yardımcımsın. Yanıtlarını adım adım düşünerek ver." 
         },
-        { role: 'user', content: prompt }
+        { role: "user", content: prompt }
       ],
-      temperature: 0.7, // Yanıtın yaratıcılık dengesi
-      max_tokens: 1500  // Çok uzun olup krediyi aniden bitirmemesi için sınır
+      // Ücretsiz modellerde bazen limitler olabilir, bu yüzden token'ı dengeli tutuyoruz
+      max_tokens: 2000 
     });
 
     const aiResponse = completion.choices[0].message.content;
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-    // 2. Başarılı Sonuç Embed'i
     const resultEmbed = new EmbedBuilder()
-      .setColor('#5865F2') // Discord Blurple rengi
+      .setColor('#00ffaa') // Chimera temasına uygun neon yeşil
       .setAuthor({ 
-        name: `${message.author.username} sordu:`, 
+        name: `${message.author.username} sordu`, 
         iconURL: message.author.displayAvatarURL({ dynamic: true }) 
       })
-      .setTitle(' Grave Yapay Zeka')
+      .setTitle('🧠 Grave Analiz')
       .setDescription(aiResponse.length > 4000 ? aiResponse.substring(0, 4000) + '...' : aiResponse)
-      .addFields({ name: '💬 Senin Sorun', value: `\`\`\`${prompt.substring(0, 1024)}\`\`\`` })
-      .setFooter({ text: 'Powered by MotionAI • GPT-4o Model', iconURL: client.user.displayAvatarURL() })
+      .addFields(
+        { name: '⏱️ Süre', value: `\`${duration}sn\``, inline: true },
+        { name: '🔋 Maliyet', value: `\`Ücretsiz (Free)\``, inline: true },
+        { name: '📡 Model', value: `\`MotionAI R1\``, inline: true }
+      )
+      .setFooter({ text: 'Grave AI • Veriler analiz edildi.', iconURL: client.user.displayAvatarURL() })
       .setTimestamp();
 
     await msg.edit({ embeds: [resultEmbed] });
 
   } catch (error) {
-    console.error('AI Hatası:', error);
-
-    // Kredi bittiyse veya bakiye yetersizse özel hata mesajı
-    if (error.status === 403) {
-      const bakiyeEmbed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('⚠️ Sistem Bakiyesi Tükendi')
-        .setDescription('Yapay zeka motorunun kredisi bittiği için şu an yanıt veremiyorum. Lütfen yöneticiye bakiye yüklemesi yapmasını iletin.');
-      return msg.edit({ embeds: [bakiyeEmbed] });
-    }
+    console.error('Chimera API Hatası:', error);
 
     const errorEmbed = new EmbedBuilder()
       .setColor('Red')
-      .setDescription('❌ Üzgünüm, zihnimde bir kısa devre oluştu. Lütfen biraz sonra tekrar dene!');
+      .setTitle('⚠️ Analiz Başarısız')
+      .setDescription('Ücretsiz model şu an yoğun olabilir veya API hatası oluştu. Lütfen tekrar deneyin.');
     
     await msg.edit({ embeds: [errorEmbed] });
   }
 };
 
 module.exports.help = { name: 'sor' };
-module.exports.conf = { aliases: ['ai', 'gpt', 'ask'] };
+module.exports.conf = { aliases: ['ai', 'ask', 'chimera'] };
