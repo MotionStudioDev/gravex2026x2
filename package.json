@@ -33,6 +33,7 @@
     "@google/genai": "^1.30.0",
     "axios": "^1.13.2",
     "chalk": "^5.6.2",
+    "openai": "^6.15.0",
     "ee-first": "^1.1.1",
     "mongodb": "^7.0.0",
     "mongoose": "^8.20.1",
