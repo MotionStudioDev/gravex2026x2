@@ -1,97 +1,98 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 
 module.exports.run = async (client, message, args) => {
-  // Verileri çekme fonksiyonu
-  const getStats = async (guild) => {
-    // withPresences: true çevrimiçi sayımı için kritik
-    const members = await guild.members.fetch({ withPresences: true });
+  // İlk yükleme mesajı
+  const loadingEmbed = new EmbedBuilder()
+    .setColor('Yellow')
+    .setDescription('⏳ Veriler analiz ediliyor, lütfen bekleyin...');
+
+  const msg = await message.channel.send({ embeds: [loadingEmbed] });
+
+  // İstatistik fonksiyonunu basitleştirdik ve hızlandırdık
+  const getStatsData = async (guild) => {
+    // Büyük sunucularda timeoutu engellemek için cache + fetch hibrit kullanımı
+    const members = await guild.members.fetch({ withPresences: true }).catch(() => guild.members.cache);
     
     const total = guild.memberCount;
     const bots = members.filter(m => m.user.bot).size;
     const humans = total - bots;
+    
     const online = members.filter(m => m.presence?.status === 'online').size;
     const idle = members.filter(m => m.presence?.status === 'idle').size;
     const dnd = members.filter(m => m.presence?.status === 'dnd').size;
     const offline = total - (online + idle + dnd);
-    const boosts = guild.premiumSubscriptionCount || 0;
-    const nitroCount = members.filter(m => !m.user.bot && m.premiumSince).size;
 
-    return { total, bots, humans, online, idle, dnd, offline, boosts, nitroCount, tier: guild.premiumTier };
+    const totalBoosts = guild.premiumSubscriptionCount || 0;
+    const boostingMembers = members.filter(m => m.premiumSince).size;
+
+    return { total, bots, humans, online, idle, dnd, offline, totalBoosts, boostingMembers, tier: guild.premiumTier };
   };
 
-  const createEmbed = (guild, s) => {
+  const buildEmbed = (guild, s) => {
     return new EmbedBuilder()
       .setColor('#5865F2')
-      .setTitle(`📊 ${guild.name} - Üye İstatistikleri`)
+      .setAuthor({ name: `${guild.name} Sunucu İstatistikleri`, iconURL: guild.iconURL({ dynamic: true }) })
       .setThumbnail(guild.iconURL({ dynamic: true }))
       .addFields(
-        { name: '👥 Üye Dağılımı', value: `> Toplam: \`${s.total}\`\n> İnsan: \`${s.humans}\`\n> Bot: \`${s.bots}\``, inline: true },
-        { name: '🟢 Aktiflik', value: `> Çevrimiçi: \`${s.online}\`\n> Boşta: \`${s.idle}\`\n> R. Etmeyin: \`${s.dnd}\``, inline: true },
-        { name: '💎 Takviye & Nitro', value: `> Toplam Boost: \`${s.boosts}\` Adet\n> Takviyeci: \`${s.nitroCount}\` Kişi\n> Seviye: \`Level ${s.tier}\``, inline: false }
+        { name: '👥 Üyeler', value: `> Toplam: \`${s.total}\`\n> İnsan: \`${s.humans}\`\n> Bot: \`${s.bots}\``, inline: true },
+        { name: '🟢 Aktiflik', value: `> Online: \`${s.online}\`\n> Boşta: \`${s.idle}\`\n> DND: \`${s.dnd}\``, inline: true },
+        { name: '💎 Takviye', value: `> Boost: \`${s.totalBoosts}\` (Lvl ${s.tier})\n> Takviyeci: \`${s.boostingMembers}\``, inline: false }
       )
-      .setFooter({ text: 'Verileri güncellemek için butonu kullanın.', iconURL: client.user.displayAvatarURL() })
+      .setFooter({ text: `Güncelleyen: ${message.author.tag}`, iconURL: message.author.displayAvatarURL() })
       .setTimestamp();
   };
 
-  // Butonları oluştururken ActionRow içine koyduğumuzdan emin oluyoruz
-  const refreshButton = new ButtonBuilder()
+  // Butonu tekrar tanımlıyoruz
+  const refreshBtn = new ButtonBuilder()
     .setCustomId('refresh_stats')
     .setLabel('Verileri Güncelle')
     .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary);
 
-  const botButton = new ButtonBuilder()
-    .setCustomId('bot_list')
-    .setLabel('Bot Sayısı')
-    .setEmoji('🤖')
-    .setStyle(ButtonStyle.Secondary);
-
-  const row = new ActionRowBuilder().addComponents(refreshButton, botButton);
+  const row = new ActionRowBuilder().addComponents(refreshBtn);
 
   try {
-    const s = await getStats(message.guild);
-    const msg = await message.channel.send({ 
-      embeds: [createEmbed(message.guild, s)], 
-      components: [row] // components bir dizi (array) olmalı ve içinde ActionRow olmalı
-    });
+    const stats = await getStatsData(message.guild);
+    await msg.edit({ embeds: [buildEmbed(message.guild, stats)], components: [row] });
 
+    // --- BUTON TOPLAYICISI (COLLECTOR) ---
     const collector = msg.createMessageComponentCollector({ 
       componentType: ComponentType.Button, 
-      time: 60000 
+      time: 60000 // Buton 1 dakika boyunca aktif kalır
     });
 
-    collector.on('collect', async i => {
+    collector.on('collect', async (i) => {
+      // Sadece komutu yazan basabilsin
       if (i.user.id !== message.author.id) {
-        return i.reply({ content: '❌ Bu işlemi sadece komutu yazan kişi yapabilir.', ephemeral: true });
+        return i.reply({ content: '❌ Bu butonu sadece komutu kullanan kişi kullanabilir.', ephemeral: true });
       }
 
-      if (i.customId === 'refresh_stats') {
-        // Güncelleniyor efekti için butonu devre dışı bırakıp güncelle
-        await i.deferUpdate(); 
-        const updatedStats = await getStats(message.guild);
+      try {
+        // 1. Önce butona tıklandığını onayla (Discord hata vermesin)
+        await i.deferUpdate();
+
+        // 2. Yeni verileri çek
+        const newStats = await getStatsData(message.guild);
+
+        // 3. Mesajı güncelle
         await i.editReply({ 
-          embeds: [createEmbed(message.guild, updatedStats)], 
+          embeds: [buildEmbed(message.guild, newStats)], 
           components: [row] 
         });
-      }
-
-      if (i.customId === 'bot_list') {
-        const stats = await getStats(message.guild);
-        await i.reply({ content: `🤖 Sunucuda şu an toplam **${stats.bots}** bot bulunuyor.`, ephemeral: true });
+      } catch (err) {
+        console.error('Buton güncelleme hatası:', err);
       }
     });
 
     collector.on('end', () => {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        refreshButton.setDisabled(true),
-        botButton.setDisabled(true)
-      );
+      // Süre bittiğinde butonu kapat
+      const disabledRow = new ActionRowBuilder().addComponents(refreshBtn.setDisabled(true));
       msg.edit({ components: [disabledRow] }).catch(() => {});
     });
 
   } catch (err) {
-    console.error(err);
-    message.reply('❌ Veriler çekilirken bir hata oluştu.');
+    console.error('Genel hata:', err);
+    message.reply('❌ Bir hata oluştu, lütfen bot yetkilerini kontrol edin.');
   }
 };
 
