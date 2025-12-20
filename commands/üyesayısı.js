@@ -1,160 +1,99 @@
-const { EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 
 module.exports.run = async (client, message, args) => {
-  const loadingEmbed = new EmbedBuilder()
-    .setColor('Yellow')
-    .setDescription('⏳ Sunucu verileri analiz ediliyor, lütfen bekleyin...');
-
-  const msg = await message.channel.send({ embeds: [loadingEmbed] });
-
-  try {
-    const members = await message.guild.members.fetch();
+  // Verileri çekme fonksiyonu
+  const getStats = async (guild) => {
+    // withPresences: true çevrimiçi sayımı için kritik
+    const members = await guild.members.fetch({ withPresences: true });
     
-    const totalMembers = message.guild.memberCount;
-    const botCount = members.filter(m => m.user.bot).size;
-    const humanCount = totalMembers - botCount;
-
+    const total = guild.memberCount;
+    const bots = members.filter(m => m.user.bot).size;
+    const humans = total - bots;
     const online = members.filter(m => m.presence?.status === 'online').size;
     const idle = members.filter(m => m.presence?.status === 'idle').size;
     const dnd = members.filter(m => m.presence?.status === 'dnd').size;
-    const offline = totalMembers - (online + idle + dnd);
+    const offline = total - (online + idle + dnd);
+    const boosts = guild.premiumSubscriptionCount || 0;
+    const nitroCount = members.filter(m => !m.user.bot && m.premiumSince).size;
 
-    const nitroCount = members.filter(m => 
-      !m.user.bot && 
-      m.premiumSince && 
-      m.premiumSince instanceof Date
-    ).size;
+    return { total, bots, humans, online, idle, dnd, offline, boosts, nitroCount, tier: guild.premiumTier };
+  };
 
-    const resultEmbed = new EmbedBuilder()
+  const createEmbed = (guild, s) => {
+    return new EmbedBuilder()
       .setColor('#5865F2')
-      .setTitle(`📊 ${message.guild.name} - Üye İstatistikleri`)
-      .setThumbnail(message.guild.iconURL({ dynamic: true }))
+      .setTitle(`📊 ${guild.name} - Üye İstatistikleri`)
+      .setThumbnail(guild.iconURL({ dynamic: true }))
       .addFields(
-        { 
-          name: '👥 Genel Toplam', 
-          value: `> **Toplam Üye:** \`${totalMembers}\`\n> **Kullanıcı:** \`${humanCount}\`\n> **Bot:** \`${botCount}\``, 
-          inline: false 
-        },
-        { 
-          name: '🟢 Aktiflik Durumu', 
-          value: `> Çevrimiçi: \`${online}\`\n> Boşta: \`${idle}\`\n> R. Etmeyin: \`${dnd}\`\n> Çevrimdışı: \`${offline}\``, 
-          inline: true 
-        },
-        { 
-          name: '✨ Özel İstatistik', 
-          value: `> **Takviye (Nitro):** \`${nitroCount}\`\n> **Boost Seviyesi:** \`${message.guild.premiumTier}\``, 
-          inline: true 
-        }
+        { name: '👥 Üye Dağılımı', value: `> Toplam: \`${s.total}\`\n> İnsan: \`${s.humans}\`\n> Bot: \`${s.bots}\``, inline: true },
+        { name: '🟢 Aktiflik', value: `> Çevrimiçi: \`${s.online}\`\n> Boşta: \`${s.idle}\`\n> R. Etmeyin: \`${s.dnd}\``, inline: true },
+        { name: '💎 Takviye & Nitro', value: `> Toplam Boost: \`${s.boosts}\` Adet\n> Takviyeci: \`${s.nitroCount}\` Kişi\n> Seviye: \`Level ${s.tier}\``, inline: false }
       )
-      .setFooter({ text: 'Veriler anlık olarak güncellendi.', iconURL: client.user.displayAvatarURL() })
+      .setFooter({ text: 'Verileri güncellemek için butonu kullanın.', iconURL: client.user.displayAvatarURL() })
       .setTimestamp();
+  };
 
-    // Create the refresh button
-    const refreshButton = new ButtonBuilder()
-      .setCustomId('refreshData')
-      .setLabel('Verileri Güncelle')
-      .setStyle(ButtonStyle.Primary);
+  // Butonları oluştururken ActionRow içine koyduğumuzdan emin oluyoruz
+  const refreshButton = new ButtonBuilder()
+    .setCustomId('refresh_stats')
+    .setLabel('Verileri Güncelle')
+    .setEmoji('🔄')
+    .setStyle(ButtonStyle.Primary);
 
-    // Send the result with the button
-    await msg.edit({ embeds: [resultEmbed], components: [refreshButton] });
+  const botButton = new ButtonBuilder()
+    .setCustomId('bot_list')
+    .setLabel('Bot Sayısı')
+    .setEmoji('🤖')
+    .setStyle(ButtonStyle.Secondary);
 
-    // Create a collector for button interactions
-    const collector = msg.createMessageComponentCollector({ componentType: 'BUTTON', time: 300000 });
+  const row = new ActionRowBuilder().addComponents(refreshButton, botButton);
 
-    collector.on('collect', async interaction => {
-      if (interaction.customId !== 'refreshData') return;
+  try {
+    const s = await getStats(message.guild);
+    const msg = await message.channel.send({ 
+      embeds: [createEmbed(message.guild, s)], 
+      components: [row] // components bir dizi (array) olmalı ve içinde ActionRow olmalı
+    });
 
-         await interaction.deferUpdate();
+    const collector = msg.createMessageComponentCollector({ 
+      componentType: ComponentType.Button, 
+      time: 60000 
+    });
 
-      // Show loading state
-      const loadingEmbed = new EmbedBuilder()
-        .setColor('Yellow')
-        .setDescription('⏳ Sunucu verileri analiz ediliyor, lütfen bekleyin...');
+    collector.on('collect', async i => {
+      if (i.user.id !== message.author.id) {
+        return i.reply({ content: '❌ Bu işlemi sadece komutu yazan kişi yapabilir.', ephemeral: true });
+      }
 
-      await msg.edit({ embeds: [loadingEmbed], components: [] });
+      if (i.customId === 'refresh_stats') {
+        // Güncelleniyor efekti için butonu devre dışı bırakıp güncelle
+        await i.deferUpdate(); 
+        const updatedStats = await getStats(message.guild);
+        await i.editReply({ 
+          embeds: [createEmbed(message.guild, updatedStats)], 
+          components: [row] 
+        });
+      }
 
-      try {
-        // Tüm üyeleri önbelleğe çekelim (en güncel veri için)
-        const members = await message.guild.members.fetch();
-        
-        // Genel Sayılar
-        const totalMembers = message.guild.memberCount;
-        const botCount = members.filter(m => m.user.bot).size;
-        const humanCount = totalMembers - botCount;
-
-        // Statü Sayıları
-        const online = members.filter(m => m.presence?.status === 'online').size;
-        const idle = members.filter(m => m.presence?.status === 'idle').size;
-        const dnd = members.filter(m => m.presence?.status === 'dnd').size;
-        const offline = totalMembers - (online + idle + dnd);
-
-        // Nitro Sayısı (Sunucuya takviye yapanlar)
-        const nitroCount = members.filter(m => 
-          !m.user.bot && 
-          m.premiumSince && 
-          m.premiumSince instanceof Date
-        ).size;
-
-        const resultEmbed = new EmbedBuilder()
-          .setColor('#5865F2')
-          .setTitle(`📊 ${message.guild.name} - Üye İstatistikleri`)
-          .setThumbnail(message.guild.iconURL({ dynamic: true }))
-          .addFields(
-            { 
-              name: '👥 Genel Toplam', 
-              value: `> **Toplam Üye:** \`${totalMembers}\`\n> **Kullanıcı:** \`${humanCount}\`\n> **Bot:** \`${botCount}\``, 
-              inline: false 
-            },
-            { 
-              name: '🟢 Aktiflik Durumu', 
-              value: `> Çevrimiçi: \`${online}\`\n> Boşta: \`${idle}\`\n> R. Etmeyin: \`${dnd}\`\n> Çevrimdışı: \`${offline}\``, 
-              inline: true 
-            },
-            { 
-              name: '✨ Özel İstatistik', 
-              value: `> **Takviye (Nitro):** \`${nitroCount}\`\n> **Boost Seviyesi:** \`${message.guild.premiumTier}\``, 
-              inline: true 
-            }
-          )
-          .setFooter({ text: 'Veriler anlık olarak güncellendi.', iconURL: client.user.displayAvatarURL() })
-          .setTimestamp();
-
-        // Create the refresh button again
-        const refreshButton = new ButtonBuilder()
-          .setCustomId('refreshData')
-          .setLabel('Verileri Güncelle')
-          .setStyle(ButtonStyle.Primary);
-
-        // Send the updated result with the button
-        await msg.edit({ embeds: [resultEmbed], components: [refreshButton] });
-
-      } catch (error) {
-        console.error(error);
-        const errorEmbed = new EmbedBuilder()
-          .setColor('Red')
-          .setDescription('❌ Üye verileri çekilirken bir hata oluştu. Lütfen botun "Üye Erişimi (Member Intent)" izninin açık olduğundan emin olun.');
-        
-        await msg.edit({ embeds: [errorEmbed], components: [] });
+      if (i.customId === 'bot_list') {
+        const stats = await getStats(message.guild);
+        await i.reply({ content: `🤖 Sunucuda şu an toplam **${stats.bots}** bot bulunuyor.`, ephemeral: true });
       }
     });
 
-    collector.on('end', collected => {
-      console.log(`Collected ${collected.size} interactions.`);
+    collector.on('end', () => {
+      const disabledRow = new ActionRowBuilder().addComponents(
+        refreshButton.setDisabled(true),
+        botButton.setDisabled(true)
+      );
+      msg.edit({ components: [disabledRow] }).catch(() => {});
     });
-  } catch (error) {
-    console.error(error);
-    const errorEmbed = new EmbedBuilder()
-      .setColor('Red')
-      .setDescription('❌ Üye verileri çekilirken bir hata oluştu. Lütfen botun "Üye Erişimi (Member Intent)" izninin açık olduğundan emin olun.');
-    
-    await msg.edit({ embeds: [errorEmbed] });
+
+  } catch (err) {
+    console.error(err);
+    message.reply('❌ Veriler çekilirken bir hata oluştu.');
   }
 };
 
-module.exports.conf = {
-  aliases: ['say', 'üyeler', 'istatistik']
-};
-
-module.exports.help = {
-  name: 'üyesayısı'
-};
+module.exports.conf = { aliases: ['say'] };
+module.exports.help = { name: 'üyesayısı' };
