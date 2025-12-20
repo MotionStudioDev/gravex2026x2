@@ -12,7 +12,7 @@ module.exports.run = async (client, message, args) => {
 
   const loadingEmbed = new EmbedBuilder()
     .setColor('Yellow')
-    .setDescription('⏳ Xiaomi MiMo analiz yapıyor...');
+    .setDescription('⏳ Grave analiz yapıyor...');
 
   const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
@@ -29,7 +29,7 @@ module.exports.run = async (client, message, args) => {
 
     const resultEmbed = new EmbedBuilder()
       .setColor('#ff4a00')
-      .setTitle('🚀 Xiaomi MiMo Yanıtı')
+      .setTitle('🚀 GraveAI Yanıtı')
       .setDescription(completion.choices[0].message.content);
 
     await msg.edit({ embeds: [resultEmbed] });
@@ -46,5 +46,5 @@ module.exports.run = async (client, message, args) => {
   }
 };
 
-module.exports.help = { name: 'sor' };
+module.exports.help = { name: 'yapayzeka' };
 module.exports.conf = { aliases: ['mi'] };
