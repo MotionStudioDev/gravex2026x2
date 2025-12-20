@@ -16,8 +16,8 @@ module.exports.run = async (client, message) => {
 
     // Komut kategorileri
     const commandLists = {
-      'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yardım'],
-      'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'emoji-bilgi'],
+      'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yapayzeka', 'yardım'],
+      'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
       'moderasyon': ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
       'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'botlist-kur', 'botlist-ayarla', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'ticket-sistemi', 'ticket-sıfırla', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'modlog', 'slowmode'],
       'sahip': ['reload', 'mesaj-gönder'],
@@ -35,7 +35,7 @@ module.exports.run = async (client, message) => {
     const pages = {
       'ana_sayfa': new EmbedBuilder()
         .setColor("Blurple")
-        .setTitle("📚 GraveBOT Yardım Merkezi")
+        .setTitle("GraveBOT Yardım Merkezi")
         .setDescription(
           `**Merhaba ${message.author.username}!**\n\n` +
           `**Prefix:** \`g!\`\n` +
