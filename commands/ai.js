@@ -1,76 +1,50 @@
 const { EmbedBuilder } = require('discord.js');
 const { OpenAI } = require('openai');
 
-// Xiaomi MiMo Resmi API Yapılandırması
 const openai = new OpenAI({
-  baseURL: "https://api.xiaomimimo.com/v1", // Xiaomi'nin resmi API uç noktası
-  apiKey: "sk-s4qnnx4bry5839nid72niqle9naflk29y7r23103ktswtosj", // Yeni aldığın key
+  baseURL: "https://api.xiaomimimo.com/v1",
+  apiKey: "sk-s4qnnx4bry5839nid72niqle9naflk29y7r23103ktswtosj",
 });
 
 module.exports.run = async (client, message, args) => {
   const prompt = args.join(' ');
-  if (!prompt) return message.reply('❌ **Hata:** Xiaomi MiMo asistanına ne sormak istersin?');
+  if (!prompt) return message.reply('❌ Lütfen bir soru sorun!');
 
-  // Senin imzan olan yükleme embed'i
   const loadingEmbed = new EmbedBuilder()
     .setColor('Yellow')
-    .setDescription('⏳ **Xiaomi MiMo Resmi Servisi** verileri analiz ediyor...');
+    .setDescription('⏳ Xiaomi MiMo analiz yapıyor...');
 
   const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
-  // Botun yazıyor durumunu başlat
-  await message.channel.sendTyping();
-
-  const startTime = Date.now();
-
   try {
     const completion = await openai.chat.completions.create({
-      model: "mimo-v2", // Xiaomi platformundaki model adın (V2 Flash veya V2)
+      // HATA BURADAYDI: Model adını Xiaomi'nin desteklediği 'mimo-v2-flash' olarak güncelledim.
+      // Eğer panelde farklı bir isim (örn: mimo-v1) görüyorsan onu yazmalısın.
+      model: "mimo-v2-flash", 
       messages: [
-        { 
-          role: "system", 
-          content: "Sen Grave asistanısın. Xiaomi MiMo resmi API'sini kullanıyorsun. Hızlı, çözüm odaklı ve kibar bir asistan ol." 
-        },
+        { role: "system", content: "Sen Grave asistanısın." },
         { role: "user", content: prompt }
       ],
-      max_tokens: 2000
     });
 
-    const aiResponse = completion.choices[0].message.content;
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
     const resultEmbed = new EmbedBuilder()
-      .setColor('#ff4a00') // Xiaomi Turuncusu
-      .setAuthor({ 
-        name: `${message.author.username} sordu`, 
-        iconURL: message.author.displayAvatarURL({ dynamic: true }) 
-      })
-      .setTitle('🚀 Xiaomi MiMo Resmi Yanıtı')
-      .setDescription(aiResponse.length > 4000 ? aiResponse.substring(0, 4000) + '...' : aiResponse)
-      .addFields(
-        { name: '⚡ İşlem Süresi', value: `\`${duration}s\``, inline: true },
-        { name: '📡 Kaynak', value: `\`Official Xiaomi API\``, inline: true }
-      )
-      .setFooter({ text: 'Grave AI • Xiaomi Cloud Computing', iconURL: client.user.displayAvatarURL() })
-      .setTimestamp();
+      .setColor('#ff4a00')
+      .setTitle('🚀 Xiaomi MiMo Yanıtı')
+      .setDescription(completion.choices[0].message.content);
 
     await msg.edit({ embeds: [resultEmbed] });
 
   } catch (error) {
     console.error('Xiaomi API Hatası:', error);
 
-    // Hata yönetimi
-    if (error.status === 401) {
-      return msg.edit({ content: '❌ **HATA:** Xiaomi API Key reddedildi! Lütfen panelden anahtarın aktifliğini kontrol et.', embeds: [] });
-    }
-    
-    if (error.status === 404) {
-      return msg.edit({ content: '❌ **HATA:** Model adı hatalı veya API adresi değişmiş olabilir.', embeds: [] });
+    // Eğer yine model hatası verirse, kullanıcıya hangi modelin desteklenmediğini söyleyelim
+    if (error.status === 400) {
+      return msg.edit(`❌ **Parametre Hatası:** Gönderilen model ismi (\`mimo-v2-flash\`) sistem tarafından kabul edilmedi. Lütfen Xiaomi panelinden doğru model adını kontrol et.`);
     }
 
-    await msg.edit({ content: '❌ Xiaomi servislerine bağlanırken teknik bir hata oluştu.', embeds: [] });
+    await msg.edit('❌ Bir hata oluştu.');
   }
 };
 
 module.exports.help = { name: 'sor' };
-module.exports.conf = { aliases: ['mimo', 'mi', 'ai'] };
+module.exports.conf = { aliases: ['mi'] };
