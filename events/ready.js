@@ -21,11 +21,11 @@ client.on("ready", async () => {
   // Rastgele activity mesajları
   const activities = [
     `g!yardım | ${client.guilds.cache.size} sunucuda aktif!`,
-    `g!davet | v1.0.9 | Yeni özellikler!`,
+    `g!davet | v2.0.0 | Yeni özellikler!`,
     `Kesintisiz Hizmet | ${client.users.cache.size} kullanıcıya hizmet!`,
     `g!yardım ile komutları keşfet!`,
-    `Destek: discord.gg/CVZ4zEkJws`,
-    `Ping: ${client.ws.ping}ms`
+    `g!deprem - 7/24 Depremleri gör`,
+    `g!yapayzeka - Yeni Nesil Modeller`
   ];
 
   setInterval(() => {
