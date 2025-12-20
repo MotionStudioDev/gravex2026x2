@@ -1,75 +1,76 @@
 const { EmbedBuilder } = require('discord.js');
 
 module.exports.run = async (client, message, args) => {
+  // Verileri analiz ediyoruz mesajı
   const loadingEmbed = new EmbedBuilder()
     .setColor('Yellow')
-    .setDescription('⏳ Nitro verileri ve sunucu istatistikleri taranıyor...');
+    .setDescription('⏳ Sunucu verileri analiz ediliyor, lütfen bekleyin...');
 
   const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
   try {
+    // Tüm üyeleri önbelleğe çekelim (en güncel veri için)
     const members = await message.guild.members.fetch();
     
-    // --- TEMEL SAYILAR ---
+    // Genel Sayılar
     const totalMembers = message.guild.memberCount;
     const botCount = members.filter(m => m.user.bot).size;
     const humanCount = totalMembers - botCount;
 
-    // --- AKTİFLİK DURUMU ---
+    // Statü Sayıları
     const online = members.filter(m => m.presence?.status === 'online').size;
     const idle = members.filter(m => m.presence?.status === 'idle').size;
     const dnd = members.filter(m => m.presence?.status === 'dnd').size;
     const offline = totalMembers - (online + idle + dnd);
 
-    // --- BOOST VE NİTRO HESAPLAMASI ---
-    
-    // 1. Toplam Boost Sayısı (Örn: 30 Basım)
-    const totalBoosts = message.guild.premiumSubscriptionCount || 0;
-    
-    // 2. Takviye Yapan Kişi Sayısı (Örn: 13 Kişi)
-    const boostingMembers = members.filter(m => m.premiumSince).size;
-
-    // 3. NİTRO TESPİTİ (Senin istediğin özel kısım)
-    // Mantık: Ya Boost basmıştır YA DA Hareketli Avatar (GIF) kullanıyordur.
-    const nitroUsers = members.filter(m => {
-        const isBoosting = m.premiumSince;
-        const hasAnimatedAvatar = m.user.avatar && m.user.avatar.startsWith('a_');
-        // Botları saymayalım, sadece insanlar
-        return !m.user.bot && (isBoosting || hasAnimatedAvatar);
-    }).size;
+    // Nitro Sayısı (Sunucuya takviye yapanlar)
+    // Botlar hariç nitromu kullanıcıları sayalım
+    const nitroCount = members.filter(m => 
+      !m.user.bot &&  // Bot değilse
+      m.premiumSince &&  // premiumSince var mı
+      m.premiumSince instanceof Date  // Geçerli bir tarih mı
+    ).size;
 
     const resultEmbed = new EmbedBuilder()
-      .setColor('#f47fff') // Nitro pembesi
-      .setAuthor({ name: `${message.guild.name} • Detaylı Analiz`, iconURL: message.guild.iconURL({ dynamic: true }) })
+      .setColor('#5865F2')
+      .setTitle(`📊 ${message.guild.name} - Üye İstatistikleri`)
       .setThumbnail(message.guild.iconURL({ dynamic: true }))
       .addFields(
         { 
-          name: '👥 Üye Dağılımı', 
-          value: `> **Toplam:** \`${totalMembers}\`\n> **Kullanıcı:** \`${humanCount}\`\n> **Bot:** \`${botCount}\``, 
+          name: '👥 Genel Toplam', 
+          value: `> **Toplam Üye:** \`${totalMembers}\`\n> **Kullanıcı:** \`${humanCount}\`\n> **Bot:** \`${botCount}\``, 
+          inline: false 
+        },
+        { 
+          name: '🟢 Aktiflik Durumu', 
+          value: `> Çevrimiçi: \`${online}\`\n> Boşta: \`${idle}\`\n> R. Etmeyin: \`${dnd}\`\n> Çevrimdışı: \`${offline}\``, 
           inline: true 
         },
         { 
-          name: '💎 Nitro & Boost', 
-          // Burada net bir şekilde ayırdık
-          value: `> **Tespit Edilen Nitro:** \`${nitroUsers} Kişi\` (Yaklaşık)\n> **Takviye Yapan:** \`${boostingMembers} Kişi\`\n> **Toplam Boost:** \`${totalBoosts} Basım\``, 
-          inline: false 
-        },
-        { 
-          name: '🟢 Aktiflik', 
-          value: `> 🟢 Çevrimiçi: \`${online}\`\n> 🌙 Boşta: \`${idle}\`\n> ⛔ Rahatsız Etmeyin: \`${dnd}\`\n> ⚫ Çevrimdışı: \`${offline}\``, 
-          inline: false 
+          name: '✨ Özel İstatistik', 
+          value: `> **Takviye (Nitro):** \`${nitroCount}\`\n> **Boost Seviyesi:** \`${message.guild.premiumTier}\``, 
+          inline: true 
         }
       )
-      .setFooter({ text: 'Not: Düz resim kullanan ve boost basmayan Nitro üyeleri görülemez.', iconURL: client.user.displayAvatarURL() })
+      .setFooter({ text: 'Veriler anlık olarak güncellendi.', iconURL: client.user.displayAvatarURL() })
       .setTimestamp();
 
     await msg.edit({ embeds: [resultEmbed] });
 
   } catch (error) {
     console.error(error);
-    msg.edit({ content: '❌ Bir hata oluştu! Lütfen botun "Presence" ve "Server Members" izinlerini kontrol et.', embeds: [] });
+    const errorEmbed = new EmbedBuilder()
+      .setColor('Red')
+      .setDescription('❌ Üye verileri çekilirken bir hata oluştu. Lütfen botun "Üye Erişimi (Member Intent)" izninin açık olduğundan emin olun.');
+    
+    await msg.edit({ embeds: [errorEmbed] });
   }
 };
 
-module.exports.conf = { aliases: ['say', 'stats'] };
-module.exports.help = { name: 'üyesayısı' };
+module.exports.conf = {
+  aliases: ['say', 'üyeler', 'istatistik']
+};
+
+module.exports.help = {
+  name: 'üyesayısı'
+};
