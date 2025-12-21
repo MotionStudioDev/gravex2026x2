@@ -23,17 +23,16 @@ module.exports.run = async (client, message, args) => {
 
     const startEmbed = new EmbedBuilder()
       .setColor('Yellow')
-      .setDescription('🎙️ **Kayıt Sistemi Hazır.** Konuşmaya başladığınızda kayıt yapılacak ve tek bir mesaj gönderilecek.');
+      .setDescription('🎙️ **Kayıt Sistemi Aktif.** Konuşmaya başladığınızda kayıt alınacak (Sadece 1 kez).');
     
     await message.channel.send({ embeds: [startEmbed] });
 
-    // 🔥 KİLİT SİSTEMİ: Sadece bir kez tetiklenmesini sağlar
-    let hasRecorded = false;
+    let hasRecorded = false; // Tek seferlik kayıt kontrolü
 
     connection.receiver.speaking.on('start', (userId) => {
       if (userId !== message.author.id || hasRecorded) return; 
       
-      hasRecorded = true; // Kayıt başladı, kapıyı kapatıyoruz.
+      hasRecorded = true; 
 
       const audioStream = connection.receiver.subscribe(userId, {
         end: { behavior: EndBehaviorType.AfterSilence, duration: 1500 },
@@ -43,7 +42,15 @@ module.exports.run = async (client, message, args) => {
       const out = fs.createWriteStream(fileName);
       const opusDecoder = new prism.opus.Decoder({ rate: 48000, channels: 2, frameSize: 960 });
 
-      opusDecoder.on('error', (err) => console.error('⚠️ Çözücü Hatası:', err.message));
+      // 🔥 ŞİFRELEME VE AKIŞ HATALARINI YAKALAMA (ÇÖKMEYİ ENGELLER)
+      audioStream.on('error', (err) => {
+        console.error('⚠️ Ses Akış Hatası (Paket Atlandı):', err.message);
+      });
+
+      opusDecoder.on('error', (err) => {
+        console.error('⚠️ Çözücü Hatası:', err.message);
+      });
+
       audioStream.pipe(opusDecoder).pipe(out);
 
       out.on('finish', async () => {
@@ -63,8 +70,8 @@ module.exports.run = async (client, message, args) => {
           const finishEmbed = new EmbedBuilder()
             .setColor('Green')
             .setTitle('✅ Kayıt Tamamlandı')
-            .setDescription(`<@${userId}> sesin başarıyla kaydedildi. Dinlemek için butona tıkla!`)
-            .setFooter({ text: 'Grave Ses Sistemleri.' });
+            .setDescription(`<@${userId}> sesin başarıyla kaydedildi. Dinlemek için aşağıdaki butona tıkla!`)
+            .setFooter({ text: 'Tek seferlik kayıt modunda çalıştı.' });
 
           const finalMsg = await message.channel.send({
             embeds: [finishEmbed],
@@ -72,17 +79,22 @@ module.exports.run = async (client, message, args) => {
             files: [{ attachment: fileName, name: `kayit-${userId}.pcm` }]
           });
 
-          // Dosyayı temizle
-          setTimeout(() => { if (fs.existsSync(fileName)) fs.unlink(fileName, () => {}); }, 5000);
+          // Dosyayı sunucudan güvenli silme
+          setTimeout(() => { 
+            if (fs.existsSync(fileName)) {
+                fs.unlink(fileName, (err) => { if(err) console.log("Silme hatası:", err.message); });
+            }
+          }, 10000);
 
           // Buton Collector
           const collector = finalMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 300000 });
 
           collector.on('collect', async (i) => {
-            if (i.user.id !== message.author.id) return i.reply({ content: '❌ Sadece kaydı yapan kullanabilir.', ephemeral: true });
+            if (i.user.id !== message.author.id) return i.reply({ content: '❌ Bu butonu sadece kaydı yapan kullanabilir.', ephemeral: true });
 
             if (i.customId === 'dinle_buton') {
               await i.deferUpdate();
+              
               const currentVChannel = i.member.voice.channel;
               if (!currentVChannel) return i.followUp({ content: '❌ Ses kanalında olmalısın!', ephemeral: true });
 
@@ -92,32 +104,49 @@ module.exports.run = async (client, message, args) => {
                 adapterCreator: i.guild.voiceAdapterCreator,
               });
 
-              const fileUrl = finalMsg.attachments.first().url;
-              const response = await axios.get(fileUrl, { responseType: 'stream' });
-              const player = createAudioPlayer();
-              const resource = createAudioResource(response.data, { inputType: StreamType.Raw });
+              try {
+                const fileUrl = finalMsg.attachments.first().url;
+                const response = await axios.get(fileUrl, { responseType: 'stream' });
+                
+                const player = createAudioPlayer();
+                const resource = createAudioResource(response.data, { inputType: StreamType.Raw });
 
-              player.play(resource);
-              playConn.subscribe(player);
-              player.on(AudioPlayerStatus.Idle, () => { setTimeout(() => playConn.destroy(), 1000); });
+                player.play(resource);
+                playConn.subscribe(player);
+
+                player.on(AudioPlayerStatus.Idle, () => {
+                  setTimeout(() => { if (playConn) playConn.destroy(); }, 1000);
+                });
+
+                player.on('error', (e) => console.error('Oynatma Hatası:', e));
+              } catch (playErr) {
+                console.error("Dinletme hatası:", playErr);
+              }
             }
 
             if (i.customId === 'sil_buton') {
               await finalMsg.delete().catch(() => {});
             }
           });
-          
-          // Kayıt bittikten sonra botu kanaldan çıkaralım (İsteğe bağlı)
-          // connection.destroy();
         }
       });
     });
 
+    // Bağlantı koptuğunda temizle
+    connection.on(VoiceConnectionStatus.Disconnected, () => {
+        try { connection.destroy(); } catch (e) {}
+    });
+
   } catch (error) {
-    console.error(error);
-    message.reply("❌ Sistem hatası oluştu.");
+    console.error("Ana Hata:", error);
+    message.reply("❌ Sistem hatası oluştu. Lütfen botu tekrar başlatın.");
   }
 };
 
-module.exports.conf = { aliases: ['rec', 'kayit'] };
-module.exports.help = { name: 'kaydet' };
+module.exports.conf = {
+  aliases: ['rec', 'kayit']
+};
+
+module.exports.help = {
+  name: 'kaydet'
+};
