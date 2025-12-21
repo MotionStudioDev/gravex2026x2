@@ -67,7 +67,7 @@ client.on("ready", async () => {
                 sehir: parts[9] ? parts[9].replace(/[()]/g, '') : ""
             };
 
-            if (sonDeprem !== deprem.saat && parseFloat(deprem.buyukluk) >= 3.0) {
+            if (sonDeprem !== deprem.saat && parseFloat(deprem.buyukluk) >= 1.0) {
                 if (sonDeprem !== null) {
                     const logKanal = client.channels.cache.get("1452290782924116048");
                     if (logKanal) {
