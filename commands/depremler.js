@@ -111,7 +111,7 @@ const generateButtons = (page, totalLen) => {
 // --- KOMUT ÇALIŞTIRMA ---
 
 module.exports.run = async (client, message, args) => {
-    const loading = new EmbedBuilder().setColor('Yellow').setDescription('⏳ Veriler Kandilli Rasathanesi\'nden alınıyor...');
+    const loading = new EmbedBuilder().setColor('Yellow').setDescription('⏳ Veriler MotionAI\'nden alınıyor...');
     const msg = await message.channel.send({ embeds: [loading] });
 
     let allDepremler = await fetchDepremler();
