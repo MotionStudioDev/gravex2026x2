@@ -2,7 +2,11 @@ const client = require("../main");
 const { Collection, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
 const db = require("orio.db");
+const axios = require('axios'); // Eklendi
+const cheerio = require('cheerio'); // Eklendi
 const Reminder = require("../models/Reminder");
+
+let sonDeprem = null; // Takip için gerekli
 
 // Bot yeniden başlatılıyor mesajı
 console.log("🔄 Bot yeniden başlatılıyor... Lütfen bekleyin.");
@@ -30,8 +34,6 @@ client.on("ready", async () => {
         jsFiles.forEach(f => {
             try {
                 const props = require(`../commands/${f}`);
-                
-                // Komut adını ve varsa aliaslarını yükle
                 if (props.help && props.help.name) {
                     client.commands.set(props.help.name, props);
                     console.log(`✔ ${props.help.name} komutu başarıyla yüklendi.`);
@@ -41,8 +43,6 @@ client.on("ready", async () => {
                             client.aliases.set(alias, props.help.name);
                         });
                     }
-                } else {
-                    console.warn(`⚠ ${f} dosyası düzgün bir komut yapısına sahip değil (help.name eksik).`);
                 }
             } catch (error) {
                 console.error(`❌ ${f} yüklenirken bir hata oluştu:`, error.message);
@@ -50,6 +50,39 @@ client.on("ready", async () => {
         });
         console.log("────────────────────────────────────────");
     });
+
+    // --- DEPREM TAKİP SİSTEMİ (ENTEGRE EDİLEN KISIM) ---
+    setInterval(async () => {
+        try {
+            const { data } = await axios.get('http://www.koeri.boun.edu.tr/scripts/lst0.asp');
+            const $ = cheerio.load(data);
+            const text = $('pre').text();
+            const row = text.split('\n')[6]; 
+            const parts = row.trim().split(/\s+/);
+            if (parts.length < 10) return;
+
+            const deprem = {
+                tarih: parts[0], saat: parts[1],
+                buyukluk: parts[6], yer: parts[8],
+                sehir: parts[9] ? parts[9].replace(/[()]/g, '') : ""
+            };
+
+            if (sonDeprem !== deprem.saat && parseFloat(deprem.buyukluk) >= 3.0) {
+                if (sonDeprem !== null) {
+                    const logKanal = client.channels.cache.get("1452290782924116048");
+                    if (logKanal) {
+                        const embed = new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('🚨 YENİ DEPREM BİLDİRİMİ')
+                            .setDescription(`**Yer:** ${deprem.yer} ${deprem.sehir}\n**Büyüklük:** \`${deprem.buyukluk}\`\n**Saat:** \`${deprem.saat}\``)
+                            .setTimestamp();
+                        logKanal.send({ embeds: [embed] });
+                    }
+                }
+                sonDeprem = deprem.saat;
+            }
+        } catch (e) {}
+    }, 45000);
 
     // Rastgele activity mesajları
     const activities = [
@@ -89,7 +122,6 @@ client.on("ready", async () => {
         try {
             const now = new Date();
             const reminders = await Reminder.find({ status: "active", remindAt: { $lte: now } });
-            
             for (const r of reminders) {
                 const user = await client.users.fetch(r.userId).catch(() => null);
                 if (user) {
