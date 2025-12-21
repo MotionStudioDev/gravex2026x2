@@ -64,7 +64,7 @@ module.exports.run = async (client, message, args) => {
             .setColor('Green')
             .setTitle('✅ Kayıt Tamamlandı')
             .setDescription(`<@${userId}> sesin başarıyla kaydedildi. Dinlemek için butona tıkla!`)
-            .setFooter({ text: 'Sadece tek bir kayıt alınmıştır.' });
+            .setFooter({ text: 'Grave Ses Sistemleri.' });
 
           const finalMsg = await message.channel.send({
             embeds: [finishEmbed],
