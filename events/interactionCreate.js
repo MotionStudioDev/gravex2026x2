@@ -15,7 +15,6 @@ const TicketSettings = require('../models/TicketSettings');
 const BotModel = require('../models/Bot');
 const BotlistSettings = require('../models/BotlistSettings');
 const AfkModel = require('../models/Afk'); // AFK Model eklendi
-const Giveaway = require('../models/giveaway'); // <<< GIVEAWAY MODELİ EKLENDİ
 
 const AUTO_CLOSE_TIMEOUT = 15 * 60 * 1000;
 
@@ -54,7 +53,7 @@ module.exports = async (client, interaction) => {
                     .filter(m => !m.author.bot || m.author.id === client.user.id)
                     .first(20);
                 transcript = relevant.reverse().map(m =>
-                    `[${new Date(m.createdTimestamp).to/localeString('tr-TR')}] ${m.author.tag}: ${m.content || '(Medya/Dosya)'}${m.attachments.size > 0 ? ' [Dosya]' : ''}`
+                    `[${new Date(m.createdTimestamp).toLocaleString('tr-TR')}] ${m.author.tag}: ${m.content || '(Medya/Dosya)'}${m.attachments.size > 0 ? ' [Dosya]' : ''}`
                 ).join('\n');
                 if (transcript.length > 1000) transcript = transcript.substring(0, 1000) + '\n... (devamı kesildi)';
             }
@@ -105,6 +104,7 @@ module.exports = async (client, interaction) => {
         if (interaction.isButton() && interaction.customId === 'afk_quick') {
             return handleAfk(interaction, 'Sebep belirtilmedi');
         }
+
         // Sebep Modalı Tetikleyici
         if (interaction.isButton() && interaction.customId === 'afk_modal_trigger') {
             const modal = new ModalBuilder()
@@ -119,32 +119,40 @@ module.exports = async (client, interaction) => {
             modal.addComponents(new ActionRowBuilder().addComponents(input));
             return interaction.showModal(modal);
         }
+
         // Modal Gönderimi
         if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'afk_reason_modal') {
             const reason = interaction.fields.getTextInputValue('afk_reason_text');
             return handleAfk(interaction, reason);
         }
+
         // Ortak AFK Fonksiyonu
         async function handleAfk(interaction, reason) {
             await interaction.deferUpdate();
+
             const oldNick = interaction.member.displayName;
             const newNick = `[AFK] ${oldNick}`.slice(0, 32);
+
             // MongoDB'ye kaydet
             await AfkModel.findOneAndUpdate(
                 { guildId: interaction.guildId, userId: interaction.user.id },
                 { reason, timestamp: Date.now(), oldNickname: oldNick },
                 { upsert: true }
             );
+
             // Nick değiştir (yetki yoksa geç)
             if (interaction.member.manageable) {
                 await interaction.member.setNickname(newNick).catch(() => {});
             }
+
             const successEmbed = new EmbedBuilder()
                 .setColor('Green')
                 .setTitle('✅ AFK Modu Aktif')
                 .setDescription(`Başarıyla AFK oldunuz.\n**Sebep:** ${reason}`)
                 .setFooter({ text: 'Herhangi bir mesaj yazdığınızda AFK modundan çıkacaksınız.' });
+
             await interaction.editReply({ embeds: [successEmbed], components: [] });
+
             // DM bildirimi
             await interaction.user.send('🚀 **AFK Oldunuz!** Sunucuda birisi sizi etiketlediği an size uyarı mesajı gönderilecektir!').catch(() => {});
         }
@@ -221,23 +229,6 @@ module.exports = async (client, interaction) => {
             await interaction.reply({ content: '🔒 Talep sonlandırılıyor...' });
             await closeTicket(interaction.channel, 'Yetkili tarafından manuel kapatıldı', interaction.user);
             return;
-        }
-
-        // =========================================================
-        // GIVEAWAY KATILMA BUTONU - YENİ EKLENDİ
-        // =========================================================
-        if (interaction.isButton() && interaction.customId === 'join_giveaway') {
-            const data = await Giveaway.findOne({ messageId: interaction.message.id });
-            if (!data) return interaction.reply({ content: '❌ Bu çekiliş veritabanında bulunamadı veya silinmiş.', ephemeral: true });
-            if (data.ended) return interaction.reply({ content: '❌ Bu çekiliş çoktan sona erdi.', ephemeral: true });
-            if (data.participants.includes(interaction.user.id)) {
-                return interaction.reply({ content: '⚠️ Zaten bu çekilişe katılmışsın!', ephemeral: true });
-            }
-            await Giveaway.updateOne(
-                { messageId: interaction.message.id },
-                { $push: { participants: interaction.user.id } }
-            );
-            return interaction.reply({ content: '🎉 Başarıyla çekilişe katıldın! Bol şans.', ephemeral: true });
         }
 
         // =========================================================
@@ -419,77 +410,12 @@ module.exports = async (client, interaction) => {
                 return interaction.reply({ content: '❌ Kanal bulunamadı veya silinmiş.', flags: 64 });
             }
         }
+
     } catch (error) {
         if (error.code === 40060 || error.code === 10062) {
             console.log('Eski interaction hatası yutuldu:', error.message);
             return;
         }
         console.error('Bilinmeyen interaction hatası:', error);
-    }
-};
-
-// =========================================================
-// ÇEKİLİŞİ DIŞARIDAN BİTİRME FONKSİYONU
-// =========================================================
-module.exports.endGiveawayExternal = async (client, messageId) => {
-    const data = await Giveaway.findOne({ messageId: messageId });
-    if (!data || data.ended) return;
-
-    const channel = client.channels.cache.get(data.channelId);
-    if (!channel) return;
-
-    try {
-        const message = await channel.messages.fetch(data.messageId);
-
-        let participants = [...data.participants];
-        let winners = [];
-
-        if (participants.length === 0) {
-            winners = [];
-        } else if (participants.length <= data.winnerCount) {
-            winners = participants;
-        } else {
-            // Fisher-Yates shuffle - adil seçim
-            for (let i = participants.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [participants[i], participants[j]] = [participants[j], participants[i]];
-            }
-            winners = participants.slice(0, data.winnerCount);
-        }
-
-        await Giveaway.updateOne({ messageId: messageId }, { ended: true });
-
-        const winnerText = winners.length > 0 
-            ? winners.map(id => `<@${id}>`).join(', ')
-            : 'Kimse katılmadı :(';
-
-        const endEmbed = new EmbedBuilder()
-            .setColor('Grey')
-            .setTitle(`🏁 ÇEKİLİŞ SONA ERDİ: ${data.prize}`)
-            .setDescription(
-                `🏆 **Kazananlar:**\n${winnerText}\n\n` +
-                `👥 **Toplam Katılımcı:** ${data.participants.length}`
-            )
-            .setFooter({ text: 'Çekiliş tamamlandı.' })
-            .setTimestamp();
-
-        const disabledBtn = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('join_giveaway')
-                .setLabel('Sona Erdi')
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji('🔒')
-                .setDisabled(true)
-        );
-
-        await message.edit({ embeds: [endEmbed], components: [disabledBtn] });
-
-        if (winners.length > 0) {
-            await channel.send(`🎉 **Tebrikler!** \`${data.prize}\` çekilişini kazananlar: ${winnerText}`);
-        } else {
-            await channel.send(`😕 **${data.prize}** çekilişine kimse katılmadı.`);
-        }
-    } catch (err) {
-        console.error('Çekiliş bitirilirken hata oluştu:', err);
     }
 };
