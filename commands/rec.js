@@ -23,12 +23,17 @@ module.exports.run = async (client, message, args) => {
 
     const startEmbed = new EmbedBuilder()
       .setColor('Yellow')
-      .setDescription('🎙️ **Kayıt Başladı.** Konuşmanız bittiğinde (1.5sn sessizlik) butonlu mesaj gönderilecek.');
+      .setDescription('🎙️ **Kayıt Sistemi Hazır.** Konuşmaya başladığınızda kayıt yapılacak ve tek bir mesaj gönderilecek.');
     
-    const statusMsg = await message.channel.send({ embeds: [startEmbed] });
+    await message.channel.send({ embeds: [startEmbed] });
+
+    // 🔥 KİLİT SİSTEMİ: Sadece bir kez tetiklenmesini sağlar
+    let hasRecorded = false;
 
     connection.receiver.speaking.on('start', (userId) => {
-      if (userId !== message.author.id) return;
+      if (userId !== message.author.id || hasRecorded) return; 
+      
+      hasRecorded = true; // Kayıt başladı, kapıyı kapatıyoruz.
 
       const audioStream = connection.receiver.subscribe(userId, {
         end: { behavior: EndBehaviorType.AfterSilence, duration: 1500 },
@@ -58,8 +63,8 @@ module.exports.run = async (client, message, args) => {
           const finishEmbed = new EmbedBuilder()
             .setColor('Green')
             .setTitle('✅ Kayıt Tamamlandı')
-            .setDescription(`<@${userId}> sesin başarıyla kaydedildi. Dinlemek için aşağıdaki butona tıkla!`)
-            .setFooter({ text: 'Ses dosyası aşağıya eklendi.' });
+            .setDescription(`<@${userId}> sesin başarıyla kaydedildi. Dinlemek için butona tıkla!`)
+            .setFooter({ text: 'Sadece tek bir kayıt alınmıştır.' });
 
           const finalMsg = await message.channel.send({
             embeds: [finishEmbed],
@@ -67,20 +72,19 @@ module.exports.run = async (client, message, args) => {
             files: [{ attachment: fileName, name: `kayit-${userId}.pcm` }]
           });
 
-          // Dosyayı sunucudan temizle
+          // Dosyayı temizle
           setTimeout(() => { if (fs.existsSync(fileName)) fs.unlink(fileName, () => {}); }, 5000);
 
-          // Buton Etkileşimi (Collector)
+          // Buton Collector
           const collector = finalMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 300000 });
 
           collector.on('collect', async (i) => {
-            if (i.user.id !== message.author.id) return i.reply({ content: '❌ Bu butonu sadece kaydı yapan kullanabilir.', ephemeral: true });
+            if (i.user.id !== message.author.id) return i.reply({ content: '❌ Sadece kaydı yapan kullanabilir.', ephemeral: true });
 
             if (i.customId === 'dinle_buton') {
               await i.deferUpdate();
-              
               const currentVChannel = i.member.voice.channel;
-              if (!currentVChannel) return i.followUp({ content: '❌ Sesi dinlemek için bir ses kanalında olmalısın!', ephemeral: true });
+              if (!currentVChannel) return i.followUp({ content: '❌ Ses kanalında olmalısın!', ephemeral: true });
 
               const playConn = joinVoiceChannel({
                 channelId: currentVChannel.id,
@@ -90,24 +94,21 @@ module.exports.run = async (client, message, args) => {
 
               const fileUrl = finalMsg.attachments.first().url;
               const response = await axios.get(fileUrl, { responseType: 'stream' });
-              
               const player = createAudioPlayer();
               const resource = createAudioResource(response.data, { inputType: StreamType.Raw });
 
               player.play(resource);
               playConn.subscribe(player);
-
-              player.on(AudioPlayerStatus.Idle, () => {
-                setTimeout(() => playConn.destroy(), 1000);
-              });
-
-              player.on('error', (e) => console.error('Oynatma Hatası:', e));
+              player.on(AudioPlayerStatus.Idle, () => { setTimeout(() => playConn.destroy(), 1000); });
             }
 
             if (i.customId === 'sil_buton') {
               await finalMsg.delete().catch(() => {});
             }
           });
+          
+          // Kayıt bittikten sonra botu kanaldan çıkaralım (İsteğe bağlı)
+          // connection.destroy();
         }
       });
     });
