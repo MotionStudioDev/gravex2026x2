@@ -8,98 +8,104 @@ const Reminder = require("../models/Reminder");
 console.log("🔄 Bot yeniden başlatılıyor... Lütfen bekleyin.");
 
 client.on("ready", async () => {
-  console.clear();
-  console.log("✅ Bot başarıyla aktif oldu!");
-  console.log(`📛 Kullanıcı: ${client.user.tag}`);
-  console.log(`🆔 ID: ${client.user.id}`);
-  console.log(`🌍 Sunucu Sayısı: ${client.guilds.cache.size}`);
-  console.log(`📶 Ping: ${client.ws.ping}ms`);
-  console.log("────────────────────────────────────────");
+    console.clear();
+    console.log("✅ Bot başarıyla aktif oldu!");
+    console.log(`📛 Kullanıcı: ${client.user.tag}`);
+    console.log(`🆔 ID: ${client.user.id}`);
+    console.log(`🌍 Sunucu Sayısı: ${client.guilds.cache.size}`);
+    console.log(`📶 Ping: ${client.ws.ping}ms`);
+    console.log("────────────────────────────────────────");
 
-  // Rastgele activity mesajları
-  const activities = [
-    `g!yardım | ${client.guilds.cache.size} sunucuda aktif!`,
-    `g!davet | v2.0.0 | Yeni özellikler!`,
-    `Kesintisiz Hizmet | ${client.users.cache.size} kullanıcıya hizmet!`,
-    `g!yardım ile komutları keşfet!`,
-    `g!deprem - 7/24 Depremleri gör`,
-    `g!yapayzeka - Yeni Nesil Modeller`
-  ];
+    // Komutları yükle
+    client.commands = new Collection();
+    client.aliases = new Collection();
+    
+    console.log("📁 Komutlar yükleniyor...");
+    fs.readdir("./commands/", (err, files) => {
+        if (err) return console.error("❌ Komutlar yüklenirken hata oluştu:", err);
+        
+        const jsFiles = files.filter(f => f.endsWith(".js"));
+        console.log(`📂 Klasörde ${jsFiles.length} komut dosyası bulundu.`);
 
-  setInterval(() => {
-    const activity = activities[Math.floor(Math.random() * activities.length)];
-    client.user.setActivity(activity, { type: 3 }); // Watching
-  }, 10000);
-
-  client.user.setStatus("dnd"); // 🔴 Rahatsız Etmeyin
-
-  // Komutları yükle
-  client.commands = new Collection();
-  client.aliases = new Collection();
-  fs.readdir("./commands/", (err, files) => {
-    if (err) return console.error("Komutlar yüklenirken hata:", err);
-    console.log(`📁 Toplam ${files.length} komut yüklendi!`);
-    files.forEach(f => {
-      if (!f.endsWith(".js")) return;
-      let props = require(`../commands/${f}`);
-      client.commands.set(props.help.name, props);
-      if (props.conf && props.conf.aliases) {
-        props.conf.aliases.forEach(alias => {
-          client.aliases.set(alias, props.help.name);
+        jsFiles.forEach(f => {
+            try {
+                const props = require(`../commands/${f}`);
+                
+                // Komut adını ve varsa aliaslarını yükle
+                if (props.help && props.help.name) {
+                    client.commands.set(props.help.name, props);
+                    console.log(`✔ ${props.help.name} komutu başarıyla yüklendi.`);
+                    
+                    if (props.conf && props.conf.aliases) {
+                        props.conf.aliases.forEach(alias => {
+                            client.aliases.set(alias, props.help.name);
+                        });
+                    }
+                } else {
+                    console.warn(`⚠ ${f} dosyası düzgün bir komut yapısına sahip değil (help.name eksik).`);
+                }
+            } catch (error) {
+                console.error(`❌ ${f} yüklenirken bir hata oluştu:`, error.message);
+            }
         });
-      }
+        console.log("────────────────────────────────────────");
     });
-  });
 
-  // Log kanalına mesaj gönder (ID kontrolü ile)
-  const logChannelId = "1416144862050259168"; 
-  if (logChannelId) {
-    const logChannel = client.channels.cache.get(logChannelId);
-    if (logChannel) {
-      const startEmbed = new EmbedBuilder()
-        .setColor("Green")
-        .setTitle("🟢 Bot Yeniden Başlatıldı")
-        .setDescription([
-          `**Bot:** ${client.user.tag}`,
-          `**Ping:** ${client.ws.ping}ms`,
-          `**Zaman:** <t:${Math.floor(Date.now() / 1000)}:F>`
-        ].join("\n"))
-        .setThumbnail(client.user.displayAvatarURL({ dynamic: true }));
-      logChannel.send({ embeds: [startEmbed] }).catch(() => {});
-    }
-  }
+    // Rastgele activity mesajları
+    const activities = [
+        `g!yardım | ${client.guilds.cache.size} sunucu!`,
+        `g!davet | v2.0.0`,
+        `g!deprem - 7/24 Depremleri İzle`,
+        `g!yapayzeka - Yapay Zeka ile konuş`
+    ];
 
-  // Hatırlatma sistemi (cron job) - Sadece hatırlatma kaldı
-  setInterval(async () => {
-    try {
-      const now = new Date();
-      // Veritabanında süresi gelmiş aktif hatırlatıcıları bul
-      const reminders = await Reminder.find({ status: "active", remindAt: { $lte: now } });
-      
-      for (const r of reminders) {
-        try {
-          const user = await client.users.fetch(r.userId).catch(() => null);
-          if (user) {
-            const reminderEmbed = new EmbedBuilder()
-              .setColor("Yellow")
-              .setTitle("⏰ Hatırlatma Zamanı!")
-              .setDescription(`**Mesajın:** ${r.message}`)
-              .setFooter({ text: "Grave Hatırlatma Sistemi" })
-              .setTimestamp();
+    setInterval(() => {
+        const activity = activities[Math.floor(Math.random() * activities.length)];
+        client.user.setActivity(activity, { type: 3 }); 
+    }, 10000);
 
-            await user.send({ embeds: [reminderEmbed] }).catch(() => {});
-          }
-          r.status = "done";
-          await r.save();
-        } catch (e) {
-          console.error(`Hatırlatma işlenirken hata (User: ${r.userId}):`, e);
-          r.status = "done";
-          await r.save();
+    client.user.setStatus("dnd");
+
+    // Log kanalına mesaj gönder
+    const logChannelId = "1416144862050259168"; 
+    if (logChannelId) {
+        const logChannel = client.channels.cache.get(logChannelId);
+        if (logChannel) {
+            const startEmbed = new EmbedBuilder()
+                .setColor("Green")
+                .setTitle("🟢 Bot Yeniden Başlatıldı")
+                .setDescription([
+                    `**Bot:** ${client.user.tag}`,
+                    `**Komut Sayısı:** ${client.commands.size}`,
+                    `**Ping:** ${client.ws.ping}ms`
+                ].join("\n"))
+                .setTimestamp();
+            logChannel.send({ embeds: [startEmbed] }).catch(() => {});
         }
-      }
-    } catch (err) {
-      console.error("Hatırlatma döngüsü hatası:", err);
     }
-  }, 60000); // Dakikada bir kontrol
 
+    // Hatırlatma sistemi
+    setInterval(async () => {
+        try {
+            const now = new Date();
+            const reminders = await Reminder.find({ status: "active", remindAt: { $lte: now } });
+            
+            for (const r of reminders) {
+                const user = await client.users.fetch(r.userId).catch(() => null);
+                if (user) {
+                    const reminderEmbed = new EmbedBuilder()
+                        .setColor("Yellow")
+                        .setTitle("⏰ Hatırlatma Zamanı!")
+                        .setDescription(`**Mesaj:** ${r.message}`)
+                        .setFooter({ text: "Grave Hatırlatma" });
+
+                    await user.send({ embeds: [reminderEmbed] }).catch(() => {});
+                }
+                r.status = "done";
+                await r.save();
+            }
+        } catch (err) {
+            console.error("Hatırlatma hatası:", err);
+        }
+    }, 60000);
 });
