@@ -301,9 +301,9 @@ client.on('interactionCreate', async (interaction) => {
             
             const replyEmbed = new EmbedBuilder()
                 .setColor('Green')
-                .setAuthor({ name: 'Bot Sahibi Yanıtı', iconURL: interaction.user.displayAvatarURL() })
+                .setAuthor({ name: 'Grave Özel Mesaj Sistemleri', iconURL: interaction.user.displayAvatarURL() })
                 .setDescription(yanitMesaji)
-                .setFooter({ text: 'Bu mesaj bot sahibi tarafından gönderilmiştir.' })
+                .setFooter({ text: 'Bu mesaj Grave tarafından iletilmiştir.' })
                 .setTimestamp();
 
             await user.send({ embeds: [replyEmbed] });
