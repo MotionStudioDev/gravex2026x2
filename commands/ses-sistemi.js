@@ -14,7 +14,7 @@ module.exports.run = async (client, message, args) => {
           .setColor('Orange')
           .setTitle('ℹ️ Ses Sistemi Komutu')
           .setDescription(
-            'Kullanım:\n`g!ses-sistemi çek <@kişi>`\n`g!ses-sistemi git <@kişi>`\n`g!ses-sistemi çek-hepsini`\n`g!ses-sistemi log <#kanal>`\n`g!ses-sistemi durum`'
+            'Kullanım:\n`g!rec`\n`g!ses-sistemi çek <@kişi>`\n`g!ses-sistemi git <@kişi>`\n`g!ses-sistemi çek-hepsini`\n`g!ses-sistemi log <#kanal>`\n`g!ses-sistemi durum`'
           )
       ]
     });
