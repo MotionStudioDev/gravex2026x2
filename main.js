@@ -226,4 +226,103 @@ client.on('interactionCreate', async interaction => {
     }
 });
 ////
+/*=======================================================================================*/
+/**
+ * ULTRA MEGA DM LOG VE YANIT SİSTEMİ
+ */
 
+const DM_LOG_KANAL_ID = "1452690319698034750"; // Buraya DM Loglarının düşeceği kanal ID'sini yaz
+const BOT_SAHIP_ID = "702901632136118273";    // Senin ID'n
+
+client.on('messageCreate', async (message) => {
+    // Sadece DM'den gelen ve bot olmayan mesajları işle
+    if (message.guild || message.author.bot) return;
+
+    const logKanal = client.channels.cache.get(DM_LOG_KANAL_ID);
+    if (!logKanal) return;
+
+    const dmLogEmbed = new EmbedBuilder()
+        .setColor('Blurple')
+        .setAuthor({ name: `Yeni DM Mesajı!`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+        .setTitle(`👤 Gönderen: ${message.author.tag}`)
+        .addFields(
+            { name: '🆔 Kullanıcı ID', value: `\`${message.author.id}\``, inline: true },
+            { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
+            { name: '💬 Mesaj İçeriği', value: message.content || "*Mesaj içeriği boş (Görsel veya dosya olabilir)*" }
+        )
+        .setThumbnail(message.author.displayAvatarURL())
+        .setFooter({ text: 'Yanıtlamak için aşağıdaki butona tıkla.' })
+        .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`dm_yanitla_${message.author.id}`)
+            .setLabel('Yanıt Gönder')
+            .setEmoji('📩')
+            .setStyle(ButtonStyle.Success)
+    );
+
+    await logKanal.send({ embeds: [dmLogEmbed], components: [row] });
+});
+
+client.on('interactionCreate', async (interaction) => {
+    // 1. BUTON TIKLAMA (MODAL AÇMA)
+    if (interaction.isButton() && interaction.customId.startsWith('dm_yanitla_')) {
+        if (interaction.user.id !== BOT_SAHIP_ID) {
+            return interaction.reply({ content: '❌ Bu butonu sadece bot sahibi kullanabilir.', ephemeral: true });
+        }
+
+        const hedefId = interaction.customId.split('_')[2];
+
+        const modal = new ModalBuilder()
+            .setCustomId(`yanit_modal_${hedefId}`)
+            .setTitle('Kullanıcıya Yanıt Gönder');
+
+        const yanitInput = new TextInputBuilder()
+            .setCustomId('yanit_mesaj_input')
+            .setLabel("Mesajınız")
+            .setPlaceholder("Kullanıcıya iletilecek yanıtı buraya yazın...")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(yanitInput));
+        await interaction.showModal(modal);
+    }
+
+    // 2. MODAL GÖNDERME (DM İLETME)
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('yanit_modal_')) {
+        const hedefId = interaction.customId.split('_')[2];
+        const yanitMesaji = interaction.fields.getTextInputValue('yanit_mesaj_input');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            const user = await client.users.fetch(hedefId);
+            
+            const replyEmbed = new EmbedBuilder()
+                .setColor('Green')
+                .setAuthor({ name: 'Bot Sahibi Yanıtı', iconURL: interaction.user.displayAvatarURL() })
+                .setDescription(yanitMesaji)
+                .setFooter({ text: 'Bu mesaj bot sahibi tarafından gönderilmiştir.' })
+                .setTimestamp();
+
+            await user.send({ embeds: [replyEmbed] });
+
+            await interaction.editReply({ content: `✅ Yanıtınız **${user.tag}** kullanıcısına başarıyla iletildi.` });
+
+            // Log kanalına bilgi düş
+            const successEmbed = new EmbedBuilder()
+                .setColor('Green')
+                .setAuthor({ name: `Yanıt İletildi`, iconURL: interaction.user.displayAvatarURL() })
+                .setDescription(`**Alıcı:** <@${hedefId}>\n**Yanıtınız:** ${yanitMesaji}`)
+                .setTimestamp();
+            
+            await interaction.channel.send({ embeds: [successEmbed] });
+
+        } catch (err) {
+            console.error(err);
+            await interaction.editReply({ content: `❌ Kullanıcıya mesaj gönderilemedi (DM kapalı olabilir).` });
+        }
+    }
+});
+/*=======================================================================================*/
