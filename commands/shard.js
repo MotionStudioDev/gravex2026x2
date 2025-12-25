@@ -1,13 +1,11 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const moment = require('moment');
 require('moment-duration-format');
 
 module.exports.run = async (client, message, args) => {
-  try {
-    // Eğer bot shardlara bölünmüşse broadcastEval ile her sharddan veri topluyoruz
-    // Eğer shard yoksa (tek process) direkt mevcut veriyi diziye alıyoruz
+  // Verileri toplayan ana fonksiyon
+  const fetchShardData = async () => {
     let shardVerileri = [];
-
     if (client.shard) {
       shardVerileri = await client.shard.broadcastEval(c => ({
         id: c.shard.ids[0],
@@ -18,7 +16,6 @@ module.exports.run = async (client, message, args) => {
         uptime: c.uptime
       }));
     } else {
-      // Shard yoksa sadece mevcut botun verisini al
       shardVerileri = [{
         id: 0,
         status: 0,
@@ -28,53 +25,87 @@ module.exports.run = async (client, message, args) => {
         uptime: client.uptime
       }];
     }
+    return shardVerileri;
+  };
 
-    const toplamSunucu = shardVerileri.reduce((a, b) => a + b.guilds, 0);
-    const toplamKullanici = shardVerileri.reduce((a, b) => a + b.users, 0);
-    const ortalamaPing = Math.round(shardVerileri.reduce((a, b) => a + b.ping, 0) / shardVerileri.length);
-    
-    // En yüksek ve en düşük pingli shardları bul
-    const enYuksekPing = shardVerileri.sort((a, b) => b.ping - a.ping)[0];
-    const enDusukPing = shardVerileri.sort((a, b) => a.ping - b.ping)[0];
-    const uptimeFormat = moment.duration(client.uptime).format("D [Gün], H [Saat], m [Dakika]");
+  // Embed oluşturma fonksiyonu
+  const createShardEmbed = (data) => {
+    const toplamSunucu = data.reduce((a, b) => a + b.guilds, 0);
+    const toplamKullanici = data.reduce((a, b) => a + b.users, 0);
+    const ortalamaPing = Math.round(data.reduce((a, b) => a + b.ping, 0) / data.length);
+    const enYuksekPing = data.sort((a, b) => b.ping - a.ping)[0];
+    const enDusukPing = data.sort((a, b) => a.ping - b.ping)[0];
+    const uptimeFormat = moment.duration(client.uptime).format("H [Saat], m [Dakika], s [Saniye]");
+    const onlineShards = data.filter(s => s.status === 0).length;
 
-    // Durum sayacı
-    const onlineShards = shardVerileri.filter(s => s.status === 0).length;
-    const offlineShards = shardVerileri.length - onlineShards;
-
-    const shardEmbed = new EmbedBuilder()
+    return new EmbedBuilder()
       .setColor('#2ecc71')
-      .setAuthor({ name: `${client.user.username} Gerçek Shard Bilgileri`, iconURL: client.user.displayAvatarURL() })
+      .setAuthor({ name: `Marpel Shard Bilgileri`, iconURL: client.user.displayAvatarURL() })
       .addFields(
         { 
           name: 'ℹ️ Shard Durumları:', 
-          value: `• 🟢 Çevrimiçi **${onlineShards}** Shard\n• ⚪ Çevrimdışı **${offlineShards}** Shard\n• 🔴 Yoğun **0** Shard`, 
+          value: `• 🟢 Çevrimiçi **${onlineShards}** Shard\n• ⚪ Çevrimdışı **${data.length - onlineShards}** Shard\n• 🔴 Yoğun **0** Shard`, 
           inline: false 
         },
         { 
           name: '📊 Shard İstatistik:', 
-          inline: false,
-          value: `• ✅ Uptime: **${uptimeFormat}**\n• 🆙 En yüksek ping: **${enYuksekPing.ping}ms** 🔴 (Shard: **${enYuksekPing.id}**)\n• ✅ En düşük ping: **${enDusukPing.ping}ms** 🟢 (Shard: **${enDusukPing.id}**)\n• 📡 Ortalama Ping: **${ortalamaPing}ms**`
+          value: `• ✅ Uptime: **${uptimeFormat}**\n• 🆙 En yüksek ping: **${enYuksekPing.ping}ms** 🔴 (Shard: **${enYuksekPing.id}**)\n• ✅ En düşük ping: **${enDusukPing.ping}ms** 🟢 (Shard: **${enDusukPing.id}**)\n• 📡 Ortalama Ping: **${ortalamaPing}ms**`, 
+          inline: false 
         },
         { 
-          name: '🛡️ Bu Sunucunun Verileri:', 
-          value: `• 🟢 Shard: **${message.guild.shardId || 0}** Ping: **${Math.round(client.ws.ping)}ms** 🟢\n• 🏠 Toplam Sunucu: **${toplamSunucu.toLocaleString()}**\n• 👤 Toplam Kullanıcı: **${toplamKullanici.toLocaleString()}**`, 
+          name: '🛡️ Bu Sunucunun Shardı:', 
+          value: `• 🟢 Shard: **${message.guild.shardId || 0}** Ping: **${Math.round(client.ws.ping)}ms** 🟢\n• 🏠 Sunucu Sayısı: **${toplamSunucu.toLocaleString()}**\n• 👤 Kullanıcı Sayısı: **${toplamKullanici.toLocaleString()}**`, 
           inline: false 
         }
       )
-      .setFooter({ text: `Güncel Shard Sayısı: ${shardVerileri.length}` })
+      .setFooter({ 
+        text: `Shard Sayısı: ${data.length} | Sunucu: ${toplamSunucu.toLocaleString()} | Kullanıcı: ${toplamKullanici.toLocaleString()}`,
+        iconURL: client.user.displayAvatarURL() 
+      })
       .setTimestamp();
+  };
 
-    message.channel.send({ embeds: [shardEmbed] });
+  const initialData = await fetchShardData();
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('refresh_shard')
+      .setLabel('Menüyü Güncelle')
+      .setEmoji('🔄')
+      .setStyle(ButtonStyle.Primary)
+  );
 
-  } catch (err) {
-    console.error(err);
-    message.reply("❌ Shard verileri toplanırken bir hata oluştu. Shard Manager aktif olmayabilir.");
-  }
+  const msg = await message.channel.send({ 
+    embeds: [createShardEmbed(initialData)], 
+    components: [row] 
+  });
+
+  // Buton Collector
+  const collector = msg.createMessageComponentCollector({ 
+    componentType: ComponentType.Button, 
+    time: 60000 
+  });
+
+  collector.on('collect', async (i) => {
+    if (i.user.id !== message.author.id) {
+      return i.reply({ content: '❌ Bu butonu sadece komutu kullanan kişi kullanabilir.', ephemeral: true });
+    }
+
+    await i.deferUpdate(); // Butonun "düşünmesini" sağlar
+    
+    const updatedData = await fetchShardData();
+    await msg.edit({ 
+      embeds: [createShardEmbed(updatedData)], 
+      components: [row] 
+    });
+  });
+
+  collector.on('end', () => {
+    msg.edit({ components: [] }).catch(() => {});
+  });
 };
 
 module.exports.conf = {
-  aliases: ['shards']
+  aliases: ['shards', 'shard-bilgi']
 };
 
 module.exports.help = {
