@@ -40,11 +40,11 @@ module.exports.run = async (client, message, args) => {
 
     return new EmbedBuilder()
       .setColor('#2ecc71')
-      .setAuthor({ name: `Marpel Shard Bilgileri`, iconURL: client.user.displayAvatarURL() })
+      .setAuthor({ name: `Grave Shard Bilgileri`, iconURL: client.user.displayAvatarURL() })
       .addFields(
         { 
-          name: 'ℹ️ Shard Durumları:', 
-          value: `• 🟢 Çevrimiçi **${onlineShards}** Shard\n• ⚪ Çevrimdışı **${data.length - onlineShards}** Shard\n• 🔴 Yoğun **0** Shard`, 
+          name: '<:Information:1453765637020319872> Shard Durumları:', 
+          value: `• <:onl:1453766738884952286> Çevrimiçi **${onlineShards}** Shard\n• <:off:1453766813291774044> Çevrimdışı **${data.length - onlineShards}** Shard\n• <:dnds:1453766771638009907> Yoğun **0** Shard`, 
           inline: false 
         },
         { 
