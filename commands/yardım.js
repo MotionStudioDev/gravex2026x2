@@ -9,7 +9,7 @@ const {
 
 module.exports.run = async (client, message) => {
   try {
-    // Komut kategorileri (Mevcut listeniz korundu)
+    // Komut kategorileri
     const commandLists = {
       'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yapayzeka', 'yardım'],
       'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
@@ -40,12 +40,9 @@ module.exports.run = async (client, message) => {
             .setTitle("<:Information:1453765637020319872> GraveBOT Yardım Merkezi")
             .setDescription(
               `Merhaba **${message.author.username}**, ben **GraveBOT**! Aşağıdaki menüyü kullanarak komutlarımı detaylıca inceleyebilirsin.\n\n` +
-              `<:onl:1453766738884952286> **Prefix:** \`g!\`\n` +
+              `<:ok1:1445126670687404143> **Prefix:** \`g!\`\n` +
               `<:gdev:1453777305389236418> **Toplam Komut:** \`${totalCommands}\` Adet\n` +
-              `📡 **Gecikme:** ${pingEmoji} \`${ping}ms\``
-            )
-            .addFields(
-              { name: "🔗 Linkler", value: "[Davet Et](https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot) • [Destek](https://discord.gg/CVZ4zEkJws) • [Oy Ver](https://top.gg/bot/1066016782827130960/vote)" }
+              `<a:ping:1416529425813737544> **Gecikme:** ${pingEmoji} \`${ping}ms\``
             );
 
         case 'genel':
@@ -65,7 +62,7 @@ module.exports.run = async (client, message) => {
       }
     };
 
-    // Komponentler
+    // Seçenek Menüsü
     const menu = new StringSelectMenuBuilder()
       .setCustomId("helpMenu")
       .setPlaceholder("📌 Bir kategori seçin...")
@@ -80,10 +77,13 @@ module.exports.run = async (client, message) => {
         { label: "Sahip", value: "sahip", emoji: "👑" },
       ]);
 
+    // Buton Satırı
     const buttons = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("home_btn").setEmoji("🏠").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setLabel("Davet Et").setStyle(ButtonStyle.Link).setURL(`https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`),
-      new ButtonBuilder().setLabel("Oy Ver").setStyle(ButtonStyle.Link).setURL("https://top.gg/bot/1066016782827130960/vote")
+      new ButtonBuilder().setLabel("Web Sitemiz").setStyle(ButtonStyle.Link).setURL("https://gravebot.vercel.app"),
+      new ButtonBuilder().setLabel("Destek Sunucusu").setStyle(ButtonStyle.Link).setURL("https://discord.gg/CVZ4zEkJws"),
+      new ButtonBuilder().setLabel("Oy Ver").setStyle(ButtonStyle.Link).setURL("https://top.gg/bot/1066016782827130960/vote"),
+      new ButtonBuilder().setLabel("Davet Et").setStyle(ButtonStyle.Link).setURL(`https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`)
     );
 
     const menuRow = new ActionRowBuilder().addComponents(menu);
@@ -96,7 +96,6 @@ module.exports.run = async (client, message) => {
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
       time: 120000,
-      componentType: ComponentType.SelectMenu || ComponentType.Button
     });
 
     collector.on("collect", async i => {
@@ -108,11 +107,8 @@ module.exports.run = async (client, message) => {
     });
 
     collector.on("end", () => {
-      const disabledRow = new ActionRowBuilder().addComponents(menu.setDisabled(true).setPlaceholder("Menü süresi doldu."));
-      const disabledBtn = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("d1").setLabel("Süre Doldu").setStyle(ButtonStyle.Secondary).setDisabled(true)
-      );
-      msg.edit({ components: [disabledRow, disabledBtn] }).catch(() => {});
+      const disabledMenu = new ActionRowBuilder().addComponents(menu.setDisabled(true).setPlaceholder("Menü süresi doldu."));
+      msg.edit({ components: [disabledMenu, buttons] }).catch(() => {});
     });
 
   } catch (err) {
