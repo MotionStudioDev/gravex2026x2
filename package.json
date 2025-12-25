@@ -39,6 +39,7 @@
     "openai": "^6.15.0",
     "ee-first": "^1.1.1",
     "mongodb": "^7.0.0",
+    "yt-search": "^2.13.1",
     "mongoose": "^8.20.1",
     "youtube-ext": "^1.1.25",
     "body-parser": "^2.2.1",
