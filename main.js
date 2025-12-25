@@ -59,6 +59,15 @@ const client = new Client({
 
 module.exports = client;
 /*=======================================================================================*/
+const { DisTube } = require('distube');
+const { YouTubePlugin } = require('@distube/youtube');
+
+client.distube = new DisTube(client, {
+  plugins: [new YouTubePlugin()],
+  emitNewSongOnly: true,
+  // FFmpeg istemediğin için bu ayar önemli:
+  checkYouTubeCookie: false 
+});
   /**
  * Events loader.
  */
