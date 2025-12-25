@@ -3,18 +3,13 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  ComponentType
 } = require("discord.js");
 
 module.exports.run = async (client, message) => {
   try {
-    // Ping durumu
-    const ping = client.ws.ping;
-    let pingEmoji = "🟢";
-    if (ping > 200) pingEmoji = "🔴";
-    else if (ping > 100) pingEmoji = "🟡";
-
-    // Komut kategorileri
+    // Komut kategorileri (Mevcut listeniz korundu)
     const commandLists = {
       'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'yapayzeka', 'yardım'],
       'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
@@ -25,158 +20,106 @@ module.exports.run = async (client, message) => {
       'ekonomi': ['param', 'günlük', 'çal', 'banka-oluştur', 'banka-transfer', 'banka-yatır', 'banka-çek', 'apara', 'cf', 'çalış', 'meslek', 'meslek-ayrıl', 'para-sıralama'],
     };
 
-    // Toplam komut sayısı
     const totalCommands = Object.values(commandLists).reduce((acc, arr) => acc + arr.length, 0);
+    const formatCommands = (list) => list.map(cmd => `\`${cmd}\``).join(" • ");
 
-    // Yardımcı fonksiyon: Komutları formatla
-    const formatCommands = (list) => list.map(cmd => `\`${cmd}\``).join(" • ") || "Bu kategoride komut yok.";
-
-    // Embed sayfaları
-    const pages = {
-      'ana_sayfa': new EmbedBuilder()
-        .setColor("Blurple")
-        .setTitle("GraveBOT Yardım Merkezi")
-        .setDescription(
-          `**Merhaba ${message.author.username}!**\n\n` +
-          `**Prefix:** \`g!\`\n` +
-          `**Toplam Komut:** ${totalCommands}\n` +
-          `**Anlık Ping:** ${pingEmoji} **${ping}ms**\n\n` +
-          `Aşağıdaki menüden bir kategori seçerek komutları görüntüleyebilirsin.\n\n` +
-          `**Destek Sunucusu:** [Tıkla Katıl](https://discord.gg/CVZ4zEkJws)`
-        )
+    // Dinamik Embed Oluşturucu
+    const getEmbed = (category = 'ana_sayfa') => {
+      const ping = client.ws.ping;
+      const pingEmoji = ping > 200 ? "<:dnds:1453766771638009907>" : ping > 100 ? "<:idle:1453766850428276796>" : "<:onl:1453766738884952286>";
+      
+      const baseEmbed = new EmbedBuilder()
         .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
-        .setFooter({ text: `Sayfa 1/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
+        .setTimestamp()
+        .setFooter({ text: `${message.author.tag} tarafından istendi.`, iconURL: message.author.displayAvatarURL({ dynamic: true }) });
 
-      'genel': new EmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle("⚙️ Genel Komutlar")
-        .setDescription(`**Toplam:** ${commandLists.genel.length}\n\n${formatCommands(commandLists.genel)}`)
-        .setFooter({ text: `Sayfa 2/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
+      switch (category) {
+        case 'ana_sayfa':
+          return baseEmbed
+            .setColor("#5865F2")
+            .setTitle("<:Information:1453765637020319872> GraveBOT Yardım Merkezi")
+            .setDescription(
+              `Merhaba **${message.author.username}**, ben **GraveBOT**! Aşağıdaki menüyü kullanarak komutlarımı detaylıca inceleyebilirsin.\n\n` +
+              `<:onl:1453766738884952286> **Prefix:** \`g!\`\n` +
+              `<:gdev:1453777305389236418> **Toplam Komut:** \`${totalCommands}\` Adet\n` +
+              `📡 **Gecikme:** ${pingEmoji} \`${ping}ms\``
+            )
+            .addFields(
+              { name: "🔗 Linkler", value: "[Davet Et](https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot) • [Destek](https://discord.gg/CVZ4zEkJws) • [Oy Ver](https://top.gg/bot/1066016782827130960/vote)" }
+            );
 
-      'kullanici': new EmbedBuilder()
-        .setColor(0x57f287)
-        .setTitle("👤 Kullanıcı Komutları")
-        .setDescription(`**Toplam:** ${commandLists.kullanici.length}\n\n${formatCommands(commandLists.kullanici)}`)
-        .setFooter({ text: `Sayfa 3/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
-
-      'moderasyon': new EmbedBuilder()
-        .setColor(0xed4245)
-        .setTitle("🛡️ Moderasyon Komutları")
-        .setDescription(`**Toplam:** ${commandLists.moderasyon.length}\n\n${formatCommands(commandLists.moderasyon)}`)
-        .setFooter({ text: `Sayfa 4/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
-
-      'sistem': new EmbedBuilder()
-        .setColor(0xfee75c)
-        .setTitle("🚨 Sistem Komutları")
-        .setDescription(`**Toplam:** ${commandLists.sistem.length}\n\n${formatCommands(commandLists.sistem)}`)
-        .setFooter({ text: `Sayfa 5/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
-
-      'sahip': new EmbedBuilder()
-        .setColor(0x99aab5)
-        .setTitle("👑 Sahip Komutları")
-        .setDescription(`**Toplam:** ${commandLists.sahip.length}\n\n${formatCommands(commandLists.sahip)}`)
-        .setFooter({ text: `Sayfa 6/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
-
-      'eğlence': new EmbedBuilder()
-        .setColor(0xe91e63)
-        .setTitle("🎉 Eğlence Komutları")
-        .setDescription(`**Toplam:** ${commandLists.eğlence.length}\n\n${formatCommands(commandLists.eğlence)}`)
-        .setFooter({ text: `Sayfa 7/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
-
-      'ekonomi': new EmbedBuilder()
-        .setColor(0x2ecc71)
-        .setTitle("💰 Ekonomi Komutları")
-        .setDescription(`**Toplam:** ${commandLists.ekonomi.length}\n\n${formatCommands(commandLists.ekonomi)}`)
-        .setFooter({ text: `Sayfa 8/8 • ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) }),
+        case 'genel':
+          return baseEmbed.setColor("#5865F2").setTitle("⚙️ Genel Komutlar").setDescription(formatCommands(commandLists.genel));
+        case 'kullanici':
+          return baseEmbed.setColor("#57F287").setTitle("👤 Kullanıcı Komutları").setDescription(formatCommands(commandLists.kullanici));
+        case 'moderasyon':
+          return baseEmbed.setColor("#ED4245").setTitle("🛡️ Moderasyon Komutları").setDescription(formatCommands(commandLists.moderasyon));
+        case 'sistem':
+          return baseEmbed.setColor("#FEE75C").setTitle("🚨 Sistem Komutları").setDescription(formatCommands(commandLists.sistem));
+        case 'sahip':
+          return baseEmbed.setColor("#23272A").setTitle("👑 Sahip Komutları").setDescription(formatCommands(commandLists.sahip));
+        case 'eğlence':
+          return baseEmbed.setColor("#EB459E").setTitle("🎉 Eğlence Komutları").setDescription(formatCommands(commandLists.eğlence));
+        case 'ekonomi':
+          return baseEmbed.setColor("#2ECC71").setTitle("💰 Ekonomi Komutları").setDescription(formatCommands(commandLists.ekonomi));
+      }
     };
 
-    // Dropdown Menü
+    // Komponentler
     const menu = new StringSelectMenuBuilder()
       .setCustomId("helpMenu")
-      .setPlaceholder("Kategori seç...")
+      .setPlaceholder("📌 Bir kategori seçin...")
       .addOptions([
-        { label: "Ana Sayfa", description: "Yardım menüsünün ana sayfası", value: "ana_sayfa", emoji: "🏠" },
-        { label: "Genel Komutlar", description: "Temel bot komutları", value: "genel", emoji: "⚙️" },
-        { label: "Kullanıcı Komutları", description: "Kişisel bilgi ve eğlence", value: "kullanici", emoji: "👤" },
-        { label: "Moderasyon", description: "Sunucu yönetimi", value: "moderasyon", emoji: "🛡️" },
-        { label: "Sistem", description: "Otomatik sistemler", value: "sistem", emoji: "🚨" },
-        { label: "Sahip Komutları", description: "Bot sahibine özel", value: "sahip", emoji: "👑" },
-        { label: "Eğlence", description: "Eğlenceli komutlar", value: "eğlence", emoji: "🎉" },
-        { label: "Ekonomi", description: "Para sistemi", value: "ekonomi", emoji: "💰" },
+        { label: "Ana Sayfa", value: "ana_sayfa", emoji: "🏠" },
+        { label: "Genel", value: "genel", emoji: "⚙️" },
+        { label: "Kullanıcı", value: "kullanici", emoji: "👤" },
+        { label: "Moderasyon", value: "moderasyon", emoji: "🛡️" },
+        { label: "Sistem", value: "sistem", emoji: "🚨" },
+        { label: "Eğlence", value: "eğlence", emoji: "🎉" },
+        { label: "Ekonomi", value: "ekonomi", emoji: "💰" },
+        { label: "Sahip", value: "sahip", emoji: "👑" },
       ]);
 
-    // Link Butonları
-    const linkButtons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel("🌐 Web Sitemiz")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://gravebot.vercel.app"),
-      new ButtonBuilder()
-        .setLabel("✨ Oy Ver!")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://top.gg/bot/1066016782827130960/vote"),
-      new ButtonBuilder()
-        .setLabel("🆘 Destek Sunucusu")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://discord.gg/CVZ4zEkJws"),
-      new ButtonBuilder()
-        .setLabel("🤖 Davet Et!")
-        .setStyle(ButtonStyle.Link)
-        .setURL(`https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot%20applications.commands`)
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("home_btn").setEmoji("🏠").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setLabel("Davet Et").setStyle(ButtonStyle.Link).setURL(`https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`),
+      new ButtonBuilder().setLabel("Oy Ver").setStyle(ButtonStyle.Link).setURL("https://top.gg/bot/1066016782827130960/vote")
     );
 
     const menuRow = new ActionRowBuilder().addComponents(menu);
 
-    // İlk mesajı gönder
     const msg = await message.channel.send({
-      embeds: [pages['ana_sayfa']],
-      components: [menuRow, linkButtons],
+      embeds: [getEmbed('ana_sayfa')],
+      components: [menuRow, buttons],
     });
 
-    // Collector
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
       time: 120000,
+      componentType: ComponentType.SelectMenu || ComponentType.Button
     });
 
     collector.on("collect", async i => {
       if (i.customId === "helpMenu") {
-        const selected = i.values[0];
-        await i.update({
-          embeds: [pages[selected]],
-          components: [menuRow, linkButtons]
-        });
+        await i.update({ embeds: [getEmbed(i.values[0])] });
+      } else if (i.customId === "home_btn") {
+        await i.update({ embeds: [getEmbed('ana_sayfa')] });
       }
     });
 
-    collector.on("end", async () => {
-      try {
-        const disabledMenu = StringSelectMenuBuilder.from(menu)
-          .setDisabled(true)
-          .setPlaceholder("Süre doldu • Tekrar kullan: g!yardım");
-
-        const disabledRow = new ActionRowBuilder().addComponents(disabledMenu);
-
-        const timeoutEmbed = new EmbedBuilder()
-          .setColor(0x2f3136)
-          .setTitle("⏰ Yardım Menüsü Kapandı")
-          .setDescription("Menünün süresi doldu.\nTekrar görüntülemek için `g!yardım` yazabilirsin.")
-          .setFooter({ text: message.author.tag, iconURL: message.author.displayAvatarURL({ dynamic: true }) });
-
-        await msg.edit({
-          embeds: [timeoutEmbed],
-          components: [disabledRow, linkButtons]
-        });
-      } catch (err) {
-        console.error("Yardım menüsü timeout hatası:", err);
-      }
+    collector.on("end", () => {
+      const disabledRow = new ActionRowBuilder().addComponents(menu.setDisabled(true).setPlaceholder("Menü süresi doldu."));
+      const disabledBtn = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("d1").setLabel("Süre Doldu").setStyle(ButtonStyle.Secondary).setDisabled(true)
+      );
+      msg.edit({ components: [disabledRow, disabledBtn] }).catch(() => {});
     });
 
   } catch (err) {
-    console.error("Yardım komutu hatası:", err);
-    message.channel.send("⚠️ Yardım menüsü oluşturulurken bir hata oluştu.");
+    console.error(err);
+    message.channel.send("⚠️ Yardım menüsü açılırken bir teknik sorun oluştu.");
   }
 };
 
-module.exports.conf = { aliases: ["help", "yardim", "commands"] };
+module.exports.conf = { aliases: ["help", "yardim"] };
 module.exports.help = { name: "yardım" };
