@@ -62,11 +62,12 @@ module.exports = client;
 const { DisTube } = require('distube');
 const { YouTubePlugin } = require('@distube/youtube');
 
+// FFmpeg istemediğin için eklentiyi en sade haliyle kuruyoruz
 client.distube = new DisTube(client, {
   plugins: [new YouTubePlugin()],
   emitNewSongOnly: true,
-  // FFmpeg istemediğin için bu ayar önemli:
-  checkYouTubeCookie: false 
+  leaveOnEmpty: true,
+  leaveOnStop: true
 });
   /**
  * Events loader.
