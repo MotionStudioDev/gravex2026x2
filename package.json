@@ -40,6 +40,7 @@
     "ee-first": "^1.1.1",
     "mongodb": "^7.0.0",
     "mongoose": "^8.20.1",
+    "youtube-ext": "^1.1.25",
     "body-parser": "^2.2.1",
     "orio.db": "^3.1.2"
   },
