@@ -23,8 +23,7 @@ app.listen(port, () => {
 // Sharding Yöneticisi Tanımlanıyor
 const manager = new ShardingManager('./main.js', {
     token: process.env.TOKEN, // Token Render ortam değişkeninden çekilir
-    totalShards: 'auto',       // Discord'un otomatik olarak parça sayısını belirlemesine izin ver
-    // shardList: [0],          // Eğer botunuz küçükse ve tek parça kullanıyorsanız bu satırı açabilirsiniz
+    totalShards: '3',       // Discord'un otomatik olarak parça sayısını belirlemesine izin ver
 });
 
 manager.on('shardCreate', shard => {
