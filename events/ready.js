@@ -86,8 +86,8 @@ client.on("ready", async () => {
 
     // Rastgele activity mesajları
     const activities = [
-        `g!yardım | ${client.guilds.cache.size} sunucu!`,
-        `g!davet | v2.0.0`,
+        `g!yardım | Gelişmiş Sistemler`,
+        `g!davet | g!hata-bildir`,
         `g!deprem - 7/24 Depremleri İzle`,
         `g!yapayzeka - Yapay Zeka ile konuş`
     ];
