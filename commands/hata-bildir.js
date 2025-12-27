@@ -1,14 +1,16 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-// Bot sahibinin ID'sini buraya yaz
+// Ayarlar
 const SAHIP_ID = "702901632136118273";
-// Log kanal ID'sini buraya yaz
 const LOG_CHANNEL_ID = "1441377140653293692";
 
 module.exports.run = async (client, message, args) => {
   const içerik = args.join(" ");
-  if (!içerik) {
-    return message.channel.send({
+  // Eğer kullanıcı bir resim yüklediyse onu da yakalayalım
+  const ek = message.attachments.first() ? message.attachments.first().proxyURL : null;
+
+  if (!içerik && !ek) {
+    return message.reply({
       embeds: [
         new EmbedBuilder()
           .setColor('Red')
@@ -18,11 +20,12 @@ module.exports.run = async (client, message, args) => {
     });
   }
 
-  // Onay embed'i
+  // Kullanıcıya Onay Soran Embed
   const embed = new EmbedBuilder()
     .setColor('Blurple')
-    .setTitle('<a:uyar1:1416526541030035530> Hata Bildir Onayı')
-    .setDescription(`Şu mesajı iletmek üzeresiniz:\n\`\`\`${içerik}\`\`\`\nOnaylıyorsanız **EVET**, iptal için **HAYIR** basın.`);
+    .setTitle('<a:uyar1:1416526541030035530> Bildirim Onayı')
+    .setDescription(`Şu mesajı yetkililere iletmek üzeresiniz:\n\`\`\`${içerik || "Sadece Dosya Eki"}\`\`\`\nOnaylıyorsanız **EVET**, iptal için **HAYIR** basın.`)
+    .setFooter({ text: 'Onaylamak için 15 saniyeniz var.' });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('evet').setLabel('EVET').setStyle(ButtonStyle.Success),
@@ -31,121 +34,77 @@ module.exports.run = async (client, message, args) => {
 
   const msg = await message.channel.send({ embeds: [embed], components: [row] });
 
+  // Sadece komutu yazan kişinin butonlara basmasını sağlayan filtre
   const collector = msg.createMessageComponentCollector({
     filter: i => i.user.id === message.author.id,
-    time: 15000
+    time: 15000,
+    max: 1
   });
 
   collector.on('collect', async i => {
     if (i.customId === 'evet') {
+      // Butona basıldıktan sonra bekleme mesajı
       await i.update({
-        embeds: [
-          new EmbedBuilder()
-            .setColor('Orange')
-            .setTitle('<a:yukle:1440677432976867448> İşlem Başlatıldı')
-            .setDescription('Talebiniz iletiliyor, lütfen bekleyin...')
-        ],
+        embeds: [new EmbedBuilder().setColor('Orange').setDescription('<a:yukle:1440677432976867448> Veriler analiz ediliyor ve iletiliyor...') ],
         components: []
       });
 
       try {
-        // Sahibine DM gönder
-        const owner = await client.users.fetch(SAHIP_ID);
-        await owner.send({
-          embeds: [
-            new EmbedBuilder()
-              .setColor('DarkBlue')
-              .setTitle('<:owner:1441129983153147975> Yeni Hata/Bug/Öneri Bildirimi')
-              .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-              .addFields(
-                { name: 'Gönderen', value: `${message.author.tag} (${message.author.id})` },
-                { name: 'Sunucu', value: `${message.guild.name} (${message.guild.id})` },
-                { name: 'Kanal', value: `<#${message.channel.id}>` },
-                { name: 'Mesaj ID', value: `${message.id}` },
-                { name: 'Mesaj', value: `\`\`\`${içerik}\`\`\`` },
-                { name: 'Zaman', value: `<t:${Math.floor(Date.now()/1000)}:F>` }
-              )
-              .setFooter({ text: 'Hey! Graveden mesajın var.' })
-          ]
-        });
+        // Loglar için ortak Embed hazırlığı
+        const reportEmbed = new EmbedBuilder()
+          .setColor('DarkBlue')
+          .setTitle('<:hastag:1441378933181251654> Yeni Bildirim Alındı')
+          .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+          .addFields(
+            { name: '👤 Gönderen', value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+            { name: '🌐 Sunucu', value: `${message.guild.name} (\`${message.guild.id}\`)`, inline: true },
+            { name: '📍 Kanal', value: `<#${message.channel.id}>`, inline: true },
+            { name: '📝 Mesaj', value: içerik ? `\`\`\`${içerik}\`\`\`` : "Mesaj içeriği boş (Sadece dosya)." }
+          )
+          .setTimestamp();
 
-        // Log kanalına gönder
-        const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+        if (ek) reportEmbed.setImage(ek);
+
+        // 1. SAHİBE DM GÖNDER (fetch ile kullanıcıyı bulur)
+        const owner = await client.users.fetch(SAHIP_ID).catch(() => null);
+        if (owner) await owner.send({ embeds: [reportEmbed] }).catch(() => console.log("Sahibin DM'si kapalı."));
+
+        // 2. LOG KANALINA GÖNDER (Kanal Bulma Sorunu Çözüldü)
+        // Cache yerine fetch kullanarak kanalı API üzerinden kesin olarak buluruz.
+        const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
         if (logChannel) {
-          await logChannel.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor('DarkPurple')
-                .setTitle('<:hastag:1441378933181251654> Hata/Bug/Öneri Log')
-                .setThumbnail(message.guild.iconURL({ dynamic: true }))
-                .addFields(
-                  { name: 'Gönderen', value: `${message.author.tag} (${message.author.id})` },
-                  { name: 'Sunucu', value: `${message.guild.name} (${message.guild.id})` },
-                  { name: 'Kanal', value: `<#${message.channel.id}>` },
-                  { name: 'Mesaj ID', value: `${message.id}` },
-                  { name: 'Mesaj', value: `\`\`\`${içerik}\`\`\`` },
-                  { name: 'Zaman', value: `<t:${Math.floor(Date.now()/1000)}:F>` }
-                )
-                .setTimestamp()
-            ]
-          });
+          await logChannel.send({ embeds: [reportEmbed] });
+        } else {
+          console.error("LOG KANAL HATASI: Belirttiğiniz ID'ye sahip bir kanal bulunamadı veya bot orayı göremiyor.");
         }
 
-        // Kullanıcıya DM gönder (embedli)
-        try {
-          await message.author.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor('Blurple')
-                .setTitle('<:userx:1441379546929561650> Talebiniz İletildi')
-                .setDescription('Sayın kullanıcı, talebiniz yetkili ekibimize iletilmiştir.\nLütfen geri dönüş mesajı gelirse cevaplayınız.')
-                .setFooter({ text: 'Hata Bildir Sistemi' })
-                .setTimestamp()
-            ]
-          });
-        } catch {}
+        // 3. KULLANICIYA DM GÖNDER
+        await message.author.send({
+          embeds: [new EmbedBuilder().setColor('Green').setTitle('✅ Talebiniz Alındı').setDescription('Bildiriminiz başarıyla sisteme kaydedildi ve yetkililere iletildi.')]
+        }).catch(() => {});
 
+        // Kanalda işlemi tamamla
         await msg.edit({
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Green')
-              .setTitle('<:tik1:1416526332803809401> Talep İletildi')
-              .setDescription('Talebiniz başarıyla yetkili ekibe iletildi.')
-          ]
+          embeds: [new EmbedBuilder().setColor('Green').setTitle('<:tik1:1416526332803809401> İşlem Başarılı').setDescription('Talebiniz başarıyla yetkili ekibe iletildi.')]
         });
+
       } catch (err) {
-        console.error('Hata bildir gönderim hatası:', err);
-        await msg.edit({
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('<:x2:1441372015343697941> Hata')
-              .setDescription('Talebiniz iletilirken bir hata oluştu.')
-          ]
-        });
+        console.error(err);
+        await msg.edit({ content: '❌ Bildirim gönderilirken teknik bir sorun oluştu.' });
       }
-
-      collector.stop();
-    }
-
-    if (i.customId === 'hayir') {
+    } else {
+      // HAYIR butonuna basılırsa
       await i.update({
-        embeds: [
-          new EmbedBuilder()
-            .setColor('Red')
-            .setTitle('<:x2:1441372015343697941> İptal')
-            .setDescription('Hata bildir işlemi iptal edildi!')
-        ],
+        embeds: [new EmbedBuilder().setColor('Red').setTitle('<:x2:1441372015343697941> İptal Edildi').setDescription('İşlem kullanıcı tarafından iptal edildi.')],
         components: []
       });
-      collector.stop();
     }
   });
 
-  collector.on('end', async () => {
-    try {
-      await msg.edit({ components: [] });
-    } catch {}
+  collector.on('end', collected => {
+    if (collected.size === 0) {
+      msg.edit({ content: '⏰ Süre dolduğu için işlem iptal edildi.', embeds: [], components: [] }).catch(() => {});
+    }
   });
 };
 
