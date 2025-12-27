@@ -1,50 +1,54 @@
 const { ShardingManager } = require('discord.js');
 const express = require('express');
 const app = express();
-const config = require('./config.js'); 
 
 // ----------------------------------------------------
-// 🌐 7/24 AKTİFLİK İÇİN HTTP SUNUCUSU (SADECE BİR KEZ ÇALIŞIR)
+// 🌐 7/24 AKTİFLİK İÇİN HTTP SUNUCUSU
 // ----------------------------------------------------
-// Render'ın otomatik atadığı portu kullanmak ZORUNLUDUR. (Genellikle 10000)
+// Render'ın uyku moduna geçmemesi için gerekli port ayarı
 const port = process.env.PORT || 8080; 
 
-// Render'a botun çalıştığını bildiren basit yanıt
 app.get('/', (req, res) => {
-    res.status(200).send('Discord Botu Aktif ve Sharder Çalışıyor!');
+    res.status(200).send('GraveBOT Sharder Aktif! 7/24 Sistemi Çalışıyor.');
 });
 
-// HTTP Sunucusunu Başlat
 app.listen(port, () => {
-    console.log(`[SHARDER] HTTP sunucusu port ${port} üzerinde dinliyor. (7/24 Aktiflik)`);
+    console.log(`[SHARDER] HTTP sunucusu port ${port} üzerinde dinliyor.`);
 });
-// ----------------------------------------------------
 
-// Sharding Yöneticisi Tanımlanıyor
+// ----------------------------------------------------
+// 🛡️ SHARDING YÖNETİCİSİ (3 PARÇA AYARLI)
+// ----------------------------------------------------
 const manager = new ShardingManager('./main.js', {
-    token: process.env.TOKEN, // Token Render ortam değişkeninden çekilir
-    totalShards: 3,       // Discord'un otomatik olarak parça sayısını belirlemesine izin ver
+    token: process.env.TOKEN, // Token Render ortam değişkenlerinden çekilir
+    totalShards: 3,           // İstediğin gibi 3 parça olarak sabitlendi
+    respawn: true,            // Bir parça çökerse otomatik olarak yeniden başlatır
+    shardArgs: ['--ansi', '--color'], 
 });
 
 manager.on('shardCreate', shard => {
-    console.log(`[SHARD] Parça (Shard) ${shard.id} başlatılıyor...`);
+    console.log(`[SHARD] Parça ${shard.id} oluşturuldu ve başlatılıyor...`);
 
-    // Parça hazır olduğunda konsola yazdır
+    // Parça tamamen hazır olduğunda
     shard.on('ready', () => {
-        console.log(`[SHARD] Parça ${shard.id} Discord'a başarıyla bağlandı (READY).`);
+        console.log(`[SHARD] Parça ${shard.id} başarıyla Discord'a bağlandı.`);
     });
     
-    // Parça kapandığında hata durumunu logla
+    // Parça beklenmedik bir şekilde kapandığında
     shard.on('death', (process, signal) => {
-        console.error(`[SHARD HATA] Parça ${shard.id} öldü. Kod: ${process.exitCode}, Sinyal: ${signal}`);
+        console.error(`[SHARD HATA] Parça ${shard.id} kapandı! Yeniden başlatılıyor...`);
     });
 });
 
-// Parçaları başlat
-manager.spawn()
+// ----------------------------------------------------
+// 🚀 PARÇALARI GÜVENLİ ŞEKİLDE BAŞLAT
+// ----------------------------------------------------
+// delay: 5000 -> Render'ın işlemcisini yormamak için her parça arası 5 saniye bekler.
+// timeout: -1 -> Yavaş yükleme durumlarında zaman aşımı hatası almanı engeller.
+manager.spawn({ delay: 5000, timeout: -1 })
     .then(shards => {
-        console.log(`[SHARDER] Toplam ${shards.size} parça başlatma emri verildi.`);
+        console.log(`[SHARDER] Toplam ${shards.size} parça başarıyla sıraya alındı ve başlatıldı.`);
     })
     .catch(error => {
-        console.error("[SHARDER KRİTİK HATA] Sharding Yönetimi başarısız oldu:", error);
+        console.error("[SHARDER KRİTİK HATA] Başlatma sırasında bir sorun oluştu:", error);
     });
