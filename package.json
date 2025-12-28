@@ -43,6 +43,7 @@
     "mongoose": "^8.20.1",
     "youtube-ext": "^1.1.25",
      "distube": "^5.2.3",
+    "adm-zip": "^0.5.16",
       "@distube/youtube": "^1.0.4",
     "body-parser": "^2.2.1",
     "orio.db": "^3.1.2"
