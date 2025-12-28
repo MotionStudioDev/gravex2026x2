@@ -1,195 +1,194 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionsBitField, AuditLogEvent } = require('discord.js');
 const axios = require('axios');
+const AdmZip = require('adm-zip');
+const moment = require('moment');
+moment.locale('tr');
 
 module.exports.run = async (client, message, args) => {
-    
-    // Tüm emojileri çek ve gerekli bilgileri hazırla
-    const allEmojis = message.guild.emojis.cache.map(e => ({
-        gösterim: `${e} \`${e.name}\``,
+    const canManage = message.member.permissions.has(PermissionsBitField.Flags.ManageEmojisAndStickers);
+    const canViewAudit = message.guild.members.me.permissions.has(PermissionsBitField.Flags.ViewAuditLog);
+
+    const fetchAll = () => message.guild.emojis.cache.map(e => ({
+        gösterim: `${e}`,
         id: e.id,
-        // DeprecationWarning ve güvenli URL için imageURL() metodu kullanıldı.
-        url: e.imageURL({ extension: e.animated ? 'gif' : 'png' }), 
+        url: e.imageURL({ extension: e.animated ? 'gif' : 'png', size: 1024 }),
         name: e.name,
-        animated: e.animated 
+        animated: e.animated,
+        createdTimestamp: e.createdTimestamp,
+        fullCode: `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`
     }));
 
+    let allEmojis = fetchAll();
+    
     if (allEmojis.length === 0) {
-        const embed = new EmbedBuilder()
+        const noEmojiEmbed = new EmbedBuilder()
             .setColor('Red')
-            .setTitle('Emoji Bulunamadı')
-            .setDescription('Bu sunucuda hiç özel emoji yok.')
-            .setFooter({ text: 'Emoji sistemi' });
-        return message.channel.send({ embeds: [embed] });
+            .setDescription('❌ **Sunucuda herhangi bir özel emoji bulunamadı!**');
+        return message.channel.send({ embeds: [noEmojiEmbed] });
     }
 
-    let currentFilter = 'ALL'; 
+    let currentFilter = 'ALL';
     let page = 0;
+    let viewMode = 'VISUAL'; 
     let filteredEmojis = allEmojis;
 
-    /**
-     * Filtreye göre emoji listesini hazırlar.
-     */
-    const applyFilter = (filter) => {
-        if (filter === 'STATIC') {
-            return allEmojis.filter(e => !e.animated);
-        } else if (filter === 'ANIMATED') {
-            return allEmojis.filter(e => e.animated);
-        } else {
-            return allEmojis;
-        }
-    };
-    
-    /**
-     * Dosya boyutunu kilobayt cinsinden çeker.
-     */
-    async function fetchFileSize(url) {
+    const getEmojiAuthor = async (emojiId) => {
+        if (!canViewAudit) return "Yetki Yok (Denetim Kaydı)";
         try {
-            const response = await axios.head(url);
-            const size = response.headers['content-length'];
-            if (size) {
-                return (parseInt(size) / 1024).toFixed(2) + ' KB';
-            }
-            return 'Bilinmiyor';
-        } catch (e) {
-            return 'Hata';
-        }
-    }
-
-    /**
-     * Embed'i oluşturur.
-     */
-    const gösterEmbed = async (index, emojisList, filter) => {
-        if (emojisList.length === 0) {
-            return new EmbedBuilder()
-                .setColor('Grey')
-                .setTitle(`📦 Sunucu Emojisi (${filter})`)
-                .setDescription(`Bu filtrede (\`${filter}\`) gösterilecek emoji bulunamadı.`);
-        }
-
-        const emoji = emojisList[index];
-        const fileSize = await fetchFileSize(emoji.url);
-        
-        let filterStatus = filter === 'ALL' ? 'Tümü' : (filter === 'STATIC' ? 'Statik' : 'Animasyonlu');
-
-        return new EmbedBuilder()
-            .setColor(emoji.animated ? '#f1c40f' : '#3498db')
-            .setTitle(`📦 Sunucu Emojisi (${index + 1}/${emojisList.length})`)
-            .setDescription(`${emoji.gösterim}\n**ID:** \`${emoji.id}\``)
-            .setImage(emoji.url) 
-            .addFields(
-                { name: 'Animasyonlu', value: emoji.animated ? 'Evet (GIF)' : 'Hayır (PNG)', inline: true },
-                { name: 'Dosya Boyutu', value: fileSize, inline: true },
-                { name: 'Filtre', value: filterStatus, inline: true },
-            )
-            .setFooter({ text: 'Butonlarla gezinebilirsin. | Komutu kullanan: ' + message.author.tag });
+            const audits = await message.guild.fetchAuditLogs({ type: AuditLogEvent.EmojiCreate, limit: 50 });
+            const entry = audits.entries.find(e => e.targetId === emojiId);
+            return entry ? `${entry.executor.tag}` : "Bulunamadı (Eski)";
+        } catch { return "Hata Oluştu"; }
     };
 
-    /**
-     * Buton grubunu oluşturur.
-     */
-    const row = (currentIndex, listLength, filter) => {
+    const buildEmbed = async (index, list) => {
+        const tier = message.guild.premiumTier;
+        const max = tier === 3 ? 250 : (tier === 2 ? 150 : (tier === 1 ? 100 : 50));
         
-        const currentEmoji = filteredEmojis[currentIndex];
+        const embed = new EmbedBuilder()
+            .setAuthor({ name: `${message.guild.name} Emoji Denetimi`, iconURL: message.guild.iconURL() })
+            .setFooter({ text: `Talep eden: ${message.author.username} • Toplam: ${list.length}` });
 
-        const filterRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('filter_all').setLabel('Tümü').setStyle(filter === 'ALL' ? ButtonStyle.Success : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('filter_static').setLabel('Statik').setStyle(filter === 'STATIC' ? ButtonStyle.Success : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('filter_animated').setLabel('Animasyonlu').setStyle(filter === 'ANIMATED' ? ButtonStyle.Success : ButtonStyle.Secondary)
+        if (viewMode === 'VISUAL') {
+            const emoji = list[index];
+            const author = await getEmojiAuthor(emoji.id);
+            
+            embed.setColor(emoji?.animated ? '#FFCC00' : '#0099FF')
+                 .setTitle(`<:pic:1454767560359674021> Görsel Görünüm (${index + 1}/${list.length})`)
+                 .setImage(emoji?.url || null)
+                 .addFields(
+                    { name: 'Emoji Bilgisi', value: `${emoji?.gösterim} \`${emoji?.name}\``, inline: true },
+                    { name: 'Ekleyen Kişi', value: `\`${author}\``, inline: true },
+                    { name: 'Eklenme Tarihi', value: `<t:${Math.floor(emoji.createdTimestamp / 1000)}:R>`, inline: true },
+                    { name: 'Emoji ID', value: `\`${emoji?.id}\``, inline: true },
+                    { name: 'Kapasite', value: ` ${allEmojis.length} / ${max * 2}`, inline: true }
+                 );
+        } else {
+            const start = index;
+            const pageEmojis = list.slice(start, start + 10);
+            const listDescription = pageEmojis.map((e, i) => `**${start + i + 1}.** ${e.gösterim} \`→\` \`${e.fullCode}\``).join('\n');
+            
+            embed.setColor('#2F3136')
+                 .setTitle(`<:ID:1416530654006349967> ID Liste Görünümü (${start + 1}-${Math.min(start + 10, list.length)})`)
+                 .setDescription(`**Tarih Aralığı:** <t:${Math.floor(list[0].createdTimestamp / 1000)}:d> - <t:${Math.floor(list[list.length-1].createdTimestamp / 1000)}:d>\n\n${listDescription || "Bu sayfada emoji yok."}`);
+        }
+        return embed;
+    };
+
+    const buildComponents = (index, list, disabled = false) => {
+        const menuRow = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('emoji_manage_menu')
+                .setPlaceholder('Emoji İşlemleri...')
+                .setDisabled(disabled)
+                .addOptions([
+                    { label: 'Filtre: Tümü', value: 'f_all', emoji: '<:box:1454769953906364479>' },
+                    { label: 'Filtre: Resimli', value: 'f_static', emoji: '<:pic:1454767560359674021>' },
+                    { label: 'Filtre: Animasyonlu', value: 'f_anim', emoji: '<a:gifs:1454769272365645925>' },
+                    { label: 'Emoji İsimlendir', value: 'edit_name', emoji: '<:kalem:1454765090963329168>' },
+                    { label: 'Emojiyi Sil', value: 'delete_emoji', emoji: '<:trash:1454766061202309142>' },
+                    { label: 'Emojileri WinRAR ile Sıkıştır', value: 'zip_all', emoji: '<:winrar:1454762951578877964>' }
+                ])
         );
-        
+
+        const step = viewMode === 'VISUAL' ? 1 : 10;
         const navRow = new ActionRowBuilder().addComponents(
-            // Etkileşimli Buton
-            new ButtonBuilder().setCustomId('prev').setLabel('⬅️ Önceki').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === 0 || listLength <= 1),
-            // Etkileşimli Buton
-            new ButtonBuilder().setCustomId('download').setLabel('📥 İndir').setStyle(ButtonStyle.Success).setDisabled(listLength === 0),
-            
-            // 🛑 RangeError Düzeltmesi: setCustomId kaldırıldı.
-            new ButtonBuilder()
-                .setLabel('🔗 URL')
-                .setStyle(ButtonStyle.Link)
-                .setURL(listLength === 0 ? 'https://discord.com' : currentEmoji.url), 
-            
-            // Etkileşimli Buton
-            new ButtonBuilder().setCustomId('next').setLabel('Sonraki ➡️').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === listLength - 1 || listLength <= 1)
+            new ButtonBuilder().setCustomId('prev').setEmoji('<:left:1454771071411552381>').setStyle(ButtonStyle.Secondary).setDisabled(disabled || index === 0),
+            new ButtonBuilder().setCustomId('toggle_view').setLabel(viewMode === 'VISUAL' ? 'ID İle Gör' : 'Görsel Gör').setEmoji(viewMode === 'VISUAL' ? '<:ID:1416530654006349967>' : '<:pic:1454767560359674021>').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+            new ButtonBuilder().setCustomId('search').setEmoji('<:search:1454768274720952444>').setStyle(ButtonStyle.Secondary).setDisabled(disabled),
+            new ButtonBuilder().setCustomId('next').setEmoji('<:right:1454771000993648660>').setStyle(ButtonStyle.Secondary).setDisabled(disabled || index + step >= list.length)
         );
-        
-        return [filterRow, navRow]; 
+        return [menuRow, navRow];
     };
 
-    // İlk gönderim
-    const msg = await message.channel.send({ 
-        embeds: [await gösterEmbed(page, filteredEmojis, currentFilter)], 
-        components: row(page, filteredEmojis.length, currentFilter) 
+    const msg = await message.channel.send({
+        embeds: [await buildEmbed(page, filteredEmojis)],
+        components: buildComponents(page, filteredEmojis)
     });
 
-    const collector = msg.createMessageComponentCollector({ time: 300000 }); 
+    const collector = msg.createMessageComponentCollector({ time: 600000 });
 
     collector.on('collect', async i => {
         if (i.user.id !== message.author.id) {
-            return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
+            return i.reply({ embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ **Bu paneli sadece komutu başlatan kişi kullanabilir!**')], ephemeral: true });
         }
-        
-        let changed = false;
 
-        if (i.customId.startsWith('filter_')) {
-            const newFilter = i.customId.replace('filter_', '').toUpperCase();
-            if (newFilter !== currentFilter) {
-                currentFilter = newFilter;
-                filteredEmojis = applyFilter(currentFilter);
-                page = 0; 
-                changed = true;
+        const step = viewMode === 'VISUAL' ? 1 : 10;
+
+        if (i.isStringSelectMenu()) {
+            const val = i.values[0];
+            if (val.startsWith('f_')) {
+                currentFilter = val.split('_')[1].toUpperCase();
+                filteredEmojis = currentFilter === 'STATIC' ? allEmojis.filter(e => !e.animated) : (currentFilter === 'ANIMATED' ? allEmojis.filter(e => e.animated) : allEmojis);
+                page = 0;
+            } else if (val === 'edit_name' && canManage) {
+                const modal = new ModalBuilder().setCustomId('edit_modal').setTitle('İsim Değiştir');
+                const input = new TextInputBuilder().setCustomId('new_name').setLabel('Yeni İsim').setStyle(TextInputStyle.Short).setValue(filteredEmojis[page].name);
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                return i.showModal(modal);
+            } else if (val === 'delete_emoji' && canManage) {
+                await message.guild.emojis.delete(filteredEmojis[page].id);
+                allEmojis = fetchAll(); filteredEmojis = allEmojis; page = 0;
+                return i.update({ embeds: [await buildEmbed(page, filteredEmojis)], components: buildComponents(page, filteredEmojis) });
+            } else if (val === 'zip_all') {
+                const zipLoading = new EmbedBuilder().setColor('Yellow').setDescription('⏳ **Paketleniyor, lütfen bekleyin...**');
+                await i.reply({ embeds: [zipLoading], ephemeral: true });
+                const zip = new AdmZip();
+                for (const e of filteredEmojis) {
+                    const res = await axios.get(e.url, { responseType: 'arraybuffer' }).catch(() => null);
+                    if (res) zip.addFile(`${e.name}.${e.animated ? 'gif' : 'png'}`, Buffer.from(res.data));
+                }
+                const zipComplete = new EmbedBuilder().setColor('Green').setDescription('✅ **Paketleme tamamlandı!**');
+                return i.editReply({ embeds: [zipComplete], files: [new AttachmentBuilder(zip.toBuffer(), { name: 'emojiler.zip' })] });
             }
-        } 
-        
-        else if (i.customId === 'prev' && page > 0) {
-            page--;
-            changed = true;
-        } else if (i.customId === 'next' && page < filteredEmojis.length - 1) {
-            page++;
-            changed = true;
         }
 
-        else if (i.customId === 'download') {
-            const currentEmoji = filteredEmojis[page];
-            const ext = currentEmoji.animated ? 'gif' : 'png';
-
-            const attachment = new AttachmentBuilder(currentEmoji.url, { name: `${currentEmoji.name}.${ext}` });
-            
-            return i.reply({ content: `📥 **${currentEmoji.name}** emojisini indiriliyor!`, files: [attachment], ephemeral: true });
+        if (i.isButton()) {
+            if (i.customId === 'prev') page = Math.max(0, page - step);
+            if (i.customId === 'next') page = Math.min(filteredEmojis.length - 1, page + step);
+            if (i.customId === 'toggle_view') { viewMode = viewMode === 'VISUAL' ? 'ID_LIST' : 'VISUAL'; page = 0; }
+            if (i.customId === 'search') {
+                const modal = new ModalBuilder().setCustomId('search_modal').setTitle('Emoji Ara');
+                const input = new TextInputBuilder().setCustomId('search_query').setLabel('Emoji Adı').setStyle(TextInputStyle.Short);
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                return i.showModal(modal);
+            }
         }
+        await i.update({ embeds: [await buildEmbed(page, filteredEmojis)], components: buildComponents(page, filteredEmojis) });
+    });
 
-        if (changed) {
-            await i.update({ 
-                embeds: [await gösterEmbed(page, filteredEmojis, currentFilter)], 
-                components: row(page, filteredEmojis.length, currentFilter) 
-            });
-        } else {
-             await i.deferUpdate();
+    // --- SÜRE BİTİMİ (TIMEOUT) KONTROLÜ ---
+    collector.on('end', async (collected, reason) => {
+        if (reason === 'time') {
+            const timeoutEmbed = new EmbedBuilder()
+                .setColor('Red')
+                .setTitle('⌛ Süre Doldu')
+                .setDescription('Bu emojiler panelinin kullanım süresi (10 dakika) dolmuştur. İşlemlere devam etmek için komutu tekrar kullanın.');
+
+            await msg.edit({ 
+                embeds: [timeoutEmbed], 
+                components: buildComponents(page, filteredEmojis, true) // Butonları kapatır
+            }).catch(() => {});
         }
     });
 
-    collector.on('end', async () => {
-        try {
-            // Zaman aşımında butonları devre dışı bırak
-            const finalRow = row(page, filteredEmojis.length, currentFilter);
-            
-            // Tüm butonları devre dışı bırak
-            const disabledComponents = finalRow.map(ar => 
-                new ActionRowBuilder().addComponents(
-                    ar.components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
-                )
-            );
-
-            await msg.edit({ components: disabledComponents }).catch(() => {});
-        } catch {}
+    client.on('interactionCreate', async m => {
+        if (!m.isModalSubmit()) return;
+        if (m.customId === 'search_modal') {
+            const query = m.fields.getTextInputValue('search_query').toLowerCase();
+            filteredEmojis = allEmojis.filter(e => e.name.toLowerCase().includes(query));
+            page = 0;
+            await m.update({ embeds: [await buildEmbed(page, filteredEmojis)], components: buildComponents(page, filteredEmojis) });
+        }
+        if (m.customId === 'edit_modal') {
+            const newName = m.fields.getTextInputValue('new_name');
+            await message.guild.emojis.edit(filteredEmojis[page].id, { name: newName });
+            allEmojis = fetchAll();
+            const editSuccess = new EmbedBuilder().setColor('Green').setDescription(`✅ **Emoji adı başarıyla \`${newName}\` olarak değiştirildi!**`);
+            await m.reply({ embeds: [editSuccess], ephemeral: true });
+        }
     });
 };
 
-module.exports.conf = {
-    aliases: ['emojilist', 'emojiler', 'serveremojis']
-};
-
-module.exports.help = {
-    name: 'emojiler',
-    description: 'Sunucudaki özel emojileri filtreleme, büyük görsel, boyut ve indirme desteğiyle listeler.'
-};
+module.exports.conf = { aliases: ['emojiler', 'eyon'] };
+module.exports.help = { name: 'emojiler' };
