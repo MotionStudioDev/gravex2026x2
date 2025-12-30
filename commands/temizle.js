@@ -1,4 +1,5 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, StringSelectMenuBuilder } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, PermissionsBitField, StringSelectMenuBuilder, AttachmentBuilder } = require("discord.js");
+const AdmZip = require("adm-zip"); // npm install adm-zip
 
 module.exports.run = async (client, message, args) => {
     // 1. YETKİ KONTROLÜ
@@ -21,7 +22,6 @@ module.exports.run = async (client, message, args) => {
     }
 
     // 2. KANAL ANALİZİ VE ÖN HAZIRLIK
-    // Kanalda o an bulunan mesajların türlerini hızlıca analiz eder
     const fetched = await message.channel.messages.fetch({ limit: 100 });
     const stats = {
         total: fetched.size,
@@ -32,9 +32,9 @@ module.exports.run = async (client, message, args) => {
 
     const analysisEmbed = new EmbedBuilder()
         .setColor('#5865F2')
-        .setAuthor({ name: 'Grave Operasyonel Temizlik Paneli', iconURL: client.user.displayAvatarURL() })
+        .setAuthor({ name: 'Grave Operasyonel Temizlik & Arşiv Paneli', iconURL: client.user.displayAvatarURL() })
         .setThumbnail(message.guild.iconURL())
-        .setDescription(`Kanal üzerinde son mesajlar analiz edildi. Belirlenen limit: **${miktar}**\n\nLütfen aşağıdan uygulanacak protokolü seçin:`)
+        .setDescription(`Kanal verileri analiz edildi. Hedef: **${miktar} Mesaj**\n\n**Yeni:** Artık "Yedekle ve Temizle" seçeneğiyle mesajları ZIP olarak arşivleyebilirsiniz!`)
         .addFields(
             { name: '🤖 Botlar', value: `\`${stats.bots} Mesaj\``, inline: true },
             { name: '🔗 Linkler', value: `\`${stats.links} Mesaj\``, inline: true },
@@ -45,10 +45,16 @@ module.exports.run = async (client, message, args) => {
     const menuRow = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
             .setCustomId('op_menu')
-            .setPlaceholder('Temizlik Protokolünü Onayla')
+            .setPlaceholder('Temizlik/Yedekleme Protokolünü Seçin')
             .addOptions([
                 { 
-                    label: `Seçilen Sayı Kadar Sil (${miktar})`, 
+                    label: 'Yedekle ve Temizle', 
+                    description: 'Mesajları ZIP yapıp DM gönderir ve kanalı temizler.', 
+                    value: 'backup_clear', 
+                    emoji: '📦' 
+                },
+                { 
+                    label: `Normal Temizlik (${miktar})`, 
                     description: 'Filtreleme yapmadan belirlenen sayı kadar mesajı siler.', 
                     value: 'all', 
                     emoji: '🧹' 
@@ -70,12 +76,6 @@ module.exports.run = async (client, message, args) => {
                     description: 'Sadece URL/Link içeren mesajları siler.', 
                     value: 'links', 
                     emoji: '🔗' 
-                },
-                { 
-                    label: 'Medya İmhası', 
-                    description: 'Dosya, fotoğraf ve Embed içerikleri siler.', 
-                    value: 'media', 
-                    emoji: '🖼️' 
                 }
             ])
     );
@@ -91,60 +91,65 @@ module.exports.run = async (client, message, args) => {
         if (i.isStringSelectMenu()) {
             const mode = i.values[0];
             
-            // İşlem Başladı Embed'i
             const procEmbed = new EmbedBuilder()
                 .setColor('Yellow')
-                .setDescription(`<a:yukle:1440677432976867448> **${mode.toUpperCase()}** protokolü yürütülüyor. Veri tabanı temizleniyor...`);
+                .setDescription(`<a:yukle:1440677432976867448> **${mode.toUpperCase()}** protokolü yürütülüyor. Lütfen bekleyin...`);
             
             await i.update({ embeds: [procEmbed], components: [] });
 
             try {
-                // Silme listesini hazırla (Botun kendi panel mesajını ve kullanıcının komutunu hariç tutar)
                 let toDelete = fetched.filter(m => m.id !== mainMsg.id && m.id !== message.id);
 
+                // --- ZIP YEDEKLEME MANTIĞI ---
+                if (mode === 'backup_clear') {
+                    const zip = new AdmZip();
+                    let logContent = `Grave Arşiv Sistemi\nKanal: ${message.channel.name}\nTarih: ${new Date().toLocaleString()}\nYetkili: ${message.author.tag}\n--------------------------\n\n`;
+                    
+                    const archiveList = Array.from(toDelete.values()).slice(0, miktar);
+                    archiveList.forEach(msg => {
+                        logContent += `[${msg.createdAt.toLocaleString()}] ${msg.author.tag}: ${msg.content || "[Dosya/Embed]"}\n`;
+                    });
+
+                    zip.addFile("mesaj-arsivi.txt", Buffer.from(logContent, "utf8"));
+                    const attachment = new AttachmentBuilder(zip.toBuffer(), { name: `Grave_Arsiv_${message.channel.id}.zip` });
+
+                    await message.author.send({ 
+                        content: `🛡️ **${message.channel.name}** kanalında yapılan temizlik operasyonunun yedeği ekte!`, 
+                        files: [attachment] 
+                    }).catch(() => {
+                        i.followUp({ content: "⚠️ DM kutunuz kapalı olduğu için yedeği özelden gönderemedim!", ephemeral: true });
+                    });
+                }
+
+                // --- FİLTRELEME MANTIĞI ---
                 if (mode === 'user') {
                     const target = message.mentions.users.first();
-                    if (!target) {
-                        return i.followUp({ 
-                            embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ **Hata:** Kullanıcı modunu kullanmak için birini etiketlemeliydiniz.')], 
-                            ephemeral: true 
-                        });
-                    }
+                    if (!target) return i.followUp({ content: '❌ Kullanıcı etiketlemediniz!', ephemeral: true });
                     toDelete = toDelete.filter(m => m.author.id === target.id);
                 } else if (mode === 'bots') {
                     toDelete = toDelete.filter(m => m.author.bot);
                 } else if (mode === 'links') {
                     toDelete = toDelete.filter(m => /https?:\/\/[^\s]+/.test(m.content));
-                } else if (mode === 'media') {
-                    toDelete = toDelete.filter(m => m.attachments.size > 0 || m.embeds.length > 0);
                 }
 
                 const deleteList = Array.from(toDelete.values()).slice(0, miktar);
+                if (deleteList.length === 0) return i.followUp({ content: '🔍 Kriterlere uygun mesaj bulunamadı.', ephemeral: true });
 
-                if (deleteList.length === 0) {
-                    return i.followUp({ 
-                        embeds: [new EmbedBuilder().setColor('Orange').setDescription('🔍 **Sonuç:** Filtreleme kriterlerine uygun mesaj bulunamadı.')], 
-                        ephemeral: true 
-                    });
-                }
-
-                // Toplu Silme İşlemi
                 const deleted = await message.channel.bulkDelete(deleteList, true);
 
                 const finalEmbed = new EmbedBuilder()
                     .setColor('#2ECC71')
-                    .setAuthor({ name: 'Operasyon Tamamlandı', iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190411.png' })
-                    .setDescription(`**${deleted.size}** adet mesaj kalıcı olarak imha edildi.`)
+                    .setAuthor({ name: 'Operasyon Tamamlandı', iconURL: client.user.displayAvatarURL() })
+                    .setDescription(`**${deleted.size}** mesaj başarıyla imha edildi.`)
                     .addFields(
                         { name: '📂 Protokol', value: `\`${mode.toUpperCase()}\``, inline: true },
-                        { name: '🛡️ Yetkili', value: `${message.author}`, inline: true }
+                        { name: '📦 Arşiv', value: mode === 'backup_clear' ? '`ZIP (DM Gönderildi)`' : '`Yok`', inline: true }
                     )
-                    .setFooter({ text: 'Kanal temizliği sağlandı.' })
+                    .setFooter({ text: 'Grave • Güvenli temizlik sağlandı.' })
                     .setTimestamp();
 
                 await mainMsg.edit({ embeds: [finalEmbed] });
 
-                // 5 saniye sonra arayüzü temizle
                 setTimeout(() => {
                     mainMsg.delete().catch(() => {});
                     message.delete().catch(() => {});
@@ -152,29 +157,18 @@ module.exports.run = async (client, message, args) => {
 
             } catch (err) {
                 console.error(err);
-                const errEmbed = new EmbedBuilder()
-                    .setColor('Red')
-                    .setTitle('❌ Kritik Hata')
-                    .setDescription('Mesajlar 14 günden eski olabilir veya botun mesajları silme yetkisi kısıtlanmış.');
-                await mainMsg.edit({ embeds: [errEmbed], components: [] });
+                const errEmbed = new EmbedBuilder().setColor('Red').setTitle('❌ Hata').setDescription('Bir sorun oluştu. Yetkileri kontrol edin.');
+                await mainMsg.edit({ embeds: [errEmbed] });
             }
         }
     });
 
     collector.on('end', (collected, reason) => {
         if (reason === 'time' && mainMsg) {
-            const timeEmbed = new EmbedBuilder().setColor('Grey').setDescription('⏰ **Zaman Aşımı:** Herhangi bir protokol seçilmediği için işlem iptal edildi.');
-            mainMsg.edit({ embeds: [timeEmbed], components: [] }).catch(() => {});
+            mainMsg.edit({ embeds: [new EmbedBuilder().setColor('Grey').setDescription('⏰ Zaman aşımı.')], components: [] }).catch(() => {});
         }
     });
 };
 
-module.exports.conf = {
-    aliases: ["clear", "sil", "purge", "temizle"]
-};
-
-module.exports.help = {
-    name: "temizle",
-    description: "Operasyonel panel üzerinden gelişmiş temizlik yapar.",
-    usage: "temizle <miktar> [@kullanıcı]"
-};
+module.exports.conf = { aliases: ["clear", "sil", "purge", "temizle"] };
+module.exports.help = { name: "temizle" };
