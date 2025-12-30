@@ -1,189 +1,168 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const AdmZip = require('adm-zip'); 
 const { 
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
-    ModalBuilder, TextInputBuilder, TextInputStyle 
+    ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder,
+    AttachmentBuilder 
 } = require('discord.js');
 
-// Ayarlar
 const DATA_URL = 'http://www.koeri.boun.edu.tr/scripts/lst0.asp';
-const perPage = 7; // Daha temiz bir görünüm için 7 idealdir
+const perPage = 3;
 
-// Cache Yönetimi
-let cachedDepremler = [];
-let lastFetchTime = 0;
-const CACHE_DURATION = 30000; // 30 saniye
+const getBarDesign = (m) => {
+    if (m >= 7.0) return { label: '\u001b[1;31mKRİTİK', wave: '\u001b[1;31m██████████' };
+    if (m >= 6.0) return { label: '\u001b[1;31mŞİDDETLİ', wave: '\u001b[1;31m████████░░' };
+    if (m >= 5.0) return { label: '\u001b[1;33mGÜÇLÜ', wave: '\u001b[1;33m██████░░░░' };
+    if (m >= 4.0) return { label: '\u001b[1;36mSARSICI', wave: '\u001b[1;36m████░░░░░░' };
+    return { label: '\u001b[1;32mHAFİF', wave: '\u001b[1;32m██░░░░░░░░' };
+};
 
-// --- YARDIMCI FONKSİYONLAR ---
-
-function getMagnitudeStyle(magnitude) {
-    const mag = parseFloat(magnitude);
-    if (isNaN(mag)) return { color: 0x808080, emoji: '⚪', title: 'Veri Yok', bar: '⬜⬜⬜⬜⬜' };
-    if (mag >= 6.0) return { color: 0x000000, emoji: '🚨', title: 'KAYTASTROFİK DEPREM', bar: '⬛⬛⬛⬛⬛' };
-    if (mag >= 5.0) return { color: 0xff0000, emoji: '🔴', title: 'ŞİDDETLİ DEPREM', bar: '🟥🟥🟥🟥🟥' };
-    if (mag >= 4.0) return { color: 0xffa500, emoji: '🟠', title: 'ORTA ŞİDDETLİ DEPREM', bar: '🟧🟧🟧🟧⬜' };
-    if (mag >= 3.0) return { color: 0xffff00, emoji: '🟡', title: 'HAFİF ŞİDDETLİ DEPREM', bar: '🟨🟨🟨⬜⬜' };
-    return { color: 0x00ff00, emoji: '🟢', title: 'DÜŞÜK ŞİDDETLİ DEPREM', bar: '🟩⬜⬜⬜⬜' };
-}
-
-async function fetchDepremler() {
-    if (Date.now() - lastFetchTime < CACHE_DURATION && cachedDepremler.length > 0) {
-        return cachedDepremler;
-    }
-    
+async function fetchData() {
     try {
         const { data } = await axios.get(DATA_URL, { timeout: 10000 });
         const $ = cheerio.load(data);
-        const text = $('pre').text();
-        const rows = text.split('\n').slice(6);
-
-        const depremler = rows.map(row => {
-            const parts = row.trim().split(/\s+/);
-            if (parts.length < 10) return null;
+        const rows = $('pre').text().split('\n').slice(6);
+        return rows.map(r => {
+            const p = r.trim().split(/\s+/);
+            if (p.length < 10) return null;
             return {
-                tarih: parts[0],
-                saat: parts[1],
-                enlem: parts[2],
-                boylam: parts[3],
-                derinlik: parts[4],
-                buyukluk: parts[6],
-                yer: parts[8],
-                sehir: parts[9] ? parts[9].replace(/[()]/g, '') : ""
+                d: p[0], t: p[1], lat: p[2], lon: p[3], dep: p[4], mag: parseFloat(p[6]),
+                loc: `${p[8]} ${p[9] ? p[9].replace(/[()]/g, '') : ""}`.replace(/İ/g, 'i').toLowerCase().replace(/(^\w|\s\w)/g, l => l.toUpperCase())
             };
-        }).filter(d => d !== null);
-
-        cachedDepremler = depremler;
-        lastFetchTime = Date.now();
-        return depremler;
-    } catch (e) {
-        console.error("Deprem çekme hatası:", e);
-        return cachedDepremler; // Hata durumunda eskisini döndür
-    }
+        }).filter(x => x !== null);
+    } catch (e) { return null; }
 }
 
-const generateEmbed = (list, page, filter = null) => {
-    const maxPage = Math.ceil(list.length / perPage) || 1;
-    const current = list.slice(page * perPage, (page + 1) * perPage);
-    const topMag = list.length > 0 ? Math.max(...list.map(d => parseFloat(d.buyukluk))) : 0;
-    const style = getMagnitudeStyle(topMag);
-
+const buildBarEmbed = (list, page, filter, minM) => {
+    const filtered = list.filter(x => x.mag >= minM && (filter === "Tümü" || x.loc.toUpperCase().includes(filter.toUpperCase())));
+    const total = filtered.length;
+    const maxP = Math.ceil(total / perPage) || 1;
+    const current = filtered.slice(page * perPage, (page + 1) * perPage);
+    
     const embed = new EmbedBuilder()
-        .setColor(style.color)
-        .setTitle(`${style.emoji} ${filter ? `Filtre: ${filter}` : 'Son Depremler (Türkiye)'}`)
-        .setThumbnail('https://upload.wikimedia.org/wikipedia/tr/b/bb/Kandilli_Rasathanesi_logosu.png')
-        .setFooter({ text: `Sayfa ${page + 1}/${maxPage} • Grave Deprem Sistemi`, iconURL: 'https://cdn.discordapp.com/emojis/1440677432976867448.gif' })
+        .setAuthor({ name: 'GraveBOT Depremler Sistemi', iconURL: 'https://cdn.discordapp.com/emojis/1043132641013735434.gif' })
+        .setColor('#2b2d31')
+        .setDescription(`**📡 Durum:** \`Sistem Aktif\` | **Filtre:** \`${filter}\` | **Eşik:** \`${minM}Mw\``)
+        .setFooter({ text: `Grave Deprem Sistemleri • Sayfa ${page + 1}/${maxP}` })
         .setTimestamp();
 
-    if (list.length === 0) {
-        embed.setDescription("❌ Belirlediğiniz kriterlere uygun deprem kaydı bulunamadı.");
-        return embed;
+    if (total === 0 || current.length === 0) {
+        embed.addFields({ name: '⚠️ BİLGİ', value: '```fix\nKriterlere uygun sismik dalga bulunamadı.```' });
+        return { embed, total };
     }
 
-    const description = current.map(d => {
-        const s = getMagnitudeStyle(d.buyukluk);
-        const yer = `${d.yer} ${d.sehir ? `(${d.sehir})` : ''}`.replace(/İ/g, 'i').toLowerCase().replace(/(^\w|\s\w)/g, l => l.toUpperCase());
-        const maps = `https://www.google.com/maps?q=${d.enlem},${d.boylam}`;
+    let body = "";
+    current.forEach((d, i) => {
+        const v = getBarDesign(d.mag);
+        const mapUrl = `https://www.google.com/maps?q=${d.lat},${d.lon}`;
         
-        return `${s.emoji} **${d.buyukluk}** | ${s.bar}\n` +
-               `📍 **[${yer}](${maps})**\n` +
-               `🕒 \`${d.tarih} ${d.saat}\` | ↕️ \`${d.derinlik} km\``;
-    }).join('\n\n');
+        const entry = `**#${page * perPage + i + 1} | KAYIT ANALİZİ**\n` +
+                `\`\`\`ansi\n` +
+                `\u001b[1;30m[ DURUM  ]\u001b[0m : ${v.label}\u001b[0m\n` +
+                `\u001b[1;30m[ KONUM  ]\u001b[0m : \u001b[1;37m${d.loc}\u001b[0m\n` +
+                `\u001b[1;30m[ GÜÇ    ]\u001b[0m : \u001b[1;37m${d.mag} Mw\u001b[0m\n` +
+                `\u001b[1;30m[ GRAFİK ]\u001b[0m : ${v.wave}\u001b[0m\n` +
+                `\u001b[1;30m[ DETAY  ]\u001b[0m : \u001b[1;34m${d.dep}KM\u001b[0m | \u001b[1;34m${d.t}\u001b[0m\n` +
+                `\`\`\`\n` +
+                `**[📍 KONUMU GÖR](${mapUrl})**\n` +
+                `──────────────────────────────\n`;
+        
+        if ((body + entry).length < 1000) body += entry;
+    });
 
-    embed.setDescription(description);
-    
-    if (page === 0 && !filter) {
-        embed.addFields({ name: '📊 İstatistik', value: `Son verilerde en büyük sarsıntı: **${topMag}**`, inline: false });
-    }
-
-    return embed;
+    embed.addFields({ name: '📑 SİSMİK VERİ LİSTESİ', value: body || 'Veri hatası.' });
+    return { embed, total };
 };
 
-const generateButtons = (page, totalLen) => {
-    const maxPage = Math.ceil(totalLen / perPage);
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('dep_prev').setLabel('◀️').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-        new ButtonBuilder().setCustomId('dep_filter').setLabel('🔍 Şehir Filtrele').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('dep_refresh').setLabel('🔄 Yenile').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('dep_next').setLabel('▶️').setStyle(ButtonStyle.Secondary).setDisabled(page + 1 >= maxPage)
-    );
-};
+module.exports.run = async (client, message) => {
+    const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor('Yellow').setDescription('<a:yukle:1440677432976867448> **Sunucuya bağlanıyor...**')] });
+    let data = await fetchData();
+    if (!data) return msg.edit({ content: '❌ Sunucuya bağlanılamadı.' });
 
-// --- KOMUT ÇALIŞTIRMA ---
+    let page = 0, filter = "Tümü", minM = 0;
 
-module.exports.run = async (client, message, args) => {
-    const loading = new EmbedBuilder().setColor('Yellow').setDescription('⏳ Veriler MotionAI\'nden alınıyor...');
-    const msg = await message.channel.send({ embeds: [loading] });
+    const comps = (p, t) => [
+        new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder().setCustomId('m').setPlaceholder('📊 Filtre / Arşiv Seçin...').addOptions([
+                { label: 'Hepsi', value: '0', emoji: '🌐' },
+                { label: '3.0+', value: '3', emoji: '🟢' },
+                { label: '4.5+', value: '4.5', emoji: '🟡' },
+                { label: '6.0+', value: '6', emoji: '🔴' },
+                { label: 'Verileri Arşivle', value: 'archive_zip', emoji: '1454762951578877964' }
+            ])
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('p')
+                .setEmoji('1454771071411552381')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(p === 0),
+            new ButtonBuilder()
+                .setCustomId('s')
+                .setEmoji('1454768274720952444')
+                .setLabel('Bölge Ara')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('r')
+                .setEmoji('1440677432976867448')
+                .setLabel('Verileri Yenile')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('n')
+                .setEmoji('1454771000993648660')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled((p + 1) * perPage >= t)
+        )
+    ];
 
-    let allDepremler = await fetchDepremler();
-    let currentList = allDepremler;
-    let page = 0;
-    let filter = null;
-
-    const updateMessage = async (interaction = null) => {
-        const embed = generateEmbed(currentList, page, filter);
-        const row = generateButtons(page, currentList.length);
-        
-        if (interaction) {
-            await interaction.update({ embeds: [embed], components: [row] });
-        } else {
-            await msg.edit({ embeds: [embed], components: [row] });
-        }
+    const refresh = async (i = null) => {
+        const res = buildBarEmbed(data, page, filter, minM);
+        const payload = { embeds: [res.embed], components: comps(page, res.total) };
+        try { if (i) await i.update(payload); else await msg.edit(payload); } catch (e) {}
     };
 
-    await updateMessage();
+    await refresh();
 
     const collector = msg.createMessageComponentCollector({ time: 600000 });
+    collector.on('collect', async i => {
+        if (i.user.id !== message.author.id) return i.reply({ content: 'Erişim izniniz yok.', ephemeral: true });
 
-    collector.on('collect', async (i) => {
-        if (i.user.id !== message.author.id) return i.reply({ content: '❌ Bu butonları sadece komutu yazan kullanabilir.', ephemeral: true });
-
-        if (i.customId === 'dep_prev') {
-            page--;
-            await updateMessage(i);
-        } else if (i.customId === 'dep_next') {
-            page++;
-            await updateMessage(i);
-        } else if (i.customId === 'dep_refresh') {
-            allDepremler = await fetchDepremler();
-            currentList = allDepremler;
-            filter = null;
-            page = 0;
-            await updateMessage(i);
-        } else if (i.customId === 'dep_filter') {
-            const modal = new ModalBuilder().setCustomId('m_dep_filter').setTitle('Deprem Filtrele');
-            const input = new TextInputBuilder()
-                .setCustomId('f_input')
-                .setLabel('Şehir veya Bölge Adı')
-                .setPlaceholder('Örn: İzmir veya Akdeniz')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-            
-            modal.addComponents(new ActionRowBuilder().addComponents(input));
-            await i.showModal(modal);
-
-            // Modal Yanıtı Bekle
-            const submitted = await i.awaitModalSubmit({ time: 60000 }).catch(() => null);
-            if (submitted) {
-                const val = submitted.fields.getTextInputValue('f_input').toUpperCase('tr-TR');
-                filter = val;
-                currentList = allDepremler.filter(d => d.yer.includes(val) || d.sehir.includes(val));
-                page = 0;
-                const embed = generateEmbed(currentList, page, filter);
-                const row = generateButtons(page, currentList.length);
-                await submitted.update({ embeds: [embed], components: [row] });
+        if (i.isStringSelectMenu()) {
+            if (i.values[0] === 'archive_zip') {
+                await i.deferReply({ ephemeral: true });
+                try {
+                    const zip = new AdmZip();
+                    const filteredData = data.filter(x => filter === "Tümü" || x.loc.toUpperCase().includes(filter.toUpperCase()));
+                    let fileContent = `--- GRAVE SİSMİK ARŞİV ---\nFiltre: ${filter}\n\n`;
+                    filteredData.forEach((d, idx) => {
+                        fileContent += `[${idx + 1}] Tarih: ${d.d} ${d.t} | Güç: ${d.mag} Mw | Konum: ${d.loc}\n`;
+                    });
+                    zip.addFile(`sismik_analiz.txt`, Buffer.from(fileContent));
+                    return i.followUp({ content: '✅ Arşiv hazır.', files: [new AttachmentBuilder(zip.toBuffer(), { name: `grave_sismik.zip` })] });
+                } catch (e) { return i.followUp({ content: '❌ Hata.' }); }
+            } else {
+                minM = parseFloat(i.values[0]); page = 0;
+                await refresh(i);
             }
+        }
+
+        if (i.customId === 'p') { page--; await refresh(i); }
+        if (i.customId === 'n') { page++; await refresh(i); }
+        if (i.customId === 'r') { data = await fetchData(); page = 0; await refresh(i); }
+        if (i.customId === 's') {
+            const modal = new ModalBuilder().setCustomId('mod').setTitle('ARAMA');
+            modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('txt').setLabel('Bölge').setStyle(TextInputStyle.Short)));
+            return i.showModal(modal);
         }
     });
 
-    collector.on('end', () => {
-        msg.edit({ components: [] }).catch(() => {});
+    client.on('interactionCreate', async m => {
+        if (!m.isModalSubmit() || m.customId !== 'mod') return;
+        filter = m.fields.getTextInputValue('txt') || "Tümü"; page = 0;
+        await refresh(m);
     });
 };
 
-module.exports.conf = {
-    aliases: ['depremler', 'earthquake', 'sondeprem']
-};
-
-module.exports.help = {
-    name: 'deprem'
-};
+module.exports.conf = { aliases: ['depremler'] };
+module.exports.help = { name: 'deprem' };
