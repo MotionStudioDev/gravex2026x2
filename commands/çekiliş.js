@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const ms = require('ms');
-const Giveaway = require('./models/Giveaway'); // Veritabanı modelini buraya bağla
+const Giveaway = require('../models/Giveaway'); // Veritabanı modelini buraya bağla
 
 module.exports.run = async (client, message, args) => {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
