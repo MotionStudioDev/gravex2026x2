@@ -2,7 +2,6 @@ const { EmbedBuilder, AuditLogEvent, ChannelType, PermissionsBitField } = requir
 const ModLog = require('../models/modlog');
 
 module.exports = (client) => {
-    // Güvenli executor bulucu
     const getExecutor = async (guild, type, targetId) => {
         if (!guild.members.me?.permissions.has(PermissionsBitField.Flags.ViewAuditLog)) return null;
 
@@ -16,16 +15,9 @@ module.exports = (client) => {
         }
     };
 
-    // Executor author fallback
     const safeExecutorAuthor = (executor) => ({
         name: executor?.tag || 'Otomatik / Bilinmeyen Yetkili',
         iconURL: executor?.displayAvatarURL({ dynamic: true, size: 4096 }) || null
-    });
-
-    // Dinamik footer - client.user null olsa bile çalışır
-    const getFooter = () => ({
-        text: `ModLog • ${client.user?.username || 'Bot'}`,
-        iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) || undefined
     });
 
     // ----------------------------------------------------------------------
@@ -57,7 +49,7 @@ module.exports = (client) => {
                 { name: '📎 Ekler', value: message.attachments.size ? `${message.attachments.size} adet` : 'Yok', inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -88,7 +80,7 @@ module.exports = (client) => {
                 { name: '⬅️ Eski', value: `\`\`\`${oldC}\`\`\``, inline: false },
                 { name: '➡️ Yeni', value: `\`\`\`${newC}\`\`\``, inline: false }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -111,7 +103,7 @@ module.exports = (client) => {
                 { name: '📍 Kanal', value: `${firstMsg.channel}`, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -137,7 +129,7 @@ module.exports = (client) => {
                 { name: '⏰ Katılma', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
                 { name: '👥 Toplam Üye', value: `\`${member.guild.memberCount}\``, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -163,7 +155,7 @@ module.exports = (client) => {
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
                 { name: '👥 Kalan Üye', value: `\`${member.guild.memberCount}\``, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -188,7 +180,7 @@ module.exports = (client) => {
                 { name: '📄 Sebep', value: ban.reason || 'Belirtilmemiş', inline: false },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -202,7 +194,6 @@ module.exports = (client) => {
 
         const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
 
-        // Timeout
         if (!oldMember.communicationDisabledUntil && newMember.communicationDisabledUntil) {
             const embed = new EmbedBuilder()
                 .setColor('#FF00FF')
@@ -214,12 +205,11 @@ module.exports = (client) => {
                     { name: '🛠️ Yetkili', value: executor ? `${executor}` : 'Bilinmiyor', inline: true },
                     { name: '⏰ Bitiş', value: `<t:${Math.floor(newMember.communicationDisabledUntilTimestamp / 1000)}:F>`, inline: false }
                 )
-                .setFooter(getFooter())
+                .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
                 .setTimestamp();
             logChannel.send({ embeds: [embed] }).catch(() => {});
         }
 
-        // Rol değişiklikleri
         const added = newMember.roles.cache.filter(r => !oldMember.roles.cache.has(r.id));
         const removed = oldMember.roles.cache.filter(r => !newMember.roles.cache.has(r.id));
         if (added.size || removed.size) {
@@ -234,12 +224,11 @@ module.exports = (client) => {
                 .setAuthor(safeExecutorAuthor(executor))
                 .setDescription(`**${newMember.user.tag}** için:\n${desc}`)
                 .addFields({ name: '🆔 ID', value: `\`${newMember.id}\``, inline: true })
-                .setFooter(getFooter())
+                .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
                 .setTimestamp();
             logChannel.send({ embeds: [embed] }).catch(() => {});
         }
 
-        // Nick değişikliği
         if (oldMember.nickname !== newMember.nickname) {
             const embed = new EmbedBuilder()
                 .setColor('#9B59B6')
@@ -251,7 +240,7 @@ module.exports = (client) => {
                     { name: '⬅️ Eski', value: oldMember.nickname || '*Yok*', inline: true },
                     { name: '➡️ Yeni', value: newMember.nickname || '*Yok*', inline: true }
                 )
-                .setFooter(getFooter())
+                .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
                 .setTimestamp();
             logChannel.send({ embeds: [embed] }).catch(() => {});
         }
@@ -279,7 +268,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${channel.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -304,7 +293,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${channel.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -331,7 +320,7 @@ module.exports = (client) => {
             .setAuthor(safeExecutorAuthor(executor))
             .setDescription(`${newChannel} kanalında:\n${changes.join('\n')}`)
             .addFields({ name: '🆔 ID', value: `\`${newChannel.id}\``, inline: true })
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -355,7 +344,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${role.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -378,7 +367,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${role.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -404,7 +393,7 @@ module.exports = (client) => {
             .setAuthor(safeExecutorAuthor(executor))
             .setDescription(`**${newRole.name}** rolünde:\n${changes.join('\n')}`)
             .addFields({ name: '🆔 ID', value: `\`${newRole.id}\``, inline: true })
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -428,7 +417,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${emoji.id}\``, inline: true }
             )
             .setThumbnail(emoji.url)
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -453,7 +442,7 @@ module.exports = (client) => {
             .setTitle('🏰 Sunucu Ayarları Güncellendi')
             .setAuthor(safeExecutorAuthor(executor))
             .setDescription(changes.join('\n'))
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -473,7 +462,7 @@ module.exports = (client) => {
         const user = newState.member.user;
         let embed = new EmbedBuilder()
             .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL({ dynamic: true, size: 4096 }) })
-            .setFooter(getFooter())
+            .setFooter({ text: `ModLog • ${client.user?.username || 'Bot'}`, iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) })
             .setTimestamp();
 
         if (!oldState.channelId && newState.channelId) {
