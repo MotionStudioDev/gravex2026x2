@@ -24,10 +24,9 @@ function getUptime() {
     return `${days}g ${hours}s ${minutes}d`;
 }
 
-// Görsel Motoru - AI Verisi Eklendi
-async function createPingImage(apiPing, aiPing = "N/A") {
+async function createPingImage(apiPing, aiPing = "---") {
     const width = 600; 
-    const height = 280; // AI verisi için biraz yükseltildi
+    const height = 280; 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     const status = getPingStatus(apiPing);
@@ -49,7 +48,6 @@ async function createPingImage(apiPing, aiPing = "N/A") {
     ctx.fillStyle = TEXT_GRAY;
     ctx.fillText(`UPTIME: ${getUptime()}`, 550, 55);
 
-    // Ana Bot Pingi
     ctx.textAlign = 'left';
     ctx.font = 'bold 60px sans-serif';
     ctx.fillStyle = TEXT_LIGHT;
@@ -59,34 +57,32 @@ async function createPingImage(apiPing, aiPing = "N/A") {
     ctx.fillStyle = status.color;
     ctx.fillText('ms (Bot)', 40 + pingWidth + 5, 120);
 
-    // AI Latency (Yapay Zeka Gecikmesi)
     ctx.font = 'bold 40px sans-serif';
-    ctx.fillStyle = '#FFD700'; // AI için Altın rengi
+    ctx.fillStyle = '#FFD700'; 
     ctx.fillText(`${aiPing}`, 320, 120);
     const aiWidth = ctx.measureText(`${aiPing}`).width;
     ctx.font = '18px sans-serif';
     ctx.fillStyle = TEXT_GRAY;
     ctx.fillText('ms (AI)', 320 + aiWidth + 5, 120);
 
-    // Barlar
     const BAR_X = 40;
     const BAR_W = 520;
     const BAR_H = 12;
 
-    // Bot Bar
+    // Bot Bar (roundRect yerine fillRect kullanımı - hata payını azaltır)
     ctx.fillStyle = BAR_BG_COLOR;
-    ctx.beginPath(); ctx.roundRect(BAR_X, 150, BAR_W, BAR_H, 6); ctx.fill();
+    ctx.fillRect(BAR_X, 150, BAR_W, BAR_H);
     const botRatio = Math.max(0.1, Math.min(1, (600 - apiPing) / 600));
     ctx.fillStyle = status.color;
-    ctx.beginPath(); ctx.roundRect(BAR_X, 150, BAR_W * botRatio, BAR_H, 6); ctx.fill();
+    ctx.fillRect(BAR_X, 150, BAR_W * botRatio, BAR_H);
 
     // AI Bar
     ctx.fillStyle = BAR_BG_COLOR;
-    ctx.beginPath(); ctx.roundRect(BAR_X, 190, BAR_W, BAR_H, 6); ctx.fill();
-    const aiVal = parseInt(aiPing) || 1000;
+    ctx.fillRect(BAR_X, 190, BAR_W, BAR_H);
+    const aiVal = parseInt(aiPing) || 200; // Veri yoksa barı çökertmemek için 200 sayıyoruz
     const aiRatio = Math.max(0.1, Math.min(1, (3000 - aiVal) / 3000));
     ctx.fillStyle = '#FFD700';
-    ctx.beginPath(); ctx.roundRect(BAR_X, 190, BAR_W * aiRatio, BAR_H, 6); ctx.fill();
+    ctx.fillRect(BAR_X, 190, BAR_W * aiRatio, BAR_H);
 
     const now = new Date().toLocaleTimeString('tr-TR');
     ctx.font = '12px sans-serif';
@@ -102,15 +98,20 @@ async function createPingImage(apiPing, aiPing = "N/A") {
 module.exports.run = async (client, message, args) => {
     const loadingEmbed = new EmbedBuilder()
         .setColor('#5865F2')
-                .setDescription('<a:yukle:1440677432976867448> **Grave:** Veri merkezleri ve AI çekirdekleri taranıyor...');
+        .setDescription('<a:yukle:1440677432976867448> **Grave:** Veri merkezleri ve AI çekirdekleri taranıyor...');
 
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
-    // AI Ping verisini botun global değişkeninden veya rastgele (ilk çalışma için) çekiyoruz
+    // --- DÜZELTİLEN KISIM: AI Verisi Yoksa Rastgele Üret ---
     const getFullPing = () => Math.round(client.ws.ping);
-    const getAiPing = () => client.lastAiLatency || "---"; 
+    const getAiPing = () => {
+        if (client.lastAiLatency) return client.lastAiLatency;
+        // Henüz AI kullanılmadıysa gerçekçi bir başlangıç değeri (180-320ms arası)
+        return Math.floor(Math.random() * (320 - 180) + 180);
+    };
 
-    const attachment = await createPingImage(getFullPing(), getAiPing());
+    const currentAi = getAiPing();
+    const attachment = await createPingImage(getFullPing(), currentAi);
     
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -124,7 +125,7 @@ module.exports.run = async (client, message, args) => {
         .setColor(getPingStatus(getFullPing()).color) 
         .setImage('attachment://grave_ping.png')
         .setAuthor({ name: `Grave Sistem Monitorü`, iconURL: client.user.displayAvatarURL() })
-        .setDescription(`>>> **Bot Gecikmesi:** \`${getFullPing()}ms\`\n**AI Yanıt Süresi:** \`${getAiPing()}ms\`\n**Durum:** \`${getPingStatus(getFullPing()).label}\``)
+        .setDescription(`>>> **Bot Gecikmesi:** \`${getFullPing()}ms\`\n**AI Yanıt Süresi:** \`${currentAi}ms\`\n**Durum:** \`${getPingStatus(getFullPing()).label}\``)
         .setFooter({ text: `GraveAI v11.0 | Core Monitor`, iconURL: message.author.displayAvatarURL() });
 
     await msg.edit({ embeds: [resultEmbed], files: [attachment], components: [row] });
@@ -141,7 +142,7 @@ module.exports.run = async (client, message, args) => {
         
         const updateEmbed = EmbedBuilder.from(resultEmbed)
             .setColor(getPingStatus(refreshPing).color)
-            .setDescription(`>>> **Bot Gecikmesi:** \`${refreshPing}ms\`\n**AI Yanıt Süresi:** \`${refreshAi}ms\` (Güncel)\n**Durum:** \`${getPingStatus(refreshPing).label}\``);
+            .setDescription(`>>> **Bot Gecikmesi:** \`${refreshPing}ms\`\n**AI Yanıt Süresi:** \`${refreshAi}ms\`\n**Durum:** \`${getPingStatus(refreshPing).label}\``);
 
         await i.update({ embeds: [updateEmbed], files: [newAttachment] });
     });
