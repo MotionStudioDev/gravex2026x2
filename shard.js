@@ -21,7 +21,7 @@ app.listen(port, () => {
 // ----------------------------------------------------
 const manager = new ShardingManager('./main.js', {
     token: process.env.TOKEN, // Token Render ortam değişkenlerinden çekilir
-    totalShards: 3,           // İstediğin gibi 3 parça olarak sabitlendi
+    totalShards: 1,           // İstediğin gibi 3 parça olarak sabitlendi
     respawn: true,            // Bir parça çökerse otomatik olarak yeniden başlatır
     shardArgs: ['--ansi', '--color'], 
 });
