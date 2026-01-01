@@ -10,12 +10,13 @@ const {
 const DATA_URL = 'http://www.koeri.boun.edu.tr/scripts/lst0.asp';
 const perPage = 3;
 
-const getBarDesign = (m) => {
-    if (m >= 7.0) return { label: '\u001b[1;31mKRİTİK', wave: '\u001b[1;31m██████████' };
-    if (m >= 6.0) return { label: '\u001b[1;31mŞİDDETLİ', wave: '\u001b[1;31m████████░░' };
-    if (m >= 5.0) return { label: '\u001b[1;33mGÜÇLÜ', wave: '\u001b[1;33m██████░░░░' };
-    if (m >= 4.0) return { label: '\u001b[1;36mSARSICI', wave: '\u001b[1;36m████░░░░░░' };
-    return { label: '\u001b[1;32mHAFİF', wave: '\u001b[1;32m██░░░░░░░░' };
+const getRiskAnalysis = (mag, depth) => {
+    const m = parseFloat(mag);
+    if (m >= 7.0) return { label: '☣️ FELAKET DÜZEYİ', color: '#8b0000', ansi: '\u001b[1;31m', threat: '██████████ %100' };
+    if (m >= 5.5) return { label: '🚨 YIKICI RİSK', color: '#ff0000', ansi: '\u001b[1;31m', threat: '████████░░ %80' };
+    if (m >= 4.5) return { label: '⚠️ YÜKSEK SARSINTI', color: '#ff8c00', ansi: '\u001b[1;33m', threat: '██████░░░░ %60' };
+    if (m >= 3.5) return { label: '🟡 HİSSEDİLEBİLİR', color: '#ffd700', ansi: '\u001b[1;33m', threat: '████░░░░░░ %40' };
+    return { label: '🟢 MİKRO AKTİVİTE', color: '#00ff00', ansi: '\u001b[1;32m', threat: '██░░░░░░░░ %15' };
 };
 
 async function fetchData() {
@@ -34,135 +35,116 @@ async function fetchData() {
     } catch (e) { return null; }
 }
 
-const buildBarEmbed = (list, page, filter, minM) => {
-    const filtered = list.filter(x => x.mag >= minM && (filter === "Tümü" || x.loc.toUpperCase().includes(filter.toUpperCase())));
+const buildUltraEmbed = (list, page, filter, minM) => {
+    // Harf duyarlılığı fixlendi: Hem liste hem filtre küçük harfe çevrilip karşılaştırılıyor
+    const filtered = list.filter(x => {
+        const matchesMag = x.mag >= minM;
+        const matchesLoc = filter === "Tümü" || x.loc.toLocaleLowerCase('tr-TR').includes(filter.toLocaleLowerCase('tr-TR'));
+        return matchesMag && matchesLoc;
+    });
+
     const total = filtered.length;
     const maxP = Math.ceil(total / perPage) || 1;
     const current = filtered.slice(page * perPage, (page + 1) * perPage);
-    
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: 'GraveBOT Depremler Sistemi', iconURL: 'https://cdn.discordapp.com/emojis/1043132641013735434.gif' })
-        .setColor('#2b2d31')
-        .setDescription(`**📡 Durum:** \`Sistem Aktif\` | **Filtre:** \`${filter}\` | **Eşik:** \`${minM}Mw\``)
-        .setFooter({ text: `Grave Deprem Sistemleri • Sayfa ${page + 1}/${maxP}` })
-        .setTimestamp();
+    const maxMag = total > 0 ? Math.max(...filtered.map(x => x.mag)) : 0;
 
-    if (total === 0 || current.length === 0) {
-        embed.addFields({ name: '⚠️ BİLGİ', value: '```fix\nKriterlere uygun sismik dalga bulunamadı.```' });
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: 'GRAVE SİSMİK İSTİHBARAT SERVİSİ', iconURL: 'https://i.imgur.com/vHpxL4s.gif' })
+        .setColor(maxMag >= 5.0 ? '#ff0000' : '#2b2d31')
+        .setTitle(`📡 Filtre: ${filter}`)
+        .setDescription(`>>> **Sistem Durumu:** \`ÇEVRİMİÇİ\`\n**Filtre:** \`${minM > 0 ? minM + ' Mw+' : 'Yok'}\`\n**Sayfa:** \`${page + 1}/${maxP}\``)
+        .addFields({ name: '📊 Analiz Sonucu', value: `\`\`\`ansi\n\u001b[1;37mEşleşen Kayıt: ${total}\nEn Büyük: ${maxMag} Mw\u001b[0m\`\`\`` });
+
+    if (total === 0) {
+        embed.addFields({ name: '⚠️ UYARI', value: '```diff\n- Aranan bölgede veya güçte sismik veri bulunamadı.```' });
         return { embed, total };
     }
 
-    let body = "";
     current.forEach((d, i) => {
-        const v = getBarDesign(d.mag);
+        const risk = getRiskAnalysis(d.mag, d.dep);
         const mapUrl = `https://www.google.com/maps?q=${d.lat},${d.lon}`;
-        
-        const entry = `**#${page * perPage + i + 1} | KAYIT ANALİZİ**\n` +
-                `\`\`\`ansi\n` +
-                `\u001b[1;30m[ DURUM  ]\u001b[0m : ${v.label}\u001b[0m\n` +
-                `\u001b[1;30m[ KONUM  ]\u001b[0m : \u001b[1;37m${d.loc}\u001b[0m\n` +
-                `\u001b[1;30m[ GÜÇ    ]\u001b[0m : \u001b[1;37m${d.mag} Mw\u001b[0m\n` +
-                `\u001b[1;30m[ GRAFİK ]\u001b[0m : ${v.wave}\u001b[0m\n` +
-                `\u001b[1;30m[ DETAY  ]\u001b[0m : \u001b[1;34m${d.dep}KM\u001b[0m | \u001b[1;34m${d.t}\u001b[0m\n` +
-                `\`\`\`\n` +
-                `**[📍 KONUMU GÖR](${mapUrl})**\n` +
-                `──────────────────────────────\n`;
-        
-        if ((body + entry).length < 1000) body += entry;
+        embed.addFields({
+            name: `📍 [${page * perPage + i + 1}] ${d.loc}`,
+            value: `\`\`\`ansi\n` +
+                   `\u001b[1;30m┌── Güç:\u001b[0m ${risk.ansi}${d.mag} Mw\u001b[0m\n` +
+                   `\u001b[1;30m├── Risk:\u001b[0m ${risk.label}\n` +
+                   `\u001b[1;30m└── Derinlik:\u001b[0m \u001b[1;34m${d.dep} KM\u001b[0m\n` +
+                   `\`\`\`\n[🗺️ Harita](${mapUrl}) | \`⏱️ ${d.t}\``
+        });
     });
 
-    embed.addFields({ name: '📑 SİSMİK VERİ LİSTESİ', value: body || 'Veri hatası.' });
     return { embed, total };
 };
 
 module.exports.run = async (client, message) => {
-    const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor('Yellow').setDescription('<a:yukle:1440677432976867448> **Sunucuya bağlanıyor...**')] });
+    const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor('#2b2d31').setDescription('📡 **Grave:** Sismik ağlar taranıyor...')] });
     let data = await fetchData();
-    if (!data) return msg.edit({ content: '❌ Sunucuya bağlanılamadı.' });
+    if (!data) return msg.edit({ content: '❌ Veri çekilemedi.' });
 
     let page = 0, filter = "Tümü", minM = 0;
 
     const comps = (p, t) => [
         new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder().setCustomId('m').setPlaceholder('📊 Filtre / Arşiv Seçin...').addOptions([
-                { label: 'Hepsi', value: '0', emoji: '🌐' },
-                { label: '3.0+', value: '3', emoji: '🟢' },
-                { label: '4.5+', value: '4.5', emoji: '🟡' },
-                { label: '6.0+', value: '6', emoji: '🔴' },
-                { label: 'Verileri Arşivle', value: 'archive_zip', emoji: '1454762951578877964' }
+            new StringSelectMenuBuilder().setCustomId('m').setPlaceholder('🔍 Analiz Modu / Filtreler...').addOptions([
+                { label: 'Tüm Hareketler (SIFIRLA)', value: 'reset', emoji: '🌐' },
+                { label: 'Hissedilenler (4.0+)', value: '4', emoji: '🟠' },
+                { label: 'Kritik Eşik (5.5+)', value: '5.5', emoji: '🔴' },
+                { label: 'Verileri Dışa Aktar (.ZIP)', value: 'zip', emoji: '💾' }
             ])
         ),
         new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('p')
-                .setEmoji('1454771071411552381')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(p === 0),
-            new ButtonBuilder()
-                .setCustomId('s')
-                .setEmoji('1454768274720952444')
-                .setLabel('Bölge Ara')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId('r')
-                .setEmoji('1440677432976867448')
-                .setLabel('Verileri Yenile')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId('n')
-                .setEmoji('1454771000993648660')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled((p + 1) * perPage >= t)
+            new ButtonBuilder().setCustomId('p').setLabel('GERİ').setStyle(ButtonStyle.Secondary).setDisabled(p === 0),
+            new ButtonBuilder().setCustomId('s').setLabel('BÖLGE TARAMASI').setStyle(ButtonStyle.Primary).setEmoji('🛰️'),
+            new ButtonBuilder().setCustomId('r').setLabel('YENİLE').setStyle(ButtonStyle.Success).setEmoji('🔄'),
+            new ButtonBuilder().setCustomId('n').setLabel('İLERİ').setStyle(ButtonStyle.Secondary).setDisabled((p + 1) * perPage >= t)
         )
     ];
 
     const refresh = async (i = null) => {
-        const res = buildBarEmbed(data, page, filter, minM);
+        const res = buildUltraEmbed(data, page, filter, minM);
         const payload = { embeds: [res.embed], components: comps(page, res.total) };
-        try { if (i) await i.update(payload); else await msg.edit(payload); } catch (e) {}
+        try { i ? await i.update(payload) : await msg.edit(payload); } catch (e) {}
     };
 
     await refresh();
 
-    const collector = msg.createMessageComponentCollector({ time: 600000 });
+    const collector = msg.createMessageComponentCollector({ time: 900000 });
     collector.on('collect', async i => {
-        if (i.user.id !== message.author.id) return i.reply({ content: 'Erişim izniniz yok.', ephemeral: true });
+        if (i.user.id !== message.author.id) return i.reply({ content: 'Bu oturum size özeldir.', ephemeral: true });
 
         if (i.isStringSelectMenu()) {
-            if (i.values[0] === 'archive_zip') {
+            if (i.values[0] === 'reset') {
+                filter = "Tümü"; minM = 0; page = 0; // Her şeyi sıfırlayan ana sayfa fixi
+            } else if (i.values[0] === 'zip') {
                 await i.deferReply({ ephemeral: true });
-                try {
-                    const zip = new AdmZip();
-                    const filteredData = data.filter(x => filter === "Tümü" || x.loc.toUpperCase().includes(filter.toUpperCase()));
-                    let fileContent = `--- GRAVE SİSMİK ARŞİV ---\nFiltre: ${filter}\n\n`;
-                    filteredData.forEach((d, idx) => {
-                        fileContent += `[${idx + 1}] Tarih: ${d.d} ${d.t} | Güç: ${d.mag} Mw | Konum: ${d.loc}\n`;
-                    });
-                    zip.addFile(`sismik_analiz.txt`, Buffer.from(fileContent));
-                    return i.followUp({ content: '✅ Arşiv hazır.', files: [new AttachmentBuilder(zip.toBuffer(), { name: `grave_sismik.zip` })] });
-                } catch (e) { return i.followUp({ content: '❌ Hata.' }); }
+                const zip = new AdmZip();
+                const filtered = data.filter(x => filter === "Tümü" || x.loc.toLowerCase().includes(filter.toLowerCase()));
+                let txt = `GRAVE RAPOR\n\n`;
+                filtered.forEach(d => txt += `[${d.d} ${d.t}] M:${d.mag} | D:${d.dep}km | YER:${d.loc}\n`);
+                zip.addFile('analiz.txt', Buffer.from(txt));
+                return i.followUp({ content: '📂 Arşiv hazır.', files: [new AttachmentBuilder(zip.toBuffer(), { name: 'grave_sismik.zip' })] });
             } else {
                 minM = parseFloat(i.values[0]); page = 0;
-                await refresh(i);
             }
+            await refresh(i);
         }
 
         if (i.customId === 'p') { page--; await refresh(i); }
         if (i.customId === 'n') { page++; await refresh(i); }
         if (i.customId === 'r') { data = await fetchData(); page = 0; await refresh(i); }
         if (i.customId === 's') {
-            const modal = new ModalBuilder().setCustomId('mod').setTitle('ARAMA');
-            modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('txt').setLabel('Bölge').setStyle(TextInputStyle.Short)));
+            const modal = new ModalBuilder().setCustomId('src').setTitle('SİSMİK TARAMA');
+            modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('in').setLabel('BÖLGE / ŞEHİR ADI').setStyle(TextInputStyle.Short).setRequired(true)));
             return i.showModal(modal);
         }
     });
 
     client.on('interactionCreate', async m => {
-        if (!m.isModalSubmit() || m.customId !== 'mod') return;
-        filter = m.fields.getTextInputValue('txt') || "Tümü"; page = 0;
+        if (!m.isModalSubmit() || m.customId !== 'src') return;
+        filter = m.fields.getTextInputValue('in') || "Tümü"; page = 0;
         await refresh(m);
     });
 };
 
-module.exports.conf = { aliases: ['depremler'] };
+module.exports.conf = { aliases: ['depremler', 'sismik'] };
 module.exports.help = { name: 'deprem' };

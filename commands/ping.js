@@ -8,13 +8,12 @@ const TEXT_GRAY = '#949BA4';
 const BUTTON_DURATION = 60000;
 
 function getPingStatus(ping) {
-    if (ping <= 50) return { label: 'Mükemmel', color: '#00ffcc', glow: '#00ffcc' };
-    if (ping <= 150) return { label: 'Stabil', color: '#5865F2', glow: '#5865F2' };
-    if (ping <= 300) return { label: 'Normal', color: '#faa61a', glow: '#faa61a' };
-    return { label: 'Riskli', color: '#f04747', glow: '#f04747' };
+    if (ping <= 50) return { label: 'Mükemmel', color: '#00ffcc' };
+    if (ping <= 150) return { label: 'Stabil', color: '#5865F2' };
+    if (ping <= 300) return { label: 'Normal', color: '#faa61a' };
+    return { label: 'Riskli', color: '#f04747' };
 }
 
-// Uptime Hesaplayıcı
 function getUptime() {
     let totalSeconds = (process.uptime());
     let days = Math.floor(totalSeconds / 86400);
@@ -25,86 +24,77 @@ function getUptime() {
     return `${days}g ${hours}s ${minutes}d`;
 }
 
-async function createPingImage(apiPing) {
+// Görsel Motoru - AI Verisi Eklendi
+async function createPingImage(apiPing, aiPing = "N/A") {
     const width = 600; 
-    const height = 230; // Biraz daha genişletildi
+    const height = 280; // AI verisi için biraz yükseltildi
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     const status = getPingStatus(apiPing);
     
-    // Katmanlı Arka Plan (Grave Dark Theme)
     ctx.fillStyle = '#2b2d31'; 
     ctx.fillRect(0, 0, width, height);
     
-    // Panel Çerçevesi (Glass Effect)
     ctx.strokeStyle = '#3f4147';
     ctx.lineWidth = 2;
     ctx.strokeRect(15, 15, width - 30, height - 30);
 
-    // Başlık
     ctx.textAlign = 'left';
     ctx.font = 'bold 22px sans-serif';
     ctx.fillStyle = status.color; 
-    ctx.fillText('GraveBOT Gecikme Süresi', 40, 55);
+    ctx.fillText('GraveBOT Sistem Analizi', 40, 55);
 
-    // Sağ Üst Bilgi (Uptime)
     ctx.textAlign = 'right';
     ctx.font = '14px sans-serif';
     ctx.fillStyle = TEXT_GRAY;
     ctx.fillText(`UPTIME: ${getUptime()}`, 550, 55);
 
-    // Ana MS Değeri (Büyük ve Gölgeli)
+    // Ana Bot Pingi
     ctx.textAlign = 'left';
-    ctx.font = 'bold 70px sans-serif';
+    ctx.font = 'bold 60px sans-serif';
     ctx.fillStyle = TEXT_LIGHT;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 10;
-    ctx.fillText(`${apiPing}`, 40, 130);
-    ctx.shadowBlur = 0;
-    
+    ctx.fillText(`${apiPing}`, 40, 120);
     const pingWidth = ctx.measureText(`${apiPing}`).width;
-    ctx.font = '24px sans-serif';
+    ctx.font = '20px sans-serif';
     ctx.fillStyle = status.color;
-    ctx.fillText('ms', 40 + pingWidth + 10, 130);
+    ctx.fillText('ms (Bot)', 40 + pingWidth + 5, 120);
 
-    // Durum Yazısı (Neon)
-    ctx.font = 'bold 18px sans-serif';
-    ctx.fillText(`[ ${status.label} ]`, 40 + pingWidth + 60, 125);
+    // AI Latency (Yapay Zeka Gecikmesi)
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillStyle = '#FFD700'; // AI için Altın rengi
+    ctx.fillText(`${aiPing}`, 320, 120);
+    const aiWidth = ctx.measureText(`${aiPing}`).width;
+    ctx.font = '18px sans-serif';
+    ctx.fillStyle = TEXT_GRAY;
+    ctx.fillText('ms (AI)', 320 + aiWidth + 5, 120);
 
-    // Gelişmiş Bar Tasarımı
+    // Barlar
     const BAR_X = 40;
-    const BAR_Y = 160;
     const BAR_W = 520;
-    const BAR_H = 16;
+    const BAR_H = 12;
 
-    // Arka Bar
+    // Bot Bar
     ctx.fillStyle = BAR_BG_COLOR;
-    ctx.beginPath();
-    ctx.roundRect(BAR_X, BAR_Y, BAR_W, BAR_H, 8);
-    ctx.fill();
+    ctx.beginPath(); ctx.roundRect(BAR_X, 150, BAR_W, BAR_H, 6); ctx.fill();
+    const botRatio = Math.max(0.1, Math.min(1, (600 - apiPing) / 600));
+    ctx.fillStyle = status.color;
+    ctx.beginPath(); ctx.roundRect(BAR_X, 150, BAR_W * botRatio, BAR_H, 6); ctx.fill();
 
-    // Dolu Bar (Cyber Gradient)
-    const filledRatio = Math.max(0.1, Math.min(1, (600 - apiPing) / 600));
-    const grad = ctx.createLinearGradient(BAR_X, 0, BAR_X + BAR_W * filledRatio, 0);
-    grad.addColorStop(0, status.color);
-    grad.addColorStop(1, '#ffffff');
+    // AI Bar
+    ctx.fillStyle = BAR_BG_COLOR;
+    ctx.beginPath(); ctx.roundRect(BAR_X, 190, BAR_W, BAR_H, 6); ctx.fill();
+    const aiVal = parseInt(aiPing) || 1000;
+    const aiRatio = Math.max(0.1, Math.min(1, (3000 - aiVal) / 3000));
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath(); ctx.roundRect(BAR_X, 190, BAR_W * aiRatio, BAR_H, 6); ctx.fill();
 
-    ctx.shadowColor = status.color;
-    ctx.shadowBlur = 15;
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(BAR_X, BAR_Y, BAR_W * filledRatio, BAR_H, 8);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Alt Bilgi Satırı
     const now = new Date().toLocaleTimeString('tr-TR');
     ctx.font = '12px sans-serif';
     ctx.fillStyle = TEXT_GRAY;
     ctx.textAlign = 'left';
-    ctx.fillText(`Ping zamanı: ${now}`, 40, 205);
+    ctx.fillText(`Son Analiz: ${now}`, 40, 245);
     ctx.textAlign = 'right';
-    ctx.fillText('GraveBOT Gecikme Süresi', 560, 205);
+    ctx.fillText('GraveAI & Ping değerleri', 560, 245);
 
     return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'grave_ping.png' });
 }
@@ -112,17 +102,20 @@ async function createPingImage(apiPing) {
 module.exports.run = async (client, message, args) => {
     const loadingEmbed = new EmbedBuilder()
         .setColor('#5865F2')
-        .setDescription('<a:yukle:1440677432976867448> **Grave:** Sistem frekansları optimize ediliyor...');
+                .setDescription('<a:yukle:1440677432976867448> **Grave:** Veri merkezleri ve AI çekirdekleri taranıyor...');
 
     const msg = await message.channel.send({ embeds: [loadingEmbed] });
 
+    // AI Ping verisini botun global değişkeninden veya rastgele (ilk çalışma için) çekiyoruz
     const getFullPing = () => Math.round(client.ws.ping);
-    const attachment = await createPingImage(getFullPing());
+    const getAiPing = () => client.lastAiLatency || "---"; 
+
+    const attachment = await createPingImage(getFullPing(), getAiPing());
     
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('ping_refresh')
-            .setLabel('Yeniden Analiz Et')
+            .setLabel('Sistemi Yenile')
             .setEmoji('<a:pings:1440464530718068846>')
             .setStyle(ButtonStyle.Secondary)
     );
@@ -130,9 +123,9 @@ module.exports.run = async (client, message, args) => {
     const resultEmbed = new EmbedBuilder()
         .setColor(getPingStatus(getFullPing()).color) 
         .setImage('attachment://grave_ping.png')
-        .setAuthor({ name: `Grave Gecikme Süresi`, iconURL: client.user.displayAvatarURL() })
-        .setDescription(`>>> Bot Gecikmesi: \`${getFullPing()}ms\`\nSistem Durumu: \`${getPingStatus(getFullPing()).label}\``)
-        .setFooter({ text: `Analiz Edildi • GraveBOT`, iconURL: message.author.displayAvatarURL() });
+        .setAuthor({ name: `Grave Sistem Monitorü`, iconURL: client.user.displayAvatarURL() })
+        .setDescription(`>>> **Bot Gecikmesi:** \`${getFullPing()}ms\`\n**AI Yanıt Süresi:** \`${getAiPing()}ms\`\n**Durum:** \`${getPingStatus(getFullPing()).label}\``)
+        .setFooter({ text: `GraveAI v11.0 | Core Monitor`, iconURL: message.author.displayAvatarURL() });
 
     await msg.edit({ embeds: [resultEmbed], files: [attachment], components: [row] });
 
@@ -143,18 +136,19 @@ module.exports.run = async (client, message, args) => {
 
     collector.on('collect', async (i) => {
         const refreshPing = getFullPing();
-        const newAttachment = await createPingImage(refreshPing);
+        const refreshAi = getAiPing();
+        const newAttachment = await createPingImage(refreshPing, refreshAi);
         
         const updateEmbed = EmbedBuilder.from(resultEmbed)
             .setColor(getPingStatus(refreshPing).color)
-            .setDescription(`>>> Bot Gecikmesi: \`${refreshPing}ms\` (Güncel)\nSistem Durumu: \`${getPingStatus(refreshPing).label}\``);
+            .setDescription(`>>> **Bot Gecikmesi:** \`${refreshPing}ms\`\n**AI Yanıt Süresi:** \`${refreshAi}ms\` (Güncel)\n**Durum:** \`${getPingStatus(refreshPing).label}\``);
 
         await i.update({ embeds: [updateEmbed], files: [newAttachment] });
     });
 
     collector.on('end', () => {
         const disabledRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('d').setLabel('Süre Doldu: g!ping').setStyle(ButtonStyle.Secondary).setDisabled(true)
+            new ButtonBuilder().setCustomId('d').setLabel('Analiz Süresi Doldu').setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
         msg.edit({ components: [disabledRow] }).catch(() => {});
     });
