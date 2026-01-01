@@ -22,8 +22,11 @@ module.exports = (client) => {
         iconURL: executor?.displayAvatarURL({ dynamic: true, size: 4096 }) || null
     });
 
-    // Ortak footer
-    const footer = { text: `ModLog • ${client.user.username}`, iconURL: client.user.displayAvatarURL({ dynamic: true, size: 4096 }) };
+    // Dinamik footer - client.user null olsa bile çalışır
+    const getFooter = () => ({
+        text: `ModLog • ${client.user?.username || 'Bot'}`,
+        iconURL: client.user?.displayAvatarURL({ dynamic: true, size: 4096 }) || undefined
+    });
 
     // ----------------------------------------------------------------------
     // 1. MESAJ OLAYLARI
@@ -54,7 +57,7 @@ module.exports = (client) => {
                 { name: '📎 Ekler', value: message.attachments.size ? `${message.attachments.size} adet` : 'Yok', inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -85,7 +88,7 @@ module.exports = (client) => {
                 { name: '⬅️ Eski', value: `\`\`\`${oldC}\`\`\``, inline: false },
                 { name: '➡️ Yeni', value: `\`\`\`${newC}\`\`\``, inline: false }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -108,7 +111,7 @@ module.exports = (client) => {
                 { name: '📍 Kanal', value: `${firstMsg.channel}`, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -134,7 +137,7 @@ module.exports = (client) => {
                 { name: '⏰ Katılma', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
                 { name: '👥 Toplam Üye', value: `\`${member.guild.memberCount}\``, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -160,7 +163,7 @@ module.exports = (client) => {
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
                 { name: '👥 Kalan Üye', value: `\`${member.guild.memberCount}\``, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -185,7 +188,7 @@ module.exports = (client) => {
                 { name: '📄 Sebep', value: ban.reason || 'Belirtilmemiş', inline: false },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -211,7 +214,7 @@ module.exports = (client) => {
                     { name: '🛠️ Yetkili', value: executor ? `${executor}` : 'Bilinmiyor', inline: true },
                     { name: '⏰ Bitiş', value: `<t:${Math.floor(newMember.communicationDisabledUntilTimestamp / 1000)}:F>`, inline: false }
                 )
-                .setFooter(footer)
+                .setFooter(getFooter())
                 .setTimestamp();
             logChannel.send({ embeds: [embed] }).catch(() => {});
         }
@@ -231,7 +234,7 @@ module.exports = (client) => {
                 .setAuthor(safeExecutorAuthor(executor))
                 .setDescription(`**${newMember.user.tag}** için:\n${desc}`)
                 .addFields({ name: '🆔 ID', value: `\`${newMember.id}\``, inline: true })
-                .setFooter(footer)
+                .setFooter(getFooter())
                 .setTimestamp();
             logChannel.send({ embeds: [embed] }).catch(() => {});
         }
@@ -248,7 +251,7 @@ module.exports = (client) => {
                     { name: '⬅️ Eski', value: oldMember.nickname || '*Yok*', inline: true },
                     { name: '➡️ Yeni', value: newMember.nickname || '*Yok*', inline: true }
                 )
-                .setFooter(footer)
+                .setFooter(getFooter())
                 .setTimestamp();
             logChannel.send({ embeds: [embed] }).catch(() => {});
         }
@@ -276,7 +279,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${channel.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -301,7 +304,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${channel.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -328,7 +331,7 @@ module.exports = (client) => {
             .setAuthor(safeExecutorAuthor(executor))
             .setDescription(`${newChannel} kanalında:\n${changes.join('\n')}`)
             .addFields({ name: '🆔 ID', value: `\`${newChannel.id}\``, inline: true })
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -352,7 +355,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${role.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -375,7 +378,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${role.id}\``, inline: true },
                 { name: '⏰ Zaman', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -401,7 +404,7 @@ module.exports = (client) => {
             .setAuthor(safeExecutorAuthor(executor))
             .setDescription(`**${newRole.name}** rolünde:\n${changes.join('\n')}`)
             .addFields({ name: '🆔 ID', value: `\`${newRole.id}\``, inline: true })
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -425,7 +428,7 @@ module.exports = (client) => {
                 { name: '🆔 ID', value: `\`${emoji.id}\``, inline: true }
             )
             .setThumbnail(emoji.url)
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -450,7 +453,7 @@ module.exports = (client) => {
             .setTitle('🏰 Sunucu Ayarları Güncellendi')
             .setAuthor(safeExecutorAuthor(executor))
             .setDescription(changes.join('\n'))
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
@@ -468,9 +471,9 @@ module.exports = (client) => {
         if (!logChannel) return;
 
         const user = newState.member.user;
-        const embed = new EmbedBuilder()
+        let embed = new EmbedBuilder()
             .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL({ dynamic: true, size: 4096 }) })
-            .setFooter(footer)
+            .setFooter(getFooter())
             .setTimestamp();
 
         if (!oldState.channelId && newState.channelId) {
@@ -483,7 +486,9 @@ module.exports = (client) => {
             embed.setColor('#9B59B6').setDescription(`🎤 Mikrofon **${newState.selfMute ? 'kapattı' : 'açtı'}**.`);
         } else if (oldState.selfDeaf !== newState.selfDeaf) {
             embed.setColor('#9B59B6').setDescription(`🎧 Kulaklık **${newState.selfDeaf ? 'kapattı' : 'açtı'}**.`);
-        } else return;
+        } else {
+            return;
+        }
 
         logChannel.send({ embeds: [embed] }).catch(() => {});
     });
