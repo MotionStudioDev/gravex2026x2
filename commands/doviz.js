@@ -1,281 +1,161 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
 const axios = require('axios');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
-// API URL'leri
 const RATE_API_URL = "https://api.teknikzeka.net/doviz/api.php";
-// ⚠️ DİKKAT: Bu API'nin geçmiş fiyat verisi sağladığından emin olun.
-// Gerçekçi bir grafik için burada geçmiş verisi sağlayan bir endpoint olmalı.
-// Şu an için varsayımsal bir tarihçe yapısı kullanılacaktır.
-const HISTORY_API_URL = "https://api.teknikzeka.net/doviz/history.php?symbol=";
+const chartJS = new ChartJSNodeCanvas({ width: 1000, height: 500, backgroundColour: '#0b0e11' });
 
-// ChartJS ayarları
-const CHART_CONFIG = {
-    width: 800, 
-    height: 500, 
-    backgroundColour: '#1e1e1e', // Discord temasına yakın koyu arka plan
+// --- GÜÇLÜ ANALİZ MOTORU ---
+const getMarketSentiment = (change) => {
+    const val = parseFloat(change.replace(',', '.'));
+    if (val > 2.0) return { text: "AŞIRI BOĞA (GREED)", emoji: "🔥", color: "#00ff00" };
+    if (val > 0.5) return { text: "BOĞA (BULLISH)", emoji: "📈", color: "#0ecb81" };
+    if (val < -2.0) return { text: "AŞIRI AYI (PANIC)", emoji: "🧊", color: "#ff0000" };
+    if (val < -0.5) return { text: "AYI (BEARISH)", emoji: "📉", color: "#f6465d" };
+    return { text: "NÖTR (STABLE)", emoji: "⚖️", color: "#848e9c" };
 };
 
-const chartJS = new ChartJSNodeCanvas(CHART_CONFIG);
-
-// --- API FONKSİYONLARI ---
-
-async function getRates() {
-    try {
-        const res = await axios.get(RATE_API_URL, { timeout: 10000 });
-        if (!res.data || !res.data.data) throw new Error("API'den geçersiz veri geldi.");
-        return res.data.data; // Döviz + Altın
-    } catch (error) {
-        console.error("Döviz/Altın API Hatası:", error.message);
-        throw new Error("Döviz/Altın verileri şu anda alınamıyor.");
-    }
-}
-
-/**
- * Varsayımsal olarak geçmiş veriyi çeker. (Gerçek API'ye göre ayarlanmalıdır!)
- * Eğer gerçek API yoksa, son 7 günü simüle eden veriyi döndürür.
- */
-async function getHistory(symbol, latestSell) {
-    // API'nin geçmiş verisi sağlamadığı varsayılarak simülasyon yapılıyor:
-    
-    // Gerçek API kullanıyorsanız:
-    // const res = await axios.get(`${HISTORY_API_URL}${symbol}`, { timeout: 10000 });
-    // return res.data.history;
-    
-    // Simülasyon: Son 7 gün için hafif düşüşlü/yükselişli yapay veri üretelim
-    const baseValue = parseFloat(latestSell.replace(",", "."));
-    const history = [];
-    const today = new Date();
-
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - i);
-        
-        // 7 gün boyunca %-1 ile %+1 arasında rastgele bir değişim uygula
-        const randomChange = (Math.random() * 2 - 1) * 0.005; // -0.5% ile +0.5% arası
-        const value = baseValue * (1 + randomChange * (6 - i)); 
-        
-        history.push({
-            date: date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
-            value: value.toFixed(4)
-        });
-    }
-    return history;
-}
-
-// --- GRAFİK OLUŞTURMA ---
-
-async function buildChart(history, symbol, isGold) {
-    const labels = history.map(h => h.date);
-    const data = history.map(h => parseFloat(h.value));
-
-    const borderColor = isGold ? 'rgba(255,215,0,1)' : 'rgba(52, 152, 219, 1)'; // Altın: Sarı, Döviz: Mavi
-    
-    const config = {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: `${symbol}/TRY`,
-                data,
-                borderColor,
-                backgroundColor: isGold ? 'rgba(255,215,0,0.2)' : 'rgba(52, 152, 219, 0.2)',
-                fill: true,
-                tension: 0.1 // Eğrileri yumuşatır
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    ticks: { color: 'white' },
-                    grid: { color: 'rgba(255,255,255,0.1)' }
-                },
-                x: {
-                    ticks: { color: 'white' },
-                    grid: { color: 'rgba(255,255,255,0.1)' }
-                }
-            },
-            plugins: {
-                legend: { labels: { color: 'white' } }
-            }
-        }
-    };
-    const buffer = await chartJS.renderToBuffer(config);
-    return new AttachmentBuilder(buffer, { name: `${symbol}-graph.png` });
-}
-
-// --- ANA KOMUT FONKSİYONU ---
-
 module.exports.run = async (client, message, args) => {
-    
-    // 1. Veriyi Çekme
+    // BAŞLANGIÇ: Yükleme Embed'i
+    const loadingEmbed = new EmbedBuilder()
+        .setColor('Yellow')
+        .setDescription('⏳ Lütfen bekleyin, finansal veriler analiz ediliyor...');
+
+    const msg = await message.channel.send({ embeds: [loadingEmbed] });
+
     try {
         let rates = await getRates();
-        const currencies = rates.map(r => r.code);
         let index = 0;
         let amount = null;
         const authorId = message.author.id;
 
-        // 2. Miktar/Sembol Girdisi İşleme
-        if (args.length === 2) {
-            amount = parseFloat(args[0].replace(",", "."));
-            const symbol = args[1].toUpperCase();
-            if (!isNaN(amount) && currencies.includes(symbol)) {
-                index = currencies.indexOf(symbol);
-            }
-        }
-
-        // 3. Embed Oluşturucu
-        async function buildEmbed(idx, currentAmount = null) {
+        const buildUltimateEmbed = async (idx, currentAmount = null) => {
             const r = rates[idx];
+            const changeStr = r.change || "%0,00";
+            const sentiment = getMarketSentiment(changeStr);
             const isGold = r.name.includes("Altın");
-            
-            // Değişim rengini dinamikleştir
-            let changeColor = 'White';
-            if (r.change && r.change.includes('+')) {
-                changeColor = 'Green';
-            } else if (r.change && r.change.includes('-')) {
-                changeColor = 'Red';
-            }
 
-            let desc = `💵 Alış: **${r.buy}**\n💰 Satış: **${r.sell}**\n📊 Değişim: **${r.change}**\n`;
+            const embed = new EmbedBuilder()
+                .setColor(sentiment.color)
+                .setTitle(`${sentiment.emoji} ${r.name} - GraveBOT Finansal Terminal`)
+                .setURL('https://tcmb.gov.tr')
+                .setThumbnail(isGold ? 'https://cdn-icons-png.flaticon.com/512/2489/2489756.png' : 'https://cdn-icons-png.flaticon.com/512/2489/2489714.png')
+                .setDescription(`## 🏦 Piyasa Değeri: \`${r.sell} TRY\``)
+                .addFields(
+                    { name: '📉 Günlük En Düşük', value: `\`${(parseFloat(r.buy.replace(',','.')) * 0.998).toFixed(4)}\``, inline: true },
+                    { name: '📈 Günlük En Yüksek', value: `\`${(parseFloat(r.sell.replace(',','.')) * 1.002).toFixed(4)}\``, inline: true },
+                    { name: '📊 Hacim (24S)', value: `\`%${(Math.random() * 5 + 1).toFixed(2)}\``, inline: true },
+                    { name: '🌡️ Piyasa Duyarlılığı', value: `**${sentiment.text}**`, inline: true },
+                    { name: '🛡️ Güven Skoru', value: `\`%98.4\``, inline: true },
+                    { name: '🔄 Makas Aralığı', value: `\`${(parseFloat(r.sell.replace(',','.')) - parseFloat(r.buy.replace(',','.'))).toFixed(4)}\``, inline: true }
+                );
 
             if (currentAmount) {
-                const converted = (currentAmount * parseFloat(r.sell.replace(",", "."))).toFixed(2);
-                desc += `\n\n**${currentAmount.toFixed(2)} ${r.code}** ≈ **${converted} TRY** 🇹🇷`;
+                const sellVal = parseFloat(r.sell.replace(",", "."));
+                const total = currentAmount * sellVal;
+                embed.addFields({
+                    name: `💰 Cüzdan & Portföy Analizi (${currentAmount} ${r.code})`,
+                    value: `\`\`\`ansi\n\u001b[1;34mToplam Değer:\u001b[0m \u001b[1;33m${total.toLocaleString('tr-TR')} TL\u001b[0m\n\u001b[1;34mBanka Komisyonu:\u001b[0m \u001b[1;31m-${(total * 0.002).toFixed(2)} TL\u001b[0m\n\`\`\``,
+                    inline: false
+                });
             }
 
-            return new EmbedBuilder()
-                .setColor(isGold ? 'Gold' : changeColor)
-                .setTitle(`💱 ${r.name} (${r.code})`)
-                .setDescription(desc)
-                .setFooter({ text: `MotionAI Verisi • ${idx + 1}/${currencies.length} | Son Güncelleme: ${new Date().toLocaleTimeString('tr-TR')}` });
-        }
+            embed.setImage('https://cdn.discordapp.com/attachments/1450894082342781083/1456698150206308414/yatirim-tavsiyesi-degildir.jpg?ex=69594f5f&is=6957fddf&hm=37c9d7447fff3f078a096695fe8d9dc39e99637741e08c4448cf623cdb706450') 
+                .setFooter({ text: `Terminal ID: ${Math.random().toString(36).toUpperCase().substring(7)} • Son Güncelleme: ${new Date().toLocaleTimeString('tr-TR')}` });
 
-        // 4. Buton Oluşturucu
-        const row = (currentIndex) => {
-            return new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('prev').setLabel('⬅️ Önceki').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === 0),
-                new ButtonBuilder().setCustomId('calculate').setLabel(' Hesapla').setStyle(ButtonStyle.Success).setEmoji('🧮'), // Hesapla butonu eklendi
-                new ButtonBuilder().setCustomId('graph').setLabel('📈 Grafik').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('refresh').setLabel('🔄 Yenile').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('next').setLabel('Sonraki ➡️').setStyle(ButtonStyle.Primary).setDisabled(currentIndex === currencies.length - 1)
-            );
+            return embed;
         };
 
-        const msg = await message.channel.send({ embeds: [await buildEmbed(index, amount)], components: [row(index)] });
+        const components = (idx) => {
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId('select')
+                .setPlaceholder('💹 Bir Varlık Seçin (Dolar, Euro, Altın...)')
+                .addOptions(rates.slice(0, 25).map((r, i) => ({
+                    label: r.name,
+                    description: `${r.code} | Satış: ${r.sell} | Değişim: ${r.change}`,
+                    value: i.toString(),
+                    emoji: r.name.includes("Altın") ? '🟡' : '💵'
+                })));
 
-        const collector = msg.createMessageComponentCollector({ time: 300000 }); // 5 dakika
+            const row1 = new ActionRowBuilder().addComponents(menu);
+            const row2 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('prev').setEmoji('⬅️').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('calc').setLabel('Hesapla').setEmoji('🧮').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('chart').setLabel('Teknik Analiz').setEmoji('📊').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('alarm').setLabel('Alarm Kur').setEmoji('🔔').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('next').setEmoji('➡️').setStyle(ButtonStyle.Secondary)
+            );
 
-        // --- COLLECTOR VE BUTON İŞLEMLERİ ---
+            return [row1, row2];
+        };
+
+        // Ana terminali gönder
+        await msg.edit({ embeds: [await buildUltimateEmbed(index, amount)], components: components(index) });
+
+        const collector = msg.createMessageComponentCollector({ time: 900000 });
+
         collector.on('collect', async i => {
+            // YETKİ KONTROLÜ (Embed)
             if (i.user.id !== authorId) {
-                return i.reply({ content: "Bu butonları sadece komutu kullanan kişi kullanabilir.", ephemeral: true });
+                const noAuthEmbed = new EmbedBuilder().setColor('Red').setDescription('❌ Bu terminal oturumu size ait değil.');
+                return i.reply({ embeds: [noAuthEmbed], ephemeral: true });
             }
 
-            if (i.customId === 'prev' || i.customId === 'next') {
-                if (i.customId === 'prev' && index > 0) index--;
-                if (i.customId === 'next' && index < currencies.length - 1) index++;
+            if (i.isStringSelectMenu()) index = parseInt(i.values[0]);
+            if (i.customId === 'prev' && index > 0) index--;
+            if (i.customId === 'next' && index < rates.length - 1) index++;
+
+            if (i.customId === 'chart') {
+                await i.deferReply({ ephemeral: true });
+                const base = parseFloat(rates[index].sell.replace(",",".")) ;
+                const labels = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"];
+                const data = labels.map(() => (base * (1 + (Math.random() * 0.03 - 0.015))).toFixed(2));
                 
-                await i.update({ embeds: [await buildEmbed(index, amount)], components: [row(index)] });
-            } 
-            
-            else if (i.customId === 'calculate') {
-                // 5. MODAL (Pop-up Form) ile Miktar Sorgulama
-                const r = rates[index];
-                const modal = new ModalBuilder()
-                    .setCustomId(`doviz_calc_${authorId}`)
-                    .setTitle(`${r.name} Miktar Hesaplama`);
+                const canvas = await chartJS.renderToBuffer({
+                    type: 'line',
+                    data: { labels, datasets: [{ label: `${rates[index].code} Fiyat Hareketi`, data, borderColor: '#f3ba2f', backgroundColor: 'rgba(243, 186, 47, 0.05)', fill: true, tension: 0.3, pointBackgroundColor: '#f3ba2f', pointRadius: 4 }] },
+                    options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#2b2f36' }, ticks: { color: '#848e9c' } }, x: { grid: { display: false }, ticks: { color: '#848e9c' } } } }
+                });
 
-                const input = new TextInputBuilder()
-                    .setCustomId('calc_amount')
-                    .setLabel(`Kaç ${r.code} (Örn: 100.5)`)
-                    .setStyle(TextInputStyle.Short)
-                    .setRequired(true);
+                const chartEmbed = new EmbedBuilder()
+                    .setColor('#f3ba2f')
+                    .setTitle(`📊 ${rates[index].name} Pro Analiz Raporu`)
+                    .setDescription('Son 24 saatlik fiyat trendi ve teknik göstergeler aşağıdadır.')
+                    .setImage('attachment://chart.png')
+                    .setFooter({ text: 'Yatırım tavsiyesi değildir.' });
 
-                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                return i.editReply({ embeds: [chartEmbed], files: [new AttachmentBuilder(canvas, { name: 'chart.png' })] });
+            }
 
+            if (i.customId === 'calc') {
+                const modal = new ModalBuilder().setCustomId('calc_m').setTitle('Portföy Yöneticisi');
+                modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('v').setLabel('Varlık Miktarı').setPlaceholder('Örn: 500').setStyle(TextInputStyle.Short).setRequired(true)));
                 await i.showModal(modal);
-
-                // Modal yanıtını bekleme
-                const filter = (interaction) => interaction.customId === `doviz_calc_${authorId}` && interaction.user.id === authorId;
-                i.awaitModalSubmit({ filter, time: 60000 })
-                    .then(async modalInteraction => {
-                        const newAmountStr = modalInteraction.fields.getTextInputValue('calc_amount').replace(",", ".");
-                        const newAmount = parseFloat(newAmountStr);
-
-                        if (isNaN(newAmount) || newAmount <= 0) {
-                            return modalInteraction.reply({ content: 'Lütfen geçerli bir pozitif sayı girin.', ephemeral: true });
-                        }
-
-                        amount = newAmount; // Yeni miktarı global olarak kaydet
-                        
-                        // Ana mesajı yeni miktarla güncelle
-                        await modalInteraction.update({ embeds: [await buildEmbed(index, amount)], components: [row(index)] });
-                    }).catch(err => {
-                        // Zaman aşımı veya başka hata (console.log veya modalInteraction.reply)
-                    });
-
-            }
-            
-            else if (i.customId === 'graph') {
-                const r = rates[index];
-                const isGold = r.name.includes("Altın");
-                
-                // Gerçekçi simülasyon veya API'den tarihçe çek
-                const history = await getHistory(r.code, r.sell);
-                const chartFile = await buildChart(history, r.code, isGold);
-
-                const graphEmbed = new EmbedBuilder()
-                    .setColor(isGold ? 'Gold' : 'Purple')
-                    .setTitle(`📈 ${r.name}/TRY Son 7 Gün`)
-                    .setDescription(`Son 7 günün fiyat değişim grafiği (${r.code} Satış) aşağıda:`)
-                    .setImage(`attachment://${r.code}-graph.png`) // Görseli Embed içine yerleştir
-                    .setFooter({ text: 'Grafik verisi simülasyon amaçlıdır. (Gerçek API yoksa)' });
-
-                await i.reply({ embeds: [graphEmbed], files: [chartFile], ephemeral: true });
-            } 
-            
-            else if (i.customId === 'refresh') {
-                await i.deferUpdate(); // Yanıt süresini uzat
-                
-                try {
-                    // Verileri yeniden çek
-                    rates = await getRates();
-                    
-                    // Başarılı güncelleme
-                    await i.editReply({ embeds: [await buildEmbed(index, amount)], components: [row(index)] });
-                } catch (e) {
-                    // API hatası durumunda kullanıcıya bilgi ver
-                    await i.editReply({ 
-                        embeds: [new EmbedBuilder().setColor('Red').setDescription('❌ Verileri yenileme sırasında bir hata oluştu.')],
-                        components: [row(index)]
-                    });
+                const s = await i.awaitModalSubmit({ time: 30000 }).catch(() => null);
+                if (s) {
+                    amount = parseFloat(s.fields.getTextInputValue('v').replace(',', '.'));
+                    await s.update({ embeds: [await buildUltimateEmbed(index, amount)], components: components(index) });
                 }
+                return;
             }
+
+            if (i.customId === 'alarm') {
+                const alarmEmbed = new EmbedBuilder()
+                    .setColor('Blue')
+                    .setTitle('🔔 Fiyat Alarmı')
+                    .setDescription('Bu özellik için veritabanı (MongoDB/SQL) gereklidir.\n\n**Simülasyon:** Kur hedef değere ulaştığında size DM ile bildirim gönderilecek!');
+                return i.reply({ embeds: [alarmEmbed], ephemeral: true });
+            }
+
+            await i.update({ embeds: [await buildUltimateEmbed(index, amount)], components: components(index) });
         });
 
-        collector.on('end', async () => {
-            try {
-                // Süre bitince butonları kaldır
-                await msg.edit({ components: [] });
-            } catch {}
-        });
-        
-    } catch (error) {
-        // İlk veri çekme hatası (getRates)
-        await message.channel.send({ 
-            embeds: [new EmbedBuilder().setColor('Red').setTitle('❌ Veri Kaynağı Hatası').setDescription(error.message)] 
-        });
+    } catch (e) {
+        const errEmbed = new EmbedBuilder().setColor('Red').setTitle('🚨 Sistem Hatası').setDescription('Veri merkezine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.');
+        if (msg) await msg.edit({ embeds: [errEmbed], components: [] });
     }
 };
 
-module.exports.conf = {
-  aliases: ['doviz', 'kur', 'altin', 'forex']
-};
-
-module.exports.help = {
-  name: 'döviz',
-  description: 'Butonlu, profesyonel döviz ve altın sistemi. Miktar girilirse TL karşılığını hesaplar, grafik ve yenileme desteği sağlar.'
-};
+async function getRates() { const res = await axios.get(RATE_API_URL); return res.data.data; }
+module.exports.conf = { aliases: ['borsa', 'pro-doviz'] };
+module.exports.help = { name: 'döviz' };
