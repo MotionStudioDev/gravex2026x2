@@ -5,113 +5,90 @@ const AfkModel = require("../models/Afk");
 
 const AUTO_CLOSE_TIMEOUT = 15 * 60 * 1000;
 
-// Daha geniş ve akıllı küfür filtresi (Harf uzatmalarını yakalar: sssiiiikkk gibi)
+// Filtreler (Gelişmiş Regex)
 const küfürRegex = /\b(amk|ananı|orospu|oç|oc|piç|pıç|yarrak|yarak|sik|sık|göt|salak|aptal|gerizekalı|ibne|siktir|sikik|amına|amcık|daşşak|taşşak)\b/i;
-
-// Gelişmiş Reklam Paternleri
 const reklamRegex = /(discord\.(gg|io|me|li)\/.+|https?:\/\/\S+|www\.\S+|\.com\b|\.net\b|\.org\b|\.xyz\b)/i;
 
 module.exports = async (message) => {
-    // Temel kontroller
     if (!message.guild || message.author.bot) return;
     const client = message.client;
-
-    // KONTROL 1: Yönetici veya Yetkili mi? (Yetkililer korumaya takılmaz)
     const isStaff = message.member.permissions.has(PermissionsBitField.Flags.ManageMessages) || 
                     message.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
-    // Mesaj içeriğini normalize et (Küfür/Reklam tespiti için boşlukları ve karakterleri düzenle)
+    // İçerik Normalizasyonu
     const normalizeContent = message.content.toLowerCase()
         .replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e").replace(/4/g, "a").replace(/5/g, "s");
 
     // =========================================================
-    // BOT ETİKETLENİNCE YANIT VER
-    // =========================================================
-    if (message.content.includes(`<@!${client.user.id}>`) || message.content.includes(`<@${client.user.id}>`)) {
-        if (message.content.split(' ').length <= 2) {
-             const embed = new EmbedBuilder()
-                .setColor("Blurple")
-                .setTitle("👋 Merhaba!")
-                .setDescription("Beni etiketledin! Komutlar için `g!yardım` yazabilirsin.")
-                .setFooter({ text: "GraveBOT • 2026" });
-            return message.channel.send({ embeds: [embed] }).catch(() => {});
-        }
-    }
-
-    // =========================================================
-    // SUNUCU AYARLARINI ÇEK
-    // =========================================================
-    const settings = await GuildSettings.findOne({ guildId: message.guild.id });
-    if (!settings) return;
-
-    // =========================================================
-    // 1. AFK SİSTEMİ (Kullanıcı mesaj yazınca AFK kalkar)
+    // 1. AFK SİSTEMİ (Embed)
     // =========================================================
     const afkData = await AfkModel.findOne({ guildId: message.guildId, userId: message.author.id });
     if (afkData) {
         await AfkModel.deleteOne({ guildId: message.guildId, userId: message.author.id });
-        if (message.member.manageable) {
-            await message.member.setNickname(afkData.oldNickname).catch(() => {});
-        }
-        message.reply(`Hoş geldin **${message.author.username}**! AFK modundan çıkarıldın.`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
-        return; // AFK kalkınca diğer filtrelere takılmasın
+        if (message.member.manageable) await message.member.setNickname(afkData.oldNickname).catch(() => {});
+
+        const welcomeEmbed = new EmbedBuilder()
+            .setColor("Green")
+            .setAuthor({ name: "Tekrar Hoş Geldin!", iconURL: message.author.displayAvatarURL() })
+            .setDescription(`**${message.author.username}**, AFK modundan başarıyla çıkarıldın.`)
+            .setTimestamp();
+
+        message.reply({ embeds: [welcomeEmbed] }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+        return;
     }
 
-    // Etiketlenen kişi AFK mı?
+    // Etiketlenen Kişi AFK mı? (Embed)
     if (message.mentions.users.size > 0) {
         message.mentions.users.forEach(async (user) => {
             const data = await AfkModel.findOne({ guildId: message.guildId, userId: user.id });
             if (data && user.id !== message.author.id) {
-                message.reply(`🛑 **${user.username}** şu an AFK! | **Sebep:** ${data.reason}`).then(m => setTimeout(() => m.delete().catch(() => {}), 10000));
+                const afkInfoEmbed = new EmbedBuilder()
+                    .setColor("Yellow")
+                    .setTitle("🛑 Kullanıcı Şu An AFK")
+                    .setDescription(`**${user.username}** şu an bilgisayar başında değil.`)
+                    .addFields(
+                        { name: "Sebep", value: `\`${data.reason}\``, inline: true },
+                        { name: "Süre", value: `<t:${Math.floor(data.timestamp / 1000)}:R>`, inline: true }
+                    )
+                    .setFooter({ text: "Grave AFK Sistemi" });
+
+                message.reply({ embeds: [afkInfoEmbed] }).then(m => setTimeout(() => m.delete().catch(() => {}), 10000));
             }
         });
     }
 
+    // Sunucu Ayarları
+    const settings = await GuildSettings.findOne({ guildId: message.guild.id });
+    if (!settings) return;
+
     // =========================================================
-    // KÜFÜR ENGELLEME (Gelişmiş)
+    // 2. KÜFÜR ENGELLEME (Full Embed Log & Uyarı)
     // =========================================================
     if (settings.kufurEngel && !isStaff) {
         if (küfürRegex.test(normalizeContent)) {
             await message.delete().catch(() => {});
-            const msg = await message.channel.send(`🚫 **${message.author}**, küfürlü içerik temizlendi!`);
+            
+            const warningEmbed = new EmbedBuilder()
+                .setColor("Red")
+                .setAuthor({ name: "Küfür Engellendi", iconURL: message.author.displayAvatarURL() })
+                .setDescription(`⚠️ **${message.author}**, bu sunucuda küfürlü kelimeler kullanılması yasaktır.`)
+                .setFooter({ text: "Lütfen topluluk kurallarına uyun." });
+
+            const msg = await message.channel.send({ embeds: [warningEmbed] });
             setTimeout(() => msg.delete().catch(() => {}), 5000);
 
             if (settings.kufurLog) {
                 const logKanal = message.guild.channels.cache.get(settings.kufurLog);
                 if (logKanal) {
                     const logEmbed = new EmbedBuilder()
-                        .setColor("Red")
-                        .setTitle("🛑 Küfür Engellendi")
+                        .setColor("DarkRed")
+                        .setTitle("🛑 Küfür Logu")
                         .addFields(
-                            { name: "Kullanıcı", value: `${message.author}` },
-                            { name: "Mesaj", value: `\`${message.content}\`` }
-                        ).setTimestamp();
-                    logKanal.send({ embeds: [logEmbed] }).catch(() => {});
-                }
-            }
-            return; // Küfür yakalandıysa reklam kontrolüne gerek yok
-        }
-    }
-
-    // =========================================================
-    // REKLAM ENGELLEME (Gelişmiş)
-    // =========================================================
-    if (settings.reklamEngel && !isStaff) {
-        if (reklamRegex.test(message.content)) {
-            await message.delete().catch(() => {});
-            const msg = await message.channel.send(`⚠️ **${message.author}**, reklam ve link paylaşımı yasaktır!`);
-            setTimeout(() => msg.delete().catch(() => {}), 5000);
-
-            if (settings.reklamLog) {
-                const logKanal = message.guild.channels.cache.get(settings.reklamLog);
-                if (logKanal) {
-                    const logEmbed = new EmbedBuilder()
-                        .setColor("Orange")
-                        .setTitle("🚫 Reklam Engellendi")
-                        .addFields(
-                            { name: "Kullanıcı", value: `${message.author}` },
-                            { name: "İçerik", value: `\`${message.content}\`` }
-                        ).setTimestamp();
+                            { name: "Kullanıcı", value: `${message.author} (\`${message.author.id}\`)`, inline: true },
+                            { name: "Kanal", value: `<#${message.channel.id}>`, inline: true },
+                            { name: "Mesaj İçeriği", value: `\`\`\`${message.content}\`\`\`` }
+                        )
+                        .setTimestamp();
                     logKanal.send({ embeds: [logEmbed] }).catch(() => {});
                 }
             }
@@ -120,13 +97,52 @@ module.exports = async (message) => {
     }
 
     // =========================================================
-    // SELAM ALMA (SA-AS)
+    // 3. REKLAM ENGELLEME (Full Embed Log & Uyarı)
+    // =========================================================
+    if (settings.reklamEngel && !isStaff) {
+        if (reklamRegex.test(message.content)) {
+            await message.delete().catch(() => {});
+
+            const reklamEmbed = new EmbedBuilder()
+                .setColor("Orange")
+                .setAuthor({ name: "Reklam Engellendi", iconURL: message.author.displayAvatarURL() })
+                .setDescription(`🚫 **${message.author}**, sunucu içerisinde link ve reklam paylaşımı yapılamaz.`)
+                .setThumbnail("https://i.imgur.com/8Nf9V8L.png"); // Buraya bir yasak ikonu koyabilirsin
+
+            const msg = await message.channel.send({ embeds: [reklamEmbed] });
+            setTimeout(() => msg.delete().catch(() => {}), 5000);
+
+            if (settings.reklamLog) {
+                const logKanal = message.guild.channels.cache.get(settings.reklamLog);
+                if (logKanal) {
+                    const logEmbed = new EmbedBuilder()
+                        .setColor("DarkOrange")
+                        .setTitle("🔗 Reklam Logu")
+                        .addFields(
+                            { name: "Kullanıcı", value: `${message.author}`, inline: true },
+                            { name: "Kanal", value: `<#${message.channel.id}>`, inline: true },
+                            { name: "Paylaşılan Link", value: `\`\`\`${message.content}\`\`\`` }
+                        )
+                        .setTimestamp();
+                    logKanal.send({ embeds: [logEmbed] }).catch(() => {});
+                }
+            }
+            return;
+        }
+    }
+
+    // =========================================================
+    // 4. SA-AS SİSTEMİ (Embed Yanıt)
     // =========================================================
     if (settings.saasAktif) {
         const saList = ["sa", "selam", "sea", "selamün aleyküm", "selamun aleyküm"];
         if (saList.includes(normalizeContent.trim())) {
-            const yanıtlar = ["Aleyküm selam, hoş geldin! 👋", "Aleyküm selam, nasılsın? ✨"];
-            message.reply(yanıtlar[Math.floor(Math.random() * yanıtlar.length)]).catch(() => {});
+            const saasEmbed = new EmbedBuilder()
+                .setColor("Blue")
+                .setDescription(`**Aleyküm Selam ${message.author}, Hoş Geldin!** ✨\nNasılsın, her şey yolunda mı?`)
+                .setFooter({ text: "GraveBOT Selam Sistemi" });
+
+            message.reply({ embeds: [saasEmbed] }).catch(() => {});
         }
     }
 };
