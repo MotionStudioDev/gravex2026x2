@@ -97,6 +97,7 @@ require("./events/ready.js")
 const guildLogs = require("./guildLogs");
 guildLogs(client);
 /*=======================================================================================*/
+const Giveaway = require('./models/Giveaway');
 
 /*=======================================================================================*/
 let x = process.env.TOKEN;
@@ -332,8 +333,6 @@ client.on('interactionCreate', async (interaction) => {
  * 🎰 7/24 RESTART KORUMALI ÇEKİLİŞ SİSTEMİ (MONGODB)
  */
 // --- ÇEKİLİŞ SİSTEMİ ETKİLEŞİMLERİ ---
-const Giveaway = require('./models/Giveaway');
-
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
