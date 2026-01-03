@@ -331,6 +331,7 @@ client.on('interactionCreate', async (interaction) => {
 /**
  * 🎰 7/24 RESTART KORUMALI ÇEKİLİŞ SİSTEMİ (MONGODB)
  */
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 const Giveaway = require('./models/Giveaway'); // Model yolunu kontrol et kanka
 
 client.on('interactionCreate', async (interaction) => {
