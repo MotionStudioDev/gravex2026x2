@@ -93,7 +93,7 @@ client.on('messageCreate', require('./events/messageCreate'));
 require("./events/message.js")
 require("./events/ready.js")
 
-
+const Giveaway = require('./models/Giveaway');
 const guildLogs = require("./guildLogs");
 guildLogs(client);
 /*=======================================================================================*/
