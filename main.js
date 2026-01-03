@@ -331,146 +331,109 @@ client.on('interactionCreate', async (interaction) => {
 /**
  * 🎰 7/24 RESTART KORUMALI ÇEKİLİŞ SİSTEMİ (MONGODB)
  */
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
-const Giveaway = require('./models/Giveaway'); // Model yolunu kontrol et kanka
-
+// --- ÇEKİLİŞ SİSTEMİ ETKİLEŞİMLERİ ---
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // Çekiliş butonlarını kontrol et
     const giveawayButtons = ['join_gv', 'leave_gv', 'list_gv', 'reroll_gv'];
     if (!giveawayButtons.includes(interaction.customId)) return;
 
     try {
-        // KRİTİK: Etkileşimi hemen başlat (3 saniye sınırını 15 dakikaya çıkarır)
+        // Render/VDS gecikmelerine karşı süreyi uzatıyoruz (Defer)
         await interaction.deferReply({ ephemeral: true }).catch(() => {});
 
-        // Veritabanından çekilişi bul
         const gv = await Giveaway.findOne({ messageId: interaction.message.id });
-        if (!gv) return interaction.editReply({ content: '❌ Çekiliş verileri veritabanında bulunamadı.' });
+        if (!gv) return interaction.editReply({ content: '❌ Çekiliş verisi bulunamadı.' }).catch(() => {});
 
-        // 1. KATILMA BUTONU
+        // 1. KATILMA
         if (interaction.customId === 'join_gv') {
-            if (gv.ended) return interaction.editReply({ content: '❌ Bu çekiliş zaten sona ermiş.' });
-            if (gv.participants.includes(interaction.user.id)) {
-                return interaction.editReply({ content: '⚠️ Zaten bu çekilişe katılmışsın!' });
-            }
+            if (gv.ended) return interaction.editReply({ content: '❌ Çekiliş sona ermiş.' });
+            if (gv.participants.includes(interaction.user.id)) return interaction.editReply({ content: '⚠️ Zaten katılmışsın.' });
 
             gv.participants.push(interaction.user.id);
             await gv.save();
 
-            const oldEmbed = interaction.message.embeds[0];
-            const updateEmbed = EmbedBuilder.from(oldEmbed)
+            const updateEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFooter({ text: `Grave Çekiliş Sistemi | Katılımcı: ${gv.participants.length}` });
             
-            await interaction.message.edit({ embeds: [updateEmbed] });
-            return interaction.editReply({ content: `✅ **${gv.prize}** çekilişine başarıyla katıldın!` });
+            await interaction.message.edit({ embeds: [updateEmbed] }).catch(() => {});
+            return interaction.editReply({ content: `✅ **${gv.prize}** çekilişine katıldın!` });
         }
 
-        // 2. AYRILMA BUTONU
+        // 2. AYRILMA
         if (interaction.customId === 'leave_gv') {
             if (gv.ended) return interaction.editReply({ content: '❌ Çekiliş bittiği için ayrılamazsın.' });
-            if (!gv.participants.includes(interaction.user.id)) {
-                return interaction.editReply({ content: '⚠️ Zaten listede yoksun!' });
-            }
+            if (!gv.participants.includes(interaction.user.id)) return interaction.editReply({ content: '⚠️ Listede değilsin.' });
 
             gv.participants = gv.participants.filter(id => id !== interaction.user.id);
             await gv.save();
 
-            const oldEmbed = interaction.message.embeds[0];
-            const updateEmbed = EmbedBuilder.from(oldEmbed)
+            const updateEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                 .setFooter({ text: `Grave Çekiliş Sistemi | Katılımcı: ${gv.participants.length}` });
             
-            await interaction.message.edit({ embeds: [updateEmbed] });
-            return interaction.editReply({ content: '👋 Çekilişten başarıyla ayrıldın.' });
+            await interaction.message.edit({ embeds: [updateEmbed] }).catch(() => {});
+            return interaction.editReply({ content: '👋 Çekilişten ayrıldın.' });
         }
 
-        // 3. LİSTELEME BUTONU
+        // 3. LİSTELEME
         if (interaction.customId === 'list_gv') {
-            const list = gv.participants.length > 0 ? gv.participants.map(id => `<@${id}>`).join(', ').substring(0, 3900) : '*Henüz kimse katılmadı...*';
-            const listEmbed = new EmbedBuilder()
-                .setColor('#2b2d31')
-                .setTitle('📋 Katılımcı Listesi')
-                .setDescription(list);
+            const list = gv.participants.length > 0 ? gv.participants.map(id => `<@${id}>`).join(', ').substring(0, 3900) : 'Henüz katılım yok.';
+            const listEmbed = new EmbedBuilder().setColor('#2b2d31').setTitle('📋 Katılımcılar').setDescription(list);
             return interaction.editReply({ embeds: [listEmbed] });
         }
 
-        // 4. REROLL (YENİDEN SEÇ)
+        // 4. REROLL
         if (interaction.customId === 'reroll_gv') {
-            // Yetki Kontrolü
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-                return interaction.editReply({ content: '❌ Bu işlemi sadece mesajları yönetme yetkisi olanlar yapabilir.' });
+                return interaction.editReply({ content: '❌ Yetkin yetersiz.' });
             }
-            
-            if (gv.participants.length === 0) {
-                return interaction.editReply({ content: '❌ Çekilişte katılımcı bulunmadığı için seçim yapılamaz!' });
-            }
+            if (gv.participants.length === 0) return interaction.editReply({ content: '❌ Katılımcı yok.' });
 
-            const yeniKazanan = gv.participants[Math.floor(Math.random() * gv.participants.length)];
-            
+            const winner = gv.participants[Math.floor(Math.random() * gv.participants.length)];
             const rerollEmbed = new EmbedBuilder()
                 .setColor('Orange')
-                .setTitle('🎲 Yeniden Seçim Yapıldı!')
-                .setDescription(`Yeni Kazanan: <@${yeniKazanan}>\nÖdül: **${gv.prize}**`)
-                .setFooter({ text: `Reroll yapan: ${interaction.user.username}` })
-                .setTimestamp();
+                .setDescription(`🎲 Yeni Kazanan: <@${winner}>\nÖdül: **${gv.prize}**`);
             
-            await interaction.channel.send({ content: `🎊 Yeni kazanan: <@${yeniKazanan}>! Tebrikler!`, embeds: [rerollEmbed] });
-            return interaction.editReply({ content: '✅ Yeni kazanan başarıyla seçildi.' });
+            await interaction.channel.send({ content: `🎊 Yeni kazanan: <@${winner}>!`, embeds: [rerollEmbed] });
+            return interaction.editReply({ content: '✅ Yeniden seçim yapıldı.' });
         }
 
-    } catch (error) {
-        console.error("Çekiliş Buton Hatası:", error);
-        // Hata durumunda etkileşimi sessizce kapat
+    } catch (err) {
+        console.error("Buton Hatası:", err);
     }
 });
 
-/**
- * ⏱️ OTOMATİK BİTİRME DÖNGÜSÜ
- */
+// --- ÇEKİLİŞ BİTİŞ KONTROL DÖNGÜSÜ ---
 setInterval(async () => {
     try {
-        const bitmesiGerekenler = await Giveaway.find({ ended: false, endTime: { $lt: Date.now() } });
-
-        for (const gv of bitmesiGerekenler) {
+        const bitenler = await Giveaway.find({ ended: false, endTime: { $lt: Date.now() } });
+        for (const gv of bitenler) {
             gv.ended = true;
             await gv.save();
 
             const kanal = client.channels.cache.get(gv.channelId);
             if (!kanal) continue;
-
             const mesaj = await kanal.messages.fetch(gv.messageId).catch(() => null);
-            
+
             if (gv.participants.length < gv.winnerCount) {
                 if (mesaj) {
-                    const failEmbed = new EmbedBuilder()
-                        .setColor('Red')
-                        .setTitle('❌ ÇEKİLİŞ İPTAL EDİLDİ')
-                        .setDescription(`**${gv.prize}** için yeterli katılım olmadı.`);
-                    await mesaj.edit({ embeds: [failEmbed], components: [] });
+                    const fail = new EmbedBuilder().setColor('Red').setTitle('❌ İptal Edildi').setDescription('Yeterli katılım yok.');
+                    await mesaj.edit({ embeds: [fail], components: [] }).catch(() => {});
                 }
                 continue;
             }
 
             const winners = gv.participants.sort(() => 0.5 - Math.random()).slice(0, gv.winnerCount);
-            const winnersTag = winners.map(id => `<@${id}>`).join(', ');
+            const tags = winners.map(id => `<@${id}>`).join(', ');
 
             if (mesaj) {
-                const winEmbed = new EmbedBuilder()
-                    .setColor('Green')
-                    .setTitle('🎉 ÇEKİLİŞ SONUÇLANDI')
-                    .setDescription(`**Ödül:** \`${gv.prize}\`\n**Kazananlar:** ${winnersTag}`);
-                
-                const rerollRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('reroll_gv').setLabel('Yeniden Seç').setStyle(ButtonStyle.Danger)
-                );
-                await mesaj.edit({ embeds: [winEmbed], components: [rerollRow] });
+                const win = new EmbedBuilder().setColor('Green').setTitle('🎉 Çekiliş Bitti').setDescription(`**Ödül:** ${gv.prize}\n**Kazananlar:** ${tags}`);
+                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('reroll_gv').setLabel('Yeniden Seç').setStyle(ButtonStyle.Danger));
+                await mesaj.edit({ embeds: [win], components: [row] }).catch(() => {});
             }
-
-            kanal.send({ content: `🎊 Tebrikler ${winnersTag}! **${gv.prize}** kazandınız!` });
+            kanal.send(`🎊 Tebrikler ${tags}! **${gv.prize}** kazandınız!`);
         }
-    } catch (e) {
-        console.error("Döngü Hatası:", e);
-    }
+    } catch (e) { console.error("Döngü hatası:", e); }
 }, 15000);
+
 /*=======================================================================================*/
