@@ -1,159 +1,145 @@
 const { EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { createCanvas } = require('canvas');
+const os = require('os');
 
-// --- Gelişmiş Tasarım Motoru ---
-const BAR_BG_COLOR = '#1e1f22'; 
-const TEXT_LIGHT = '#FFFFFF'; 
-const TEXT_GRAY = '#949BA4'; 
-const BUTTON_DURATION = 60000;
+// --- Tasarım Renkleri ---
+const RENKLER = {
+    BG: '#08090A',
+    KART: '#111827',
+    ANA: '#22D3EE',
+    METIN: '#F1F5F9',
+    GRI: '#94A3B8',
+    AI: '#FBBF24',
+    RAM: '#F43F5E',
+    IZGARA: '#1E293B'
+};
 
-function getPingStatus(ping) {
-    if (ping <= 50) return { label: 'Mükemmel', color: '#00ffcc' };
-    if (ping <= 150) return { label: 'Stabil', color: '#5865F2' };
-    if (ping <= 300) return { label: 'Normal', color: '#faa61a' };
-    return { label: 'Riskli', color: '#f04747' };
+function calismaSuresi() {
+    let s = process.uptime();
+    let d = Math.floor(s / 86400);
+    let h = Math.floor((s % 86400) / 3600);
+    let m = Math.floor((s % 3600) / 60);
+    return `${d}g ${h}s ${m}d`;
 }
 
-function getUptime() {
-    let totalSeconds = (process.uptime());
-    let days = Math.floor(totalSeconds / 86400);
-    totalSeconds %= 86400;
-    let hours = Math.floor(totalSeconds / 3600);
-    totalSeconds %= 3600;
-    let minutes = Math.floor(totalSeconds / 60);
-    return `${days}g ${hours}s ${minutes}d`;
-}
-
-async function createPingImage(apiPing, aiPing = "---") {
-    const width = 600; 
-    const height = 280; 
-    const canvas = createCanvas(width, height);
+async function gorselOlustur(client, botPing, aiPing = "---") {
+    const genislik = 800;
+    const yukseklik = 400;
+    const canvas = createCanvas(genislik, yukseklik);
     const ctx = canvas.getContext('2d');
-    const status = getPingStatus(apiPing);
-    
-    ctx.fillStyle = '#2b2d31'; 
-    ctx.fillRect(0, 0, width, height);
-    
-    ctx.strokeStyle = '#3f4147';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(15, 15, width - 30, height - 30);
 
-    ctx.textAlign = 'left';
+    // 1. Arka Plan
+    ctx.fillStyle = RENKLER.BG;
+    ctx.fillRect(0, 0, genislik, yukseklik);
+    
+    // Izgara
+    ctx.strokeStyle = RENKLER.IZGARA;
+    ctx.lineWidth = 1;
+    for(let i=0; i<genislik; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,yukseklik); ctx.stroke(); }
+    for(let i=0; i<yukseklik; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(genislik,i); ctx.stroke(); }
+
+    // 2. Üst Panel
+    ctx.fillStyle = RENKLER.KART;
+    ctx.beginPath(); ctx.roundRect(25, 25, genislik - 50, 55, 12); ctx.fill();
+
     ctx.font = 'bold 22px sans-serif';
-    ctx.fillStyle = status.color; 
-    ctx.fillText('GraveBOT Sistem Analizi', 40, 55);
-
+    ctx.fillStyle = RENKLER.ANA;
+    ctx.fillText('Grave X PenDC', 50, 60);
+    
+    ctx.font = '11px monospace';
+    ctx.fillStyle = RENKLER.GRI;
     ctx.textAlign = 'right';
-    ctx.font = '14px sans-serif';
-    ctx.fillStyle = TEXT_GRAY;
-    ctx.fillText(`UPTIME: ${getUptime()}`, 550, 55);
-
+    ctx.fillText('Grave v2.5.1', genislik - 50, 58);
     ctx.textAlign = 'left';
-    ctx.font = 'bold 60px sans-serif';
-    ctx.fillStyle = TEXT_LIGHT;
-    ctx.fillText(`${apiPing}`, 40, 120);
-    const pingWidth = ctx.measureText(`${apiPing}`).width;
-    ctx.font = '20px sans-serif';
-    ctx.fillStyle = status.color;
-    ctx.fillText('ms (Bot)', 40 + pingWidth + 5, 120);
 
-    ctx.font = 'bold 40px sans-serif';
-    ctx.fillStyle = '#FFD700'; 
-    ctx.fillText(`${aiPing}`, 320, 120);
-    const aiWidth = ctx.measureText(`${aiPing}`).width;
-    ctx.font = '18px sans-serif';
-    ctx.fillStyle = TEXT_GRAY;
-    ctx.fillText('ms (AI)', 320 + aiWidth + 5, 120);
+    // 3. İstatistik Kartları (Alt çizgiler kaldırıldı)
+    const kartCiz = (x, y, baslik, deger, birim, renk) => {
+        ctx.fillStyle = RENKLER.KART;
+        ctx.beginPath(); ctx.roundRect(x, y, 240, 100, 15); ctx.fill();
+        
+        // Yan Şerit
+        ctx.fillStyle = renk;
+        ctx.fillRect(x, y + 25, 3, 50);
 
-    const BAR_X = 40;
-    const BAR_W = 520;
-    const BAR_H = 12;
-
-    // Bot Bar (roundRect yerine fillRect kullanımı - hata payını azaltır)
-    ctx.fillStyle = BAR_BG_COLOR;
-    ctx.fillRect(BAR_X, 150, BAR_W, BAR_H);
-    const botRatio = Math.max(0.1, Math.min(1, (600 - apiPing) / 600));
-    ctx.fillStyle = status.color;
-    ctx.fillRect(BAR_X, 150, BAR_W * botRatio, BAR_H);
-
-    // AI Bar
-    ctx.fillStyle = BAR_BG_COLOR;
-    ctx.fillRect(BAR_X, 190, BAR_W, BAR_H);
-    const aiVal = parseInt(aiPing) || 200; // Veri yoksa barı çökertmemek için 200 sayıyoruz
-    const aiRatio = Math.max(0.1, Math.min(1, (3000 - aiVal) / 3000));
-    ctx.fillStyle = '#FFD700';
-    ctx.fillRect(BAR_X, 190, BAR_W * aiRatio, BAR_H);
-
-    const now = new Date().toLocaleTimeString('tr-TR');
-    ctx.font = '12px sans-serif';
-    ctx.fillStyle = TEXT_GRAY;
-    ctx.textAlign = 'left';
-    ctx.fillText(`Son Analiz: ${now}`, 40, 245);
-    ctx.textAlign = 'right';
-    ctx.fillText('GraveAI & Ping değerleri', 560, 245);
-
-    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'grave_ping.png' });
-}
-
-module.exports.run = async (client, message, args) => {
-    const loadingEmbed = new EmbedBuilder()
-        .setColor('#5865F2')
-        .setDescription('<a:yukle:1440677432976867448> **Grave:** Veri merkezleri ve AI çekirdekleri taranıyor...');
-
-    const msg = await message.channel.send({ embeds: [loadingEmbed] });
-
-    // --- DÜZELTİLEN KISIM: AI Verisi Yoksa Rastgele Üret ---
-    const getFullPing = () => Math.round(client.ws.ping);
-    const getAiPing = () => {
-        if (client.lastAiLatency) return client.lastAiLatency;
-        // Henüz AI kullanılmadıysa gerçekçi bir başlangıç değeri (180-320ms arası)
-        return Math.floor(Math.random() * (320 - 180) + 180);
+        // Başlık
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = RENKLER.GRI;
+        ctx.fillText(baslik.toUpperCase(), x + 20, y + 35);
+        
+        // Değer
+        ctx.font = 'bold 36px sans-serif';
+        ctx.fillStyle = RENKLER.METIN;
+        ctx.fillText(deger, x + 20, y + 78);
+        
+        // MS / MB Yazısı (Alt çizgi kaldırıldı, sadeleştirildi)
+        let dGenislik = ctx.measureText(deger).width;
+        ctx.font = 'bold 16px sans-serif'; 
+        ctx.fillStyle = renk;
+        ctx.fillText(birim.toUpperCase(), x + 28 + dGenislik, y + 78);
     };
 
-    const currentAi = getAiPing();
-    const attachment = await createPingImage(getFullPing(), currentAi);
+    const bellek = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
+    kartCiz(25, 110, 'Ağ Gecikmesi', botPing, 'ms', RENKLER.ANA);
+    kartCiz(280, 110, 'Yapay Zeka', aiPing, 'ms', RENKLER.AI);
+    kartCiz(535, 110, 'Bellek Yükü', bellek, 'mb', RENKLER.RAM);
+
+    // 4. İlerleme Barları
+    const barCiz = (y, yuzde, etiket, renk) => {
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = RENKLER.GRI;
+        ctx.fillText(etiket, 45, y - 12);
+        
+        ctx.fillStyle = '#1F2937';
+        ctx.beginPath(); ctx.roundRect(40, y, genislik - 80, 8, 4); ctx.fill();
+        
+        ctx.fillStyle = renk;
+        ctx.beginPath(); ctx.roundRect(40, y, (genislik - 80) * Math.min(yuzde, 1), 8, 4); ctx.fill();
+    };
+
+    barCiz(270, (500 - botPing) / 500, 'BAĞLANTI DURUMU (PENDC)', RENKLER.ANA);
+    barCiz(330, (1024 - bellek) / 1024, 'SİSTEM KAYNAK VERİMLİLİĞİ', RENKLER.RAM);
+
+    // 5. Minimal Footer
+    ctx.font = '10px monospace';
+    ctx.fillStyle = RENKLER.GRI;
+    ctx.textAlign = 'center';
+    ctx.fillText(`Uptime: ${calismaSuresi()} | PenDC Data Center | Node: ${process.version}`, genislik/2, 385);
+
+    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'grave.png' });
+}
+
+module.exports.run = async (client, message) => {
+    const yukleniyor = new EmbedBuilder()
+        .setColor('#22D3EE')
+        .setDescription('📡 **GraveOS:** Görsel birimler optimize ediliyor...');
+
+    const msg = await message.channel.send({ embeds: [yukleniyor] });
+
+    const p = () => Math.round(client.ws.ping);
+    const a = () => client.lastAiLatency || "104";
+
+    const gorsel = await gorselOlustur(client, p(), a());
     
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('ping_refresh')
-            .setLabel('Sistemi Yenile')
-            .setEmoji('<a:pings:1440464530718068846>')
-            .setStyle(ButtonStyle.Secondary)
+    const anaEmbed = new EmbedBuilder()
+        .setColor('#111827')
+        .setAuthor({ name: 'Grave | PenDC İş Ortaklığı', iconURL: client.user.displayAvatarURL() })
+        .setDescription('>>> GraveBOT verileri **PenDC** üzerinden başarıyla çekildi.')
+        .setImage('attachment://grave.png')
+        .setFooter({ text: 'GraveOS X PenDC İzmir' })
+        .setTimestamp();
+
+    const buton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('ref').setLabel('Sistemi Tazele').setStyle(ButtonStyle.Secondary)
     );
 
-    const resultEmbed = new EmbedBuilder()
-        .setColor(getPingStatus(getFullPing()).color) 
-        .setImage('attachment://grave_ping.png')
-        .setAuthor({ name: `Grave Sistem Monitorü`, iconURL: client.user.displayAvatarURL() })
-        .setDescription(`>>> **Bot Gecikmesi:** \`${getFullPing()}ms\`\n**AI Yanıt Süresi:** \`${currentAi}ms\`\n**Durum:** \`${getPingStatus(getFullPing()).label}\``)
-        .setFooter({ text: `GraveAI v11.0 | Core Monitor`, iconURL: message.author.displayAvatarURL() });
+    await msg.edit({ embeds: [anaEmbed], files: [gorsel], components: [buton] });
 
-    await msg.edit({ embeds: [resultEmbed], files: [attachment], components: [row] });
-
-    const collector = msg.createMessageComponentCollector({ 
-        filter: i => i.customId === 'ping_refresh' && i.user.id === message.author.id, 
-        time: BUTTON_DURATION 
-    });
-
-    collector.on('collect', async (i) => {
-        const refreshPing = getFullPing();
-        const refreshAi = getAiPing();
-        const newAttachment = await createPingImage(refreshPing, refreshAi);
-        
-        const updateEmbed = EmbedBuilder.from(resultEmbed)
-            .setColor(getPingStatus(refreshPing).color)
-            .setDescription(`>>> **Bot Gecikmesi:** \`${refreshPing}ms\`\n**AI Yanıt Süresi:** \`${refreshAi}ms\`\n**Durum:** \`${getPingStatus(refreshPing).label}\``);
-
-        await i.update({ embeds: [updateEmbed], files: [newAttachment] });
-    });
-
-    collector.on('end', () => {
-        const disabledRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('d').setLabel('Analiz Süresi Doldu').setStyle(ButtonStyle.Secondary).setDisabled(true)
-        );
-        msg.edit({ components: [disabledRow] }).catch(() => {});
+    const collector = msg.createMessageComponentCollector({ filter: i => i.user.id === message.author.id, time: 60000 });
+    collector.on('collect', async i => {
+        const yeniGorsel = await gorselOlustur(client, p(), a());
+        await i.update({ files: [yeniGorsel] });
     });
 };
 
-module.exports.conf = { aliases: ["ms", "p", "gecikme"] };
+module.exports.conf = { aliases: ["ping"] };
 module.exports.help = { name: 'ping' };
