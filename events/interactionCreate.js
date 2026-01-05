@@ -14,7 +14,7 @@ const TicketModel = require('../models/Ticket');
 const TicketSettings = require('../models/TicketSettings');
 const BotModel = require('../models/Bot');
 const BotlistSettings = require('../models/BotlistSettings');
-const AfkModel = require('../models/Afk'); // AFK Model eklendi
+const AfkModel = require('../models/Afk');
 
 const AUTO_CLOSE_TIMEOUT = 15 * 60 * 1000;
 
@@ -190,9 +190,31 @@ module.exports = async (client, interaction) => {
         // Üstlen
         if (interaction.isButton() && interaction.customId === 'claim_ticket') {
             const check = await getStaffRoleCheck();
-            if (!check.allowed) return interaction.reply({ content: '❌ Bu butonu sadece **destek ekibi** kullanabilir!', flags: 64 });
+            if (!check.allowed) {
+                return interaction.reply({ 
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('❌ Yetki Hatası')
+                            .setDescription('Bu butonu sadece **destek ekibi** kullanabilir!')
+                            .setTimestamp()
+                    ], 
+                    flags: 64 
+                });
+            }
             const ticketData = await TicketModel.findOne({ channelId: interaction.channelId });
-            if (!ticketData) return interaction.reply({ content: '❌ Bu bilet veritabanında bulunamadı.', flags: 64 });
+            if (!ticketData) {
+                return interaction.reply({ 
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('❌ Hata')
+                            .setDescription('Bu bilet veritabanında bulunamadı.')
+                            .setTimestamp()
+                    ], 
+                    flags: 64 
+                });
+            }
             const currentEmbed = interaction.message.embeds[0];
             const newEmbed = EmbedBuilder.from(currentEmbed)
                 .addFields({ name: '✅ Üstlenen Yetkili', value: `${interaction.user}`, inline: false })
@@ -201,32 +223,137 @@ module.exports = async (client, interaction) => {
             const newRow = ActionRowBuilder.from(oldRow);
             newRow.components[0].setDisabled(true).setLabel('Üstlenildi').setStyle(ButtonStyle.Secondary);
             await interaction.update({ embeds: [newEmbed], components: [newRow] });
-            await interaction.followUp({ content: `🔔 **${interaction.user.tag}** adlı yetkili bu talebi devraldı.` });
+            
+            const claimEmbed = new EmbedBuilder()
+                .setColor('Blue')
+                .setTitle('👤 Ticket Üstlenildi')
+                .setDescription(`**${interaction.user.tag}** adlı yetkili bu talebi devraldı.`)
+                .setTimestamp();
+            
+            await interaction.followUp({ embeds: [claimEmbed] });
             return;
         }
 
-        // Sesli kanal
+        // Sesli kanal - İYİLEŞTİRİLMİŞ VERSİYON
         if (interaction.isButton() && interaction.customId === 'voice_support') {
             await interaction.deferReply({ flags: 64 });
+            
             try {
+                const ticketData = await TicketModel.findOne({ channelId: interaction.channelId });
+                if (!ticketData) {
+                    return interaction.editReply({ 
+                        embeds: [
+                            new EmbedBuilder()
+                                .setColor('Red')
+                                .setTitle('❌ Hata')
+                                .setDescription('Bu ticket veritabanında bulunamadı.')
+                                .setTimestamp()
+                        ]
+                    });
+                }
+
+                // Zaten sesli kanal var mı kontrol et
+                const existingVoice = interaction.guild.channels.cache.find(c =>
+                    c.type === ChannelType.GuildVoice &&
+                    c.parentId === interaction.channel.parentId &&
+                    c.name.toLowerCase() === `🔊-${interaction.user.username.toLowerCase()}`
+                );
+
+                if (existingVoice) {
+                    return interaction.editReply({ 
+                        embeds: [
+                            new EmbedBuilder()
+                                .setColor('Orange')
+                                .setTitle('⚠️ Uyarı')
+                                .setDescription(`Bu ticket için zaten bir sesli kanal mevcut: ${existingVoice}`)
+                                .setTimestamp()
+                        ]
+                    });
+                }
+
+                // Sadece ticket sahibi ve yetkili rolü görebilir
+                const settings = await TicketSettings.findOne({ guildId: interaction.guildId });
+                const permissionOverwrites = [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionsBitField.Flags.ViewChannel]
+                    },
+                    {
+                        id: ticketData.userId,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.Connect,
+                            PermissionsBitField.Flags.Speak
+                        ]
+                    }
+                ];
+
+                // Yetkili rolü varsa ekle
+                if (settings?.staffRoleId) {
+                    permissionOverwrites.push({
+                        id: settings.staffRoleId,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.Connect,
+                            PermissionsBitField.Flags.Speak,
+                            PermissionsBitField.Flags.MuteMembers,
+                            PermissionsBitField.Flags.DeafenMembers
+                        ]
+                    });
+                }
+
                 const voiceChannel = await interaction.guild.channels.create({
                     name: `🔊-${interaction.user.username}`,
                     type: ChannelType.GuildVoice,
                     parent: interaction.channel.parentId,
-                    permissionOverwrites: interaction.channel.permissionOverwrites.cache.map(p => p)
+                    permissionOverwrites: permissionOverwrites
                 });
-                return interaction.editReply({ content: `✅ Sesli kanal başarıyla oluşturuldu: ${voiceChannel}` });
+
+                const successEmbed = new EmbedBuilder()
+                    .setColor('Green')
+                    .setTitle('✅ Sesli Kanal Oluşturuldu')
+                    .setDescription(`Sesli destek kanalınız başarıyla oluşturuldu!\n\n**Kanal:** ${voiceChannel}\n**Not:** Sadece siz ve destek ekibi bu kanalı görebilir.`)
+                    .setFooter({ text: 'Ticket kapandığında sesli kanal otomatik silinecektir.' })
+                    .setTimestamp();
+
+                return interaction.editReply({ embeds: [successEmbed] });
             } catch (e) {
-                console.error(e);
-                return interaction.editReply({ content: '❌ Sesli kanal oluşturulurken bir yetki hatası oluştu.' });
+                console.error('Sesli kanal hatası:', e);
+                return interaction.editReply({ 
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('❌ Hata')
+                            .setDescription('Sesli kanal oluşturulurken bir yetki hatası oluştu.')
+                            .setTimestamp()
+                    ]
+                });
             }
         }
 
         // Kapat
         if (interaction.isButton() && interaction.customId === 'close_ticket') {
             const check = await getStaffRoleCheck();
-            if (!check.allowed) return interaction.reply({ content: '❌ Bu butonu sadece **destek ekibi** kullanabilir!', flags: 64 });
-            await interaction.reply({ content: '🔒 Talep sonlandırılıyor...' });
+            if (!check.allowed) {
+                return interaction.reply({ 
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('❌ Yetki Hatası')
+                            .setDescription('Bu butonu sadece **destek ekibi** kullanabilir!')
+                            .setTimestamp()
+                    ], 
+                    flags: 64 
+                });
+            }
+            
+            const closingEmbed = new EmbedBuilder()
+                .setColor('Orange')
+                .setTitle('🔒 Ticket Kapatılıyor')
+                .setDescription('Talep sonlandırılıyor...')
+                .setTimestamp();
+            
+            await interaction.reply({ embeds: [closingEmbed] });
             await closeTicket(interaction.channel, 'Yetkili tarafından manuel kapatıldı', interaction.user);
             return;
         }
@@ -284,10 +411,26 @@ module.exports = async (client, interaction) => {
                         await closeTicket(ticketChannel, 'Otomatik kapanma: 15 dakika yanıt gelmedi');
                     }
                 }, AUTO_CLOSE_TIMEOUT);
-                return interaction.editReply({ content: `✅ Talebiniz başarıyla açıldı: ${ticketChannel}` });
+                
+                const successEmbed = new EmbedBuilder()
+                    .setColor('Green')
+                    .setTitle('✅ Ticket Oluşturuldu')
+                    .setDescription(`Talebiniz başarıyla açıldı!\n\n**Kanal:** ${ticketChannel}\n**Konu:** ${topic}`)
+                    .setFooter({ text: 'Destek ekibimiz en kısa sürede size yardımcı olacaktır.' })
+                    .setTimestamp();
+                
+                return interaction.editReply({ embeds: [successEmbed] });
             } catch (error) {
                 console.error(error);
-                return interaction.editReply({ content: '❌ Bilet oluşturulurken teknik bir hata meydana geldi.' });
+                return interaction.editReply({ 
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('❌ Hata')
+                            .setDescription('Bilet oluşturulurken teknik bir hata meydana geldi.')
+                            .setTimestamp()
+                    ]
+                });
             }
         }
 
