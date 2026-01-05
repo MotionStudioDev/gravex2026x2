@@ -91,9 +91,9 @@ async function gorselOlustur(client, botPing, aiPing = "---") {
     const ramMB = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
     const cpuHiz = os.cpus()[0].speed;
 
-    kartCiz(25, 100, 'Bağlantı', botPing, 'ms', RENKLER.ANA, '⚡ Stabil PenDC Hattı');
-    kartCiz(300, 100, 'Zeka Motoru', aiPing, 'ms', RENKLER.AI, '🧠 GraveAI v4.2 Active');
-    kartCiz(575, 100, 'Sistem Kaynağı', ramMB, 'mb', RENKLER.RAM, `🔥 ${cpuHiz} MHz CPU Gücü`);
+    kartCiz(25, 100, 'Bağlantı', botPing, 'ms', RENKLER.ANA, 'Stabil PenDC Hattı');
+    kartCiz(300, 100, 'Zeka Motoru', aiPing, 'ms', RENKLER.AI, 'GraveAI v4.2 Active');
+    kartCiz(575, 100, 'Sistem Kaynağı', ramMB, 'mb', RENKLER.RAM, `${cpuHiz} MHz CPU Gücü`);
 
     // 4. Dinamik Analiz Barları
     const barCiz = (y, yuzde, etiket, renk, yuzdeMetni) => {
@@ -168,3 +168,4 @@ module.exports.run = async (client, message) => {
 
 module.exports.conf = { aliases: ["ping", "stats", "i"] };
 module.exports.help = { name: 'ping' };
+
