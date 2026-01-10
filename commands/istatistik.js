@@ -69,7 +69,7 @@ module.exports.run = async (client, message) => {
                 },
                 { 
                     name: '🕒 TERMİNAL LOGLARI', 
-                    value: `\`\`\`yaml\nBot Uptime: "${uptime}"\nSon Veri Senkronu: "${moment().format('HH:mm:ss')}"\nBot Sahibi: "${message.author.username}"\n\`\`\``, 
+                    value: `\`\`\`yaml\nBot Uptime: "${uptime}"\nSon Veri Senkronu: "${moment().format('HH:mm:ss')}"\nİsteyen: "${message.author.username}"\n\`\`\``, 
                     inline: false 
                 }
             )
