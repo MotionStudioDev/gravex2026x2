@@ -20,7 +20,7 @@ module.exports = (client) => {
             // Bot mesajlarını ve DM'leri yoksay
             if (message.author.bot || !message.guild) return;
 
-            const prefix = "g+";
+            const prefix = "g!";
             if (!message.content.startsWith(prefix)) return;
 
             const args = message.content.slice(prefix.length).trim().split(/ +/);
