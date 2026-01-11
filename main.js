@@ -96,6 +96,9 @@ require("./events/ready.js")
 
 const guildLogs = require("./guildLogs");
 guildLogs(client);
+// Komut loglama sistemi
+const komutLog = require("./komutlog.js");
+komutLog(client);
 /*=======================================================================================*/
 
 /*=======================================================================================*/
