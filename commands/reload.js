@@ -5,7 +5,6 @@ const path = require('path');
 // --- AYARLAR ---
 const SAHIP_ID = "702901632136118273";
 const LOG_KANAL_ID = "1447918299554910305";
-const REBOOT_HISTORY_FILE = path.join(__dirname, '..', 'oriodb', 'reboot_history.json');
 
 // Yardımcı Fonksiyonlar
 const formatUptime = (ms) => {
@@ -75,40 +74,6 @@ const performHealthCheck = async (client) => {
     };
 };
 
-const saveRebootHistory = async (data) => {
-    try {
-        let history = [];
-        try {
-            const fileContent = await fs.readFile(REBOOT_HISTORY_FILE, 'utf-8');
-            history = JSON.parse(fileContent);
-        } catch (e) {
-            // Dosya yoksa yeni oluştur
-        }
-
-        history.unshift({
-            timestamp: new Date().toISOString(),
-            ...data
-        });
-
-        // Son 50 kaydı tut
-        history = history.slice(0, 50);
-
-        await fs.writeFile(REBOOT_HISTORY_FILE, JSON.stringify(history, null, 2));
-    } catch (error) {
-        console.error('[REBOOT HISTORY ERROR]:', error);
-    }
-};
-
-const getRebootHistory = async () => {
-    try {
-        const fileContent = await fs.readFile(REBOOT_HISTORY_FILE, 'utf-8');
-        const history = JSON.parse(fileContent);
-        return history.slice(0, 5); // Son 5 kayıt
-    } catch (error) {
-        return [];
-    }
-};
-
 const createCountdownEmbed = (seconds, stats) => {
     const bars = ['▰', '▱'];
     const progress = Math.max(0, ((20 - seconds) / 20) * 100);
@@ -149,7 +114,6 @@ module.exports.run = async (client, message, args) => {
     // Sistem İstatistiklerini Al
     const stats = getSystemStats(client);
     const health = await performHealthCheck(client);
-    const history = await getRebootHistory();
 
     // Sağlık Kontrolü Uyarısı
     let healthWarning = '';
@@ -190,21 +154,6 @@ module.exports.run = async (client, message, args) => {
                 inline: true
             }
         );
-
-    // Reboot Geçmişi Ekle
-    if (history.length > 0) {
-        const historyText = history.map((h, i) => {
-            const date = new Date(h.timestamp);
-            const timeAgo = formatUptime(Date.now() - date.getTime());
-            return `${i + 1}. ${timeAgo} önce - ${h.reason || 'Sebep belirtilmedi'}`;
-        }).join('\n');
-
-        onayEmbed.addFields({
-            name: '📜 Son Yeniden Başlatmalar',
-            value: `\`\`\`\n${historyText}\`\`\``,
-            inline: false
-        });
-    }
 
     onayEmbed
         .setThumbnail('https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJmZzI0ZzRwamZ4ZzRwamZ4ZzRwamZ4ZzRwamZ4ZzRwamZ4ZzRwaCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKMGpxfPNHbcV0Y/giphy.gif')
@@ -355,16 +304,6 @@ module.exports.run = async (client, message, args) => {
 
                     await anaMesaj.edit({ embeds: [asamaEmbed1], components: [] });
 
-                    // Backup oluştur
-                    await saveRebootHistory({
-                        user: message.author.tag,
-                        userId: message.author.id,
-                        reason: rebootReason,
-                        stats: stats,
-                        health: health,
-                        emergency: emergencyMode
-                    });
-
                     // Aşama 2: Durum Güncelleme
                     await new Promise(resolve => setTimeout(resolve, 800));
                     const asamaEmbed2 = new EmbedBuilder()
@@ -378,7 +317,7 @@ module.exports.run = async (client, message, args) => {
 
                     // Durum değiştir
                     await client.user.setStatus('idle');
-                    await client.user.setActivity('🔄 Yeniden Başlatılıyor...', { type: 3 });
+                    await client.user.setActivity('Sistem Yeniden Başlatılıyor...', { type: 3 });
 
                     // Aşama 3: Bağlantılar Kapatılıyor
                     await new Promise(resolve => setTimeout(resolve, 800));
@@ -509,7 +448,7 @@ module.exports.conf = {
 
 module.exports.help = {
     name: 'reload',
-    description: 'Botu güvenli bir şekilde yeniden başlatır. Gelişmiş özellikler: geri sayım, sağlık kontrolü, geçmiş takibi.',
+    description: 'Botu güvenli bir şekilde yeniden başlatır. Gelişmiş özellikler: geri sayım, sağlık kontrolü.',
     usage: 'reload [--emergency/-e] [sebep]',
     category: 'Sistem',
     examples: [
