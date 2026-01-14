@@ -86,10 +86,10 @@ client.on("ready", async () => {
 
     // Rastgele activity mesajları
     const activities = [
-        `g!yardım | Gelişmiş Sistemler`,
-        `g!davet | g!hata-bildir`,
-        `g!deprem - 7/24 Depremleri İzle`,
-        `g!yapayzeka - Yapay Zeka ile konuş`
+        `g!davet | Gelişmiş Sistemler`,
+        `Kısıtlı Hizmet Verilmektedir`,
+        `g!yardım - Kısıtlı Hizmet Modu Aktif`,
+        `Kısıtlı Hizmet Verilmektedir!`
     ];
 
     setInterval(() => {
@@ -97,7 +97,7 @@ client.on("ready", async () => {
         client.user.setActivity(activity, { type: 3 }); 
     }, 10000);
 
-    client.user.setStatus("dnd");
+    client.user.setStatus("idle");
 
     // Log kanalına mesaj gönder
     const logChannelId = "1416144862050259168"; 
