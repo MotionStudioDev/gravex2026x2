@@ -1,5 +1,5 @@
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
-const UyeEtiket = require('"../models/UyeEtiket');
+const UyeEtiket = require('../models/UyeEtiket');
 
 module.exports = (client) => {
     // Üye katıldığında etiketleme sistemi
