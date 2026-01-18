@@ -99,6 +99,11 @@ guildLogs(client);
 // Komut loglama sistemi
 const komutLog = require("./komutlog.js");
 komutLog(client);
+///
+// Üye etiket sistemi
+const uyeEtiket = require("./commands/üyeetiket.js");
+uyeEtiket(client);
+
 /*=======================================================================================*/
 
 /*=======================================================================================*/
