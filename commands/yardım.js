@@ -15,7 +15,7 @@ module.exports.run = async (client, message) => {
     const commandLists = {
       'genel': ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'shard', 'yapayzeka', 'yardım'],
       'kullanici': ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'rastgele-emoji', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
-      'moderasyon': ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'timeout', 'untimeout', 'lock', 'unlock', 'kanal-ekle', 'kanal-sil', 'uyar'],
+      'moderasyon': ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'timeout', 'untimeout', 'lock', 'unlock', 'kanal-ekle', 'üyeetiket', 'kanal-sil', 'uyar'],
       'sistem': ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'botlist-kur', 'botlist-ayarla', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'çekiliş', 'ticket-sistemi', 'ticket-sıfırla', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'modlog', 'slowmode'],
       'sahip': ['reload', 'mesaj-gönder'],
       'eğlence': ['ship', 'espiri', 'yazı-tura', 'burger', 'iskender', 'lahmacun', '2048', 'tweet', 'çayiç', 'zar-at'],
@@ -64,7 +64,7 @@ module.exports.run = async (client, message) => {
               },
               {
                 name: '📈 Gelişim Çubuğu',
-                value: `▰▰▰▰▱▱▱▱ %60 [V3 Beta]`
+                value: `▰▰▰▰▰▱▱▱ %71 [V3 Beta]`
               }
             );
 
