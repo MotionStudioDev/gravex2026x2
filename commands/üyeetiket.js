@@ -74,7 +74,7 @@ module.exports.run = async (client, message, args) => {
                         inline: false
                     }
                 )
-                .setFooter({ text: 'GraveBOT Üye Yönetim Sistemi • MongoDB' })
+                .setFooter({ text: 'GraveBOT Üye Yönetim Sistemi' })
                 .setTimestamp();
             return message.channel.send({ embeds: [durumEmbed] });
         } catch (err) {
