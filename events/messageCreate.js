@@ -4,47 +4,47 @@ const AfkModel = require("../models/Afk");
 const moment = require("moment");
 require("moment/locale/tr");
 
-// --- SİSTEM AYARLARI ---
-const UYARI_SURESİ = 7000;
+// --- AYARLAR ---
+const UYARI_SURESI = 7000;
 const CAPS_ORAN = 0.70;
 
 /**
- * @title Gelişmiş Filtreleme Algoritması (Apex Engine)
- * @description Harf uzatmalarını, özel karakterleri ve sinsi boşlukları analiz eder.
+ * Gelişmiş Filtreleme Algoritması (Apex Engine)
+ * Boşlukları, harf uzatmalarını ve özel karakterleri temizleyip analiz eder.
  */
 function sentinelAnaliz(text) {
     if (!text) return { ihlal: false };
 
-    // 1. Aşama: Ham içerik temizliği (Leet Speak Dönüşümü)
+    // 1. Leet Speak ve Benzer Karakter Dönüşümü
     let ham = text.toLowerCase()
         .replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e")
         .replace(/4/g, "a").replace(/5/g, "s").replace(/7/g, "t").replace(/9/g, "g");
 
-    // 2. Aşama: Karakter Temizliği (Noktalama ve görünmez karakterleri siler)
+    // 2. Karakter Temizliği (Noktalama ve sinsi boşlukları siler)
     const temiz = ham.replace(/[^\w\sğüşıöç]/gi, '').replace(/\s+/g, '');
 
-    // 3. Aşama: Harf Tekrarlarını Teke İndirme (oooooç -> oç | piiiiiççç -> piç)
+    // 3. Harf Tekrarlarını Teke İndirme (oooooç -> oç)
     const sadelesmis = temiz.replace(/(.)\1+/g, '$1');
 
-    // 4. Aşama: Yasaklı Kelime Veritabanı (Genişletilmiş)
+    // 4. Yasaklı Kelime Veritabanı
     const karaListe = [
         'amk', 'amq', 'ananı', 'orospu', 'oç', 'oc', 'piç', 'pıç', 'yarrak', 'yarak', 'sik', 'sık', 
         'göt', 'salak', 'aptal', 'gerizekalı', 'ibne', 'siktir', 'sikik', 'amına', 'amcık', 
         'daşşak', 'taşşak', 'fahişe', 'kahpe', 'yavşak', 'gevşek', 'pezevenk', 'şerefsiz',
-        'puşt', 'gavat', 'dalyarak', 'amın feryadı', 'amın evladı', 'kahpenin evladı'
+        'puşt', 'gavat', 'dalyarak'
     ];
 
-    // Kontrol: Kelime bazlı, temizlenmiş bazlı ve sadeleşmiş bazlı tarama
-    const yakalandı mı = karaListe.some(yasak => {
+    // Hata düzeltildi: Boşluk kaldırıldı, değişken ismi "yakalandiMi" yapıldı.
+    const yakalandiMi = karaListe.some(yasak => {
         const regex = new RegExp(`(^|\\s|[^a-zğüşıöç])${yasak}([^a-zğüşıöç]|\\s|$)`, 'i');
         return regex.test(ham) || temiz.includes(yasak) || sadelesmis.includes(yasak);
     });
 
-    return { ihlal: yakalandı mı, tespit: yakalandı mı ? "Küfür/Uygunsuz İçerik" : null };
+    return { ihlal: yakalandiMi, tespit: yakalandiMi ? "Küfür/Uygunsuz İçerik" : null };
 }
 
 module.exports = async (message) => {
-    // --- ÖN KONTROLLER ---
+    // TEMEL KONTROLLER
     if (!message.guild || message.author.bot || message.channel.type === ChannelType.DM) return;
     
     const { client, author, channel, guild, member, content } = message;
@@ -52,7 +52,7 @@ module.exports = async (message) => {
                    member.permissions.has(PermissionsBitField.Flags.Administrator);
 
     // =========================================================
-    // 1. AFK SİSTEMİ (GELİŞMİŞ UI)
+    // 1. AFK SİSTEMİ
     // =========================================================
     const afkData = await AfkModel.findOne({ guildId: guild.id, userId: author.id });
     if (afkData) {
@@ -61,8 +61,8 @@ module.exports = async (message) => {
         
         const welcome = new EmbedBuilder()
             .setColor("#27ae60")
-            .setAuthor({ name: "GraveBOT | Güvenli Dönüş", iconURL: author.displayAvatarURL() })
-            .setDescription(`👋 **Tekrar Hoş Geldin!** AFK modun başarıyla devre dışı bırakıldı.\n**Süre:** <t:${Math.floor(afkData.timestamp / 1000)}:R>`)
+            .setAuthor({ name: "GraveOS | AFK Sistemi", iconURL: author.displayAvatarURL() })
+            .setDescription(`👋 **Tekrar Hoş Geldin!** AFK modun sonlandırıldı.\n**Süre:** <t:${Math.floor(afkData.timestamp / 1000)}:R>`)
             .setTimestamp();
 
         channel.send({ embeds: [welcome] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESİ));
@@ -75,89 +75,87 @@ module.exports = async (message) => {
             if (data && id !== author.id) {
                 const info = new EmbedBuilder()
                     .setColor("#f39c12")
-                    .setAuthor({ name: "Kullanıcı Meşgul", iconURL: user.displayAvatarURL() })
-                    .setDescription(`🛑 **${user.username}** şu anda AFK modunda.\n**Sebep:** \`${data.reason}\``)
-                    .setFooter({ text: "GraveBOT AFK Bildirimi" });
+                    .setAuthor({ name: "Kullanıcı Müsait Değil", iconURL: user.displayAvatarURL() })
+                    .setDescription(`🛑 **${user.username}** şu anda AFK.\n**Sebep:** \`${data.reason}\``);
                 channel.send({ embeds: [info] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESİ));
             }
         }
     }
 
+    // Ayarları Çek
     const ayarlar = await GuildSettings.findOne({ guildId: guild.id });
     if (!ayarlar) return;
 
     // =========================================================
-    // 2. MODERASYON MOTORU (APEX SENTINEL)
+    // 2. KORUMA SİSTEMİ
     // =========================================================
     if (!yetkili) {
-        let ihlal = null;
+        let ihlalTuru = null;
 
-        // A) KÜFÜR ANALİZİ
+        // KÜFÜR ANALİZİ
         if (ayarlar.kufurEngel) {
             const analiz = sentinelAnaliz(content);
-            if (analiz.ihlal) ihlal = analiz.tespit;
+            if (analiz.ihlal) ihlalTuru = analiz.tespit;
         }
 
-        // B) REKLAM & LİNK KONTROLÜ
-        const reklamRegex = /(discord\.(gg|io|me|li|club)\/.+|https?:\/\/\S+|www\.\S+|\.com\b|\.net\b|\.org\b|\.xyz\b|\.pw\b|\.tk\b)/i;
-        if (!ihlal && ayarlar.reklamEngel && reklamRegex.test(content)) {
-            ihlal = "Reklam veya Yasaklı Bağlantı";
+        // REKLAM KONTROLÜ
+        const reklamRegex = /(discord\.(gg|io|me|li|club)\/.+|https?:\/\/\S+|www\.\S+|\.com\b|\.net\b|\.org\b|\.xyz\b)/i;
+        if (!ihlalTuru && ayarlar.reklamEngel && reklamRegex.test(content)) {
+            ihlalTuru = "Reklam veya Yasaklı Link";
         }
 
-        // C) CAPS LOCK KONTROLÜ
-        if (!ihlal && ayarlar.capsEngel && content.length >= 10) {
+        // CAPS LOCK KONTROLÜ
+        if (!ihlalTuru && ayarlar.capsEngel && content.length >= 10) {
             const buyukHarf = content.replace(/[^A-Z]/g, "").length;
             if (buyukHarf / content.length >= CAPS_ORAN) {
-                ihlal = "Aşırı Büyük Harf (Caps)";
+                ihlalTuru = "Aşırı Caps Lock";
             }
         }
 
-        // --- İHLAL DURUMUNDA AKSİYON ---
-        if (ihlal) {
+        // AKSİYON
+        if (ihlalTuru) {
             await message.delete().catch(() => {});
             
             const alert = new EmbedBuilder()
                 .setColor("#c0392b")
-                .setAuthor({ name: "GraveBOT Güvenlik Birimi", iconURL: client.user.displayAvatarURL() })
-                .setTitle("🚨 Erişim Engellendi")
-                .setDescription(`${author}, gönderdiğin içerik sunucu kurallarını ihlal ediyor.`)
-                .addFields({ name: "Neden?", value: `\`${ihlal}\`` })
-                .setFooter({ text: "İşlemleriniz kayıt altına alınıyor." });
+                .setTitle("🚨 GraveOS Güvenlik Engeli")
+                .setDescription(`${author}, gönderdiğin içerik kurallara aykırı bulundu.`)
+                .addFields({ name: "Sebep", value: `\`${ihlalTuru}\`` })
+                .setFooter({ text: "GraveOS Koruma Motoru" });
 
             const msg = await channel.send({ embeds: [alert] });
-            setTimeout(() => msg.delete().catch(() => {}), UYARI_SURESİ);
+            setTimeout(() => msg.delete().catch(() => {}), UYARI_SURESI);
 
-            // LOG SİSTEMİ
-            const logId = ihlal.includes("Küfür") ? ayarlar.kufurLog : ayarlar.reklamLog;
-            const logKanali = guild.channels.cache.get(logId);
-            if (logKanali) {
-                const logEmbed = new EmbedBuilder()
-                    .setColor("#1a1a1a")
-                    .setTitle("🛡️ Sentinel Müdahale Kaydı")
-                    .addFields(
-                        { name: "Kullanıcı", value: `${author} (\`${author.id}\`)`, inline: true },
-                        { name: "Kanal", value: `${channel}`, inline: true },
-                        { name: "Tespit", value: `\`${ihlal}\``, inline: true },
-                        { name: "Mesaj", value: `\`\`\`${content}\`\`\`` }
-                    ).setTimestamp();
-                logKanali.send({ embeds: [logEmbed] }).catch(() => {});
+            // LOG
+            const logId = ihlalTuru.includes("Küfür") ? ayarlar.kufurLog : ayarlar.reklamLog;
+            const logKanal = guild.channels.cache.get(logId);
+            if (logKanal) {
+                logKanal.send({ embeds: [
+                    new EmbedBuilder()
+                        .setColor("#1a1a1a")
+                        .setTitle("🛡️ Güvenlik Logu")
+                        .addFields(
+                            { name: "Kullanıcı", value: `${author} (\`${author.id}\`)`, inline: true },
+                            { name: "İşlem", value: `\`${ihlalTuru}\``, inline: true },
+                            { name: "Mesaj", value: `\`\`\`${content}\`\`\`` }
+                        ).setTimestamp()
+                ]}).catch(() => {});
             }
             return;
         }
     }
 
     // =========================================================
-    // 3. AKILLI SELAMLAŞMA (SA-AS)
+    // 3. SA-AS SİSTEMİ
     // =========================================================
     if (ayarlar.saasAktif) {
-        const selamlar = ["sa", "selam", "sea", "selamun aleyküm", "merhaba", "slm", "selamlar"];
-        const normalizeSelam = content.toLowerCase().replace(/[^\w\sğüşıöç]/gi, '').trim();
+        const selamlar = ["sa", "selam", "sea", "selamun aleyküm", "merhaba", "slm"];
+        const normalize = content.toLowerCase().replace(/[^\w\sğüşıöç]/gi, '').trim();
         
-        if (selamlar.includes(normalizeSelam)) {
-            const response = new EmbedBuilder()
-                .setColor("#3498db")
-                .setDescription(`👋 **Aleyküm Selam ${author}, Sunucumuza Hoş Geldin!**\nNasılsın, her şey yolunda mı?`);
-            message.reply({ embeds: [response] }).catch(() => {});
+        if (selamlar.includes(normalize)) {
+            message.reply({ embeds: [
+                new EmbedBuilder().setColor("#3498db").setDescription(`👋 **Aleyküm Selam ${author}, hoş geldin!**`)
+            ]}).catch(() => {});
         }
     }
 };
