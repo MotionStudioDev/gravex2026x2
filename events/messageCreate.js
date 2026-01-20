@@ -1,45 +1,31 @@
-const { EmbedBuilder, PermissionsBitField, ChannelType } = require("discord.js");
+const { EmbedBuilder, PermissionsBitField, ChannelType, Collection } = require("discord.js");
 const GuildSettings = require("../models/GuildSettings");
 const AfkModel = require("../models/Afk");
+const SpamLog = require("../models/SpamLog"); // MongoDB Sabıka Kaydı
 const moment = require("moment");
 require("moment/locale/tr");
 
-// --- AYARLAR ---
+// --- SABİTLER ---
 const UYARI_SURESI = 7000;
 const CAPS_ORAN = 0.70;
+const mesajTakip = new Collection(); // RAM üzerinde anlık hız kontrolü
 
 /**
  * Gelişmiş Filtreleme Algoritması (Apex Engine)
- * Boşlukları, harf uzatmalarını ve özel karakterleri temizleyip analiz eder.
  */
 function sentinelAnaliz(text) {
     if (!text) return { ihlal: false };
-
-    // 1. Leet Speak ve Benzer Karakter Dönüşümü
     let ham = text.toLowerCase()
         .replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e")
         .replace(/4/g, "a").replace(/5/g, "s").replace(/7/g, "t").replace(/9/g, "g");
-
-    // 2. Karakter Temizliği (Noktalama ve sinsi boşlukları siler)
     const temiz = ham.replace(/[^\w\sğüşıöç]/gi, '').replace(/\s+/g, '');
-
-    // 3. Harf Tekrarlarını Teke İndirme (oooooç -> oç)
     const sadelesmis = temiz.replace(/(.)\1+/g, '$1');
+    const karaListe = ['amk', 'amq', 'ananı', 'orospu', 'oç', 'oc', 'piç', 'pıç', 'yarrak', 'yarak', 'sik', 'sık', 'göt', 'salak', 'aptal', 'gerizekalı', 'ibne', 'siktir', 'sikik', 'amına', 'amcık', 'daşşak', 'taşşak', 'fahişe', 'kahpe', 'yavşak', 'gevşek', 'pezevenk', 'şerefsiz', 'puşt', 'gavat', 'dalyarak'];
 
-    // 4. Yasaklı Kelime Veritabanı
-    const karaListe = [
-        'amk', 'amq', 'ananı', 'orospu', 'oç', 'oc', 'piç', 'pıç', 'yarrak', 'yarak', 'sik', 'sık', 
-        'göt', 'salak', 'aptal', 'gerizekalı', 'ibne', 'siktir', 'sikik', 'amına', 'amcık', 
-        'daşşak', 'taşşak', 'fahişe', 'kahpe', 'yavşak', 'gevşek', 'pezevenk', 'şerefsiz',
-        'puşt', 'gavat', 'dalyarak'
-    ];
-
-    // Hata düzeltildi: Boşluk kaldırıldı, değişken ismi "yakalandiMi" yapıldı.
     const yakalandiMi = karaListe.some(yasak => {
         const regex = new RegExp(`(^|\\s|[^a-zğüşıöç])${yasak}([^a-zğüşıöç]|\\s|$)`, 'i');
         return regex.test(ham) || temiz.includes(yasak) || sadelesmis.includes(yasak);
     });
-
     return { ihlal: yakalandiMi, tespit: yakalandiMi ? "Küfür/Uygunsuz İçerik" : null };
 }
 
@@ -52,23 +38,20 @@ module.exports = async (message) => {
                    member.permissions.has(PermissionsBitField.Flags.Administrator);
 
     // =========================================================
-    // 1. AFK SİSTEMİ
+    // 1. AFK SİSTEMİ (Dokunulmadı)
     // =========================================================
     const afkData = await AfkModel.findOne({ guildId: guild.id, userId: author.id });
     if (afkData) {
         await AfkModel.deleteOne({ guildId: guild.id, userId: author.id });
         if (member.manageable) await member.setNickname(afkData.oldNickname).catch(() => {});
-        
         const welcome = new EmbedBuilder()
             .setColor("#27ae60")
             .setAuthor({ name: "GraveOS | AFK Sistemi", iconURL: author.displayAvatarURL() })
             .setDescription(`👋 **Tekrar Hoş Geldin!** AFK modun sonlandırıldı.\n**Süre:** <t:${Math.floor(afkData.timestamp / 1000)}:R>`)
             .setTimestamp();
-
-        channel.send({ embeds: [welcome] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESİ));
+        channel.send({ embeds: [welcome] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESI));
     }
 
-    // Etiket AFK Kontrolü
     if (message.mentions.users.size > 0) {
         for (const [id, user] of message.mentions.users) {
             const data = await AfkModel.findOne({ guildId: guild.id, userId: id });
@@ -77,45 +60,88 @@ module.exports = async (message) => {
                     .setColor("#f39c12")
                     .setAuthor({ name: "Kullanıcı Müsait Değil", iconURL: user.displayAvatarURL() })
                     .setDescription(`🛑 **${user.username}** şu anda AFK.\n**Sebep:** \`${data.reason}\``);
-                channel.send({ embeds: [info] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESİ));
+                channel.send({ embeds: [info] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESI));
             }
         }
     }
 
-    // Ayarları Çek
     const ayarlar = await GuildSettings.findOne({ guildId: guild.id });
     if (!ayarlar) return;
 
     // =========================================================
-    // 2. KORUMA SİSTEMİ
+    // 2. ULTRA MEGA SPAM KORUMASI (YENİ ENTEGRE)
+    // =========================================================
+    if (!yetkili && ayarlar.spamSistemi) {
+        const simdi = Date.now();
+        let userMessages = mesajTakip.get(author.id) || [];
+        userMessages.push(simdi);
+        const sonMesajlar = userMessages.filter(t => simdi - t < 3000);
+        mesajTakip.set(author.id, sonMesajlar);
+
+        if (sonMesajlar.length >= 5) { // 3 saniyede 5 mesaj
+            await message.delete().catch(() => {});
+
+            let sabika = await SpamLog.findOne({ guildId: guild.id, userId: author.id });
+            if (!sabika) sabika = new SpamLog({ guildId: guild.id, userId: author.id, ihlalSayisi: 0 });
+
+            sabika.ihlalSayisi += 1;
+            await sabika.save();
+
+            const logKanal = guild.channels.cache.get(ayarlar.spamLogKanali);
+
+            if (sabika.ihlalSayisi === 1) {
+                // 1. İHLAL: 10 DAKİKA TIMEOUT
+                try {
+                    await member.timeout(10 * 60 * 1000, "Spam Koruması: 1. Uyarı");
+                    channel.send(`🚨 ${author}, spam yaptığın için **10 dakika** susturuldun. (1/2)`);
+                    if (logKanal) logKanal.send({ embeds: [new EmbedBuilder().setColor('Orange').setTitle('Spam İhlali: Kademe 1').setDescription(`${author} (\`${author.id}\`) susturuldu.`)] });
+                } catch (e) { console.log("Timeout Yetki Hatası"); }
+                return; // Diğer korumalara bakmaya gerek yok
+            } 
+            else if (sabika.ihlalSayisi >= 2) {
+                // 2. İHLAL: DM + BAN
+                try {
+                    const dmEmbed = new EmbedBuilder()
+                        .setColor('Red')
+                        .setTitle('Sunucudan Yasaklandınız!')
+                        .setDescription(`**${guild.name}** sunucusunda spam yapmaya devam ettiğiniz için yasaklandınız.`);
+                    
+                    await author.send({ embeds: [dmEmbed] }).catch(() => {});
+                    await member.ban({ reason: 'Spam Koruması: 2. İhlal (Otomatik Ban)' });
+                    
+                    channel.send(`🚫 ${author} spam nedeniyle sunucudan **BANLANDI!** (2/2)`);
+                    if (logKanal) logKanal.send({ embeds: [new EmbedBuilder().setColor('Red').setTitle('Spam İhlali: Kademe 2 (BAN)').setDescription(`${author} (\`${author.id}\`) banlandı.`)] });
+                    
+                    await SpamLog.deleteOne({ guildId: guild.id, userId: author.id });
+                } catch (e) { console.log("Ban Yetki Hatası"); }
+                return;
+            }
+        }
+    }
+
+    // =========================================================
+    // 3. KÜFÜR, REKLAM VE CAPS KORUMASI
     // =========================================================
     if (!yetkili) {
         let ihlalTuru = null;
 
-        // KÜFÜR ANALİZİ
         if (ayarlar.kufurEngel) {
             const analiz = sentinelAnaliz(content);
             if (analiz.ihlal) ihlalTuru = analiz.tespit;
         }
 
-        // REKLAM KONTROLÜ
         const reklamRegex = /(discord\.(gg|io|me|li|club)\/.+|https?:\/\/\S+|www\.\S+|\.com\b|\.net\b|\.org\b|\.xyz\b)/i;
         if (!ihlalTuru && ayarlar.reklamEngel && reklamRegex.test(content)) {
             ihlalTuru = "Reklam veya Yasaklı Link";
         }
 
-        // CAPS LOCK KONTROLÜ
         if (!ihlalTuru && ayarlar.capsEngel && content.length >= 10) {
             const buyukHarf = content.replace(/[^A-Z]/g, "").length;
-            if (buyukHarf / content.length >= CAPS_ORAN) {
-                ihlalTuru = "Aşırı Caps Lock";
-            }
+            if (buyukHarf / content.length >= CAPS_ORAN) ihlalTuru = "Aşırı Caps Lock";
         }
 
-        // AKSİYON
         if (ihlalTuru) {
             await message.delete().catch(() => {});
-            
             const alert = new EmbedBuilder()
                 .setColor("#c0392b")
                 .setTitle("🚨 GraveOS Güvenlik Engeli")
@@ -126,7 +152,6 @@ module.exports = async (message) => {
             const msg = await channel.send({ embeds: [alert] });
             setTimeout(() => msg.delete().catch(() => {}), UYARI_SURESI);
 
-            // LOG
             const logId = ihlalTuru.includes("Küfür") ? ayarlar.kufurLog : ayarlar.reklamLog;
             const logKanal = guild.channels.cache.get(logId);
             if (logKanal) {
@@ -146,12 +171,11 @@ module.exports = async (message) => {
     }
 
     // =========================================================
-    // 3. SA-AS SİSTEMİ
+    // 4. SA-AS SİSTEMİ
     // =========================================================
     if (ayarlar.saasAktif) {
         const selamlar = ["sa", "selam", "sea", "selamun aleyküm", "merhaba", "slm"];
         const normalize = content.toLowerCase().replace(/[^\w\sğüşıöç]/gi, '').trim();
-        
         if (selamlar.includes(normalize)) {
             message.reply({ embeds: [
                 new EmbedBuilder().setColor("#3498db").setDescription(`👋 **Aleyküm Selam ${author}, hoş geldin!**`)
