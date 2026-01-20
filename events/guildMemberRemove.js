@@ -1,35 +1,82 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
+const moment = require('moment');
+require('moment/locale/tr');
 
 module.exports = async (member) => {
-  const guildId = member.guild.id;
-  const client = member.client;
-  const now = Date.now(); // Çıkış zamanı
+  const { client, guild, user } = member;
+  const guildId = guild.id;
 
-  if (member.user.bot) return; // Botlar için Last Seen kaydı tutmaya gerek yok
+  // Botlar için istatistik tutmaya gerek yok, sistemi yormayalım
+  if (user.bot) return;
 
-//////
+  // 1. VERİTABANI KONTROLÜ
+  const settings = await GuildSettings.findOne({ guildId });
+  if (!settings) return;
 
-  const settings = await GuildSettings.findOne({ guildId });
-  if (!settings || !settings.sayaçHedef) return;
+  // --- ANALİZ BİRİMİ: SUNUCUDA KALMA SÜRESİ ---
+  const joinDate = member.joinedTimestamp;
+  const stayDuration = joinDate ? Date.now() - joinDate : null;
+  
+  // Süreyi okunabilir formata çevir (Örn: 2 gün, 5 saat)
+  const durationText = stayDuration 
+    ? moment.duration(stayDuration).format("D [gün], H [saat], m [dakika]")
+    : "Bilinmiyor";
 
-  // ⬇️ MEVCUT SAYAÇ SİSTEMİ BAŞLANGICI
+  // =========================================================
+  // 2. GELİŞMİŞ SAYAÇ VE ANALİZ MESAJI
+  // =========================================================
+  if (settings.sayaçHedef) {
+    const mevcut = guild.memberCount;
+    const hedef = settings.sayaçHedef;
+    const kalan = hedef - mevcut;
+    const yuzde = Math.floor((mevcut / hedef) * 100);
 
-  const mevcut = member.guild.memberCount;
-  const kalan = settings.sayaçHedef - mevcut;
+    // Görsel İlerleme Çubuğu (Giden Üye Versiyonu)
+    const progress = "🟥".repeat(Math.floor(yuzde / 10)) + "⬜".repeat(10 - Math.floor(yuzde / 10));
 
-  const embed = new EmbedBuilder()
-    .setColor('Red')
-    .setTitle('📉 Bir Üye Ayrıldı')
-    .setDescription(`**${member.user.tag}** sunucudan ayrıldı.\nHedefe ulaşmak için **${kalan}** kişi kaldı.`)
-    .setFooter({ text: 'Grave Sayaç sistemi' })
-    .setTimestamp();
+    const goodbyeEmbed = new EmbedBuilder()
+      .setColor("#FF4136") // Canlı Kırmızı
+      .setAuthor({ name: `${user.tag} Aramızdan Ayrıldı`, iconURL: user.displayAvatarURL({ dynamic: true }) })
+      .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+      .setDescription(
+        `👋 **Güle Güle ${user.username}!**\n\n` +
+        `⏱️ **Sunucuda Kalma Süresi:** \`${durationText}\`\n` +
+        `📅 **Katılım Tarihi:** <t:${Math.floor(joinDate / 1000)}:R>\n\n` +
+        `📊 **Güncel Hedef Durumu:**\n` +
+        `\`${mevcut}\` / \`${hedef}\` üye (Hedefe **${kalan}** kişi kaldı)\n` +
+        `**İlerleme:** [${yuzde}%]\n\`${progress}\``
+      )
+      .setFooter({ text: `GraveOS İstatistik Sistemi • Toplam ${mevcut} Kişiyiz` })
+      .setTimestamp();
 
-  const kanal = settings.sayaçKanal
-    ? member.guild.channels.cache.get(settings.sayaçKanal)
-    : member.guild.systemChannel;
+    // Kanal Belirleme (Sayaç kanalı yoksa sistem kanalına gönderir)
+    const kanal = settings.sayaçKanal 
+      ? guild.channels.cache.get(settings.sayaçKanal) 
+      : guild.systemChannel;
 
-  if (kanal && kanal.permissionsFor(member.guild.members.me).has('SendMessages')) {
-    kanal.send({ embeds: [embed] });
-  }
+    if (kanal?.permissionsFor(guild.members.me).has('SendMessages')) {
+      kanal.send({ embeds: [goodbyeEmbed] });
+    }
+  }
+
+  // =========================================================
+  // 3. MODERASYON LOG (OPSİYONEL)
+  // =========================================================
+  // Eğer sunucuda bir genel log kanalı varsa, üyeyi kimin attığını veya 
+  // sadece çıktığını oraya sessizce bildirebilirsin.
+  if (settings.modLog) {
+    const logKanal = guild.channels.cache.get(settings.modLog);
+    if (logKanal) {
+      const logEmbed = new EmbedBuilder()
+        .setColor("#3d3d3d")
+        .setDescription(`📤 **Bir kullanıcı sunucudan ayrıldı.**`)
+        .addFields(
+          { name: "Kullanıcı", value: `${user.tag} (\`${user.id}\`)`, inline: true },
+          { name: "Toplam Üye", value: `\`${guild.memberCount}\``, inline: true }
+        )
+        .setTimestamp();
+      logKanal.send({ embeds: [logEmbed] }).catch(() => {});
+    }
+  }
 };
