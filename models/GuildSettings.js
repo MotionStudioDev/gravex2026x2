@@ -31,6 +31,9 @@ const guildSettingsSchema = new mongoose.Schema({
   // ✅ Sayaç
   sayaçHedef: { type: Number, default: null },
   sayaçKanal: { type: String, default: null },
+  // Mevcut şemanın içine bunları ekle:
+spamSistemi: { type: Boolean, default: false },
+spamLogKanali: { type: String, default: null },
 
   // ✅ Anti-Raid
   antiRaidAktif: { type: Boolean, default: false },
