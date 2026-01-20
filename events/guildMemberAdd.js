@@ -1,132 +1,164 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionsBitField, AttachmentBuilder } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
+const moment = require('moment');
+require('moment/locale/tr');
 
 module.exports = async (member) => {
-  const client = member.client;
-  const guildId = member.guild.id;
-  const user = member.user;
+  const { client, guild, user } = member;
+  const guildId = guild.id;
 
-  // Sunucu ayarlarını DB’den çek
-  const settings = await GuildSettings.findOne({ guildId });
-  if (!settings) return;
-  // ✅ KAYIT SİSTEMİ (dokunmadım)
-  if (settings.kayıtAktif && settings.kayıtKanal) {
-    const kanal = member.guild.channels.cache.get(settings.kayıtKanal);
-    if (kanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
-      const embed = new EmbedBuilder()
-        .setColor(0x1E90FF)
-        .setTitle("<a:giris:1416530113989705959> Yeni Üye Katıldı")
-        .setDescription(
-          `<:userx:1441379546929561650> Üye: ${member}\n` +
-          `<:ID:1416530654006349967> ID: ${member.id}\n` +
-          `<a:takvm:1445125311850090618> Hesap Açılış: <t:${Math.floor(user.createdTimestamp / 1000)}:R>\n\n` +
-          "<:ok1:1445126670687404143> Kayıt için `g!kayıt @üye İsim Yaş` komutunu kullanın."
-        )
-        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-        .setFooter({ text: 'Grave Kayıt sistemi' })
-        .setTimestamp();
+  // 1. VERİTABANI KONTROLÜ
+  const settings = await GuildSettings.findOne({ guildId });
+  if (!settings) return;
 
-      kanal.send({ embeds: [embed] });
-    }
-  }
+  // --- ANALİZ BİRİMİ: HESAP GÜVENLİK DURUMU ---
+  const accountAge = Date.now() - user.createdTimestamp;
+  const sevenDays = 1000 * 60 * 60 * 24 * 7;
+  const isSuspect = accountAge < sevenDays; // 7 günden yeni hesaplar şüpheli
+  const securityStatus = isSuspect ? "⚠️ Şüpheli (Yeni Hesap)" : "✅ Güvenli";
+  const securityColor = isSuspect ? "#FF4136" : "#2ECC40";
 
-  // ✅ OTO-ROL SİSTEMİ
-  if (settings.otorol) {
-    const rol = member.guild.roles.cache.get(settings.otorol);
-    if (rol) {
-      const logKanal = settings.otorolLog
-        ? member.guild.channels.cache.get(settings.otorolLog)
-        : member.guild.systemChannel;
-      try {
-        await member.roles.add(rol);
-        if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
-          logKanal.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor('Green')
-                .setTitle('<:tik33:1445123298139574353> Otorol Verildi')
-                .setDescription(`${member} kullanıcısına <@&${rol.id}> rolü verildi.`)
-                .setFooter({ text: 'Grave Otorol sistemi' })
-            ]
-          });
-        }
-      } catch (err) {
-        if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
-          logKanal.send({
-            embeds: [
-              new EmbedBuilder()
-                .setColor('Red')
-                .setTitle('<a:uyar1:1416526541030035530> Otorol Verilemedi')
-                .setDescription(`**${user.tag}** için <@&${rol.id}> rolü verilemedi.\nHata: \`Missing Permissions\``)
-                .setFooter({ text: 'Grave Otorol sistemi' })
-            ]
-          });
-        }
-        console.error('Otorol verilemedi:', err);
-      }
-    }
-  }
+  // =========================================================
+  // 2. BOT KORUMA & LOG SİSTEMİ
+  // =========================================================
+  if (user.bot) {
+    const botLog = settings.modLog ? guild.channels.cache.get(settings.modLog) : null;
+    if (botLog) {
+      const botEmbed = new EmbedBuilder()
+        .setColor("#5865F2")
+        .setTitle("🤖 Yeni Bot Katıldı")
+        .setDescription(`${user} (\`${user.id}\`) sunucuya eklendi.`)
+        .setTimestamp();
+      botLog.send({ embeds: [botEmbed] });
+    }
+    // Botlara özel rol varsa ver (opsiyonel geliştirme alanı)
+    return; // Botlar için aşağıdaki süreçleri (kayıt vs.) çalıştırma
+  }
 
-  // ✅ SAYAÇ SİSTEMİ
-  if (settings.sayaçHedef) {
-    const mevcut = member.guild.memberCount;
-    const kalan = settings.sayaçHedef - mevcut;
+  // =========================================================
+  // 3. GELİŞMİŞ KAYIT SİSTEMİ (WELCOME UI)
+  // =========================================================
+  if (settings.kayıtAktif && settings.kayıtKanal) {
+    const kanal = guild.channels.cache.get(settings.kayıtKanal);
+    if (kanal?.permissionsFor(guild.members.me).has('SendMessages')) {
+      
+      const welcomeEmbed = new EmbedBuilder()
+        .setColor(isSuspect ? "Red" : "Blue")
+        .setAuthor({ name: `${guild.name} Hoş Geldin!`, iconURL: guild.iconURL() })
+        .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 512 }))
+        .setDescription(
+          `🚀 **Aramıza Hoş Geldin ${member}!**\n\n` +
+          `🆔 **Kullanıcı ID:** \`${member.id}\`\n` +
+          `🗓️ **Hesap Kuruluş:** <t:${Math.floor(user.createdTimestamp / 1000)}:D> (<t:${Math.floor(user.createdTimestamp / 1000)}:R>)\n` +
+          `🛡️ **Güvenlik Analizi:** \`${securityStatus}\`\n\n` +
+          `📢 **Kayıt Bilgi:** \`g!kayıt\` komutunu kullanarak sunucumuza erişim sağlayabilirsin.`
+        )
+        .addFields({ name: '📝 Kayıt Talimatı', value: "Lütfen yetkilileri bekleyin veya kayıt odasına geçiş yapın." })
+        .setFooter({ text: `Seninle beraber ${guild.memberCount} kişiyiz!` })
+        .setTimestamp();
 
-    const embed = new EmbedBuilder()
-      .setColor('Green')
-      .setTitle('<:userx:1441379546929561650> Yeni Üye Katıldı')
-      .setDescription(`**${user.tag}** aramıza katıldı!\nHedefe ulaşmak için **${kalan}** kişi kaldı.`)
-      .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-      .setFooter({ text: 'Grave Sayaç sistemi' });
+      kanal.send({ content: isSuspect ? `⚠️ ${member} Hesabın çok yeni, dikkatli ol!` : `🎉 Hoş geldin ${member}!`, embeds: [welcomeEmbed] });
+    }
+  }
 
-    const kanal = settings.sayaçKanal
-      ? member.guild.channels.cache.get(settings.sayaçKanal)
-      : member.guild.systemChannel;
+  // =========================================================
+  // 4. OTOROL SİSTEMİ (DENETİMLİ)
+  // =========================================================
+  if (settings.otorol) {
+    const rol = guild.roles.cache.get(settings.otorol);
+    const logKanal = settings.otorolLog ? guild.channels.cache.get(settings.otorolLog) : guild.systemChannel;
 
-    if (kanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
-      kanal.send({ embeds: [embed] });
-    }
+    if (rol) {
+      // Botun rol yetkisini kontrol et
+      if (guild.members.me.roles.highest.position <= rol.position) {
+        if (logKanal) {
+          logKanal.send({ embeds: [new EmbedBuilder().setColor("Red").setDescription(`❌ **Otorol Hatası:** \`${rol.name}\` rolü benim rolümden üstte olduğu için veremiyorum!`)] });
+        }
+      } else {
+        try {
+          await member.roles.add(rol);
+          if (logKanal?.permissionsFor(guild.members.me).has('SendMessages')) {
+            const otoEmbed = new EmbedBuilder()
+              .setColor("#2ECC40")
+              .setAuthor({ name: "GraveOS Otorol", iconURL: client.user.displayAvatarURL() })
+              .setDescription(`✅ ${member} kullanıcısına **${rol.name}** rolü başarıyla tanımlandı.`)
+              .setTimestamp();
+            logKanal.send({ embeds: [otoEmbed] });
+          }
+        } catch (err) {
+          console.error("Otorol Hatası:", err);
+        }
+      }
+    }
+  }
 
-    if (kalan <= 0) {
-      const kutlama = new EmbedBuilder()
-        .setColor('Gold')
-        .setTitle('<:tik33:1445123298139574353> Sayaç Tamamlandı!')
-        .setDescription(`Sunucumuz **${settings.sayaçHedef}** üyeye ulaştı!\nHoş geldin ${user}, seni aramızda görmek harika!`);
+  // =========================================================
+  // 5. AKILLI SAYAÇ SİSTEMİ (PROGRESS BAR)
+  // =========================================================
+  if (settings.sayaçHedef) {
+    const mevcut = guild.memberCount;
+    const hedef = settings.sayaçHedef;
+    const kalan = hedef - mevcut;
+    const yuzde = Math.floor((mevcut / hedef) * 100);
 
-      kanal?.send({ embeds: [kutlama] });
+    // Basit bir ilerleme çubuğu (Progress Bar)
+    const progress = "🟩".repeat(Math.floor(yuzde / 10)) + "⬜".repeat(10 - Math.floor(yuzde / 10));
 
-      // Sayaç sıfırlama
-      settings.sayaçHedef = null;
-      settings.sayaçKanal = null;
-      await settings.save();
-    }
-  }
+    const sayacEmbed = new EmbedBuilder()
+      .setColor(kalan <= 0 ? "Gold" : "#3498db")
+      .setTitle("📊 Sayaç Durumu")
+      .setDescription(
+        `👤 **Üye:** ${user.tag}\n` +
+        `🎯 **Hedef:** \`${hedef}\`\n` +
+        `👥 **Mevcut:** \`${mevcut}\`\n` +
+        `📉 **Kalan:** \`${kalan > 0 ? kalan : "Hedefe ulaşıldı!"}\`\n\n` +
+        `**İlerleme:** [${yuzde}%]\n\`${progress}\``
+      )
+      .setFooter({ text: "GraveOS Sayaç Sistemi" });
 
-  // ✅ ANTI-RAID SİSTEMİ
-  if (settings.antiRaidAktif) {
-    const now = Date.now();
-    if (!client.antiRaidGirişler) client.antiRaidGirişler = new Map();
-    const girişler = client.antiRaidGirişler.get(guildId) || [];
-    const yeniGirişler = [...girişler, now].filter(t => now - t <= settings.antiRaidSüre * 1000);
-    client.antiRaidGirişler.set(guildId, yeniGirişler);
+    const kanal = settings.sayaçKanal ? guild.channels.cache.get(settings.sayaçKanal) : guild.systemChannel;
+    if (kanal?.permissionsFor(guild.members.me).has('SendMessages')) {
+      kanal.send({ embeds: [sayacEmbed] });
 
-    if (yeniGirişler.length >= settings.antiRaidEşik) {
-      const logKanal = settings.antiRaidLog
-        ? member.guild.channels.cache.get(settings.antiRaidLog)
-        : null;
+      if (kalan <= 0) {
+        kanal.send({ content: "🎊 **TEBRİKLER!** Sunucumuz hedeflenen üye sayısına ulaştı! @everyone" });
+        settings.sayaçHedef = null; // Hedefe ulaşınca sıfırla
+        await settings.save();
+      }
+    }
+  }
 
-      const raidEmbed = new EmbedBuilder()
-        .setColor('DarkRed')
-        .setTitle('<a:uyar2:1416526724182835282> Raid Algılandı')
-        .setDescription(`**${settings.antiRaidSüre} saniye** içinde **${yeniGirişler.length}** kişi sunucuya katıldı.`)
-        .addFields({ name: 'Zaman', value: `<t:${Math.floor(now / 1000)}:F>`, inline: false })
-        .setFooter({ text: 'Grave Anti-Raid sistemi' });
+  // =========================================================
+  // 6. ANTI-RAID ENGINE (SÜPER KORUMA)
+  // =========================================================
+  if (settings.antiRaidAktif) {
+    if (!client.antiRaidGirişler) client.antiRaidGirişler = new Map();
+    
+    const simdi = Date.now();
+    const girisler = client.antiRaidGirişler.get(guildId) || [];
+    const sonGirisler = [...girisler, simdi].filter(t => simdi - t <= settings.antiRaidSüre * 1000);
+    client.antiRaidGirişler.set(guildId, sonGirisler);
 
-      if (logKanal?.permissionsFor(member.guild.members.me).has('SendMessages')) {
-        logKanal.send({ embeds: [raidEmbed] });
-      }
-
-      client.antiRaidGirişler.set(guildId, []);
-    }
-  }
+    if (sonGirisler.length >= settings.antiRaidEşik) {
+      // Raid tespit edildiğinde yapılacak ek aksiyonlar buraya gelebilir (Kanalları kilitleme vb.)
+      const logKanal = settings.antiRaidLog ? guild.channels.cache.get(settings.antiRaidLog) : null;
+      if (logKanal) {
+        const raidAlert = new EmbedBuilder()
+          .setColor("DarkRed")
+          .setTitle("🚨 RAID TEHLİKESİ ANALİZ EDİLDİ")
+          .setDescription(`Sunucuya ani giriş tespiti yapıldı!`)
+          .addFields(
+            { name: 'Süre', value: `\`${settings.antiRaidSüre} saniye\``, inline: true },
+            { name: 'Giriş Sayısı', value: `\`${sonGirisler.length} kullanıcı\``, inline: true },
+            { name: 'Durum', value: `🔴 **Kritik - İzlemeye Alındı**`, inline: false }
+          )
+          .setFooter({ text: "Anti-Raid Koruma Devrede" })
+          .setTimestamp();
+        
+        logKanal.send({ embeds: [raidAlert] });
+      }
+      // Hafızayı temizle ki her girişte spam yapmasın
+      client.antiRaidGirişler.set(guildId, []);
+    }
+  }
 };
