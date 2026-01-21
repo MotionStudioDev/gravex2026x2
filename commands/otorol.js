@@ -1,140 +1,142 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionsBitField } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionsBitField, ComponentType } = require('discord.js');
 const GuildSettings = require('../models/GuildSettings');
 
 module.exports.run = async (client, message, args) => {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.reply("❌ Bu sistem için **Yönetici** yetkisi gereklidir.");
-    }
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
     const guildId = message.guild.id;
 
-    // --- KAPATMA KOMUTU (HIZLI ERİŞİM) ---
+    // --- KAPATMA KOMUTU (GELİŞMİŞ) ---
     if (args[0] === 'kapat') {
         await GuildSettings.findOneAndUpdate({ guildId }, { otorol: null, otorolLog: null });
         return message.reply({
-            embeds: [new EmbedBuilder()
-                .setColor('#FF0000')
-                .setAuthor({ name: 'GraveOS Güvenlik', iconURL: client.user.displayAvatarURL() })
-                .setDescription('🛑 **Otorol Sistemi Kapatıldı.**\nSunucuya katılan yeni üyelere artık otomatik rol tanımlanmayacak.')
-                .setTimestamp()]
+            embeds: [new EmbedBuilder().setColor('#FF4B4B').setDescription('🗑️ **Otorol Sistemi Kapatıldı.** Veritabanı kayıtları temizlendi.')]
         });
     }
 
-    // --- ANA DASHBOARD ---
+    // --- İLK DURUM ANALİZİ ---
     const settings = await GuildSettings.findOne({ guildId });
-    
-    const dashboardEmbed = new EmbedBuilder()
-        .setColor('#5865F2')
-        .setAuthor({ name: 'Otorol Kontrol Paneli', iconURL: message.guild.iconURL({ dynamic: true }) })
-        .setTitle('🛰️ GraveOS Otorol Yapılandırması')
-        .setDescription(
-            'Sunucunuzun giriş güvenliğini ve otomatik rol dağıtımını buradan yönetin. Aşağıdaki interaktif menüleri kullanarak kurulumu tamamlayabilirsiniz.\n\n' +
-            '**─── 📊 MEVCUT YAPILANDIRMA ───**\n' +
-            `🔹 **Otorol Durumu:** ${settings?.otorol ? '`AKTİF` ✅' : '`PASİF` ❌'}\n` +
-            `🔹 **Tanımlı Rol:** ${settings?.otorol ? `<@&${settings.otorol}>` : '`Belirlenmedi`'}\n` +
-            `🔹 **Log Kanalı:** ${settings?.otorolLog ? `<#${settings.otorolLog}>` : '`Belirlenmedi`'}\n` +
-            '**──────────────────────────**'
-        )
-        .addFields({ name: '💡 İpucu', value: 'Botun rolü, verilecek rolden daha üstte olmalıdır.' })
-        .setFooter({ text: 'GraveOS • Yönetim Sistemi', iconURL: client.user.displayAvatarURL() })
-        .setTimestamp();
+    let selection = { roleId: settings?.otorol || null, channelId: settings?.otorolLog || null };
+
+    const generateMainEmbed = (step = "DASHBOARD") => {
+        const embed = new EmbedBuilder()
+            .setAuthor({ name: 'GraveOS Otorol Denetleme Merkezi', iconURL: client.user.displayAvatarURL() })
+            .setTitle(step === "DASHBOARD" ? '📊 Sistem Durum Raporu' : '🛠️ Yapılandırma Sihirbazı')
+            .setColor('#2F3136')
+            .setDescription(`**──────────────────────────**\n` +
+                `🛰️ **Sistem:** \`Grave-Otorol Engine v3.0\`\n` +
+                `📡 **Durum:** ${selection.roleId ? '`AKTİF` ✅' : '`YAPILANDIRILMAMIŞ` ⚠️'}\n` +
+                `**──────────────────────────**\n` +
+                `🎭 **Hedef Rol:** ${selection.roleId ? `<@&${selection.roleId}>` : '`Seçilmedi`'}\n` +
+                `📂 **Log Kanalı:** ${selection.channelId ? `<#${selection.channelId}>` : '`Seçilmedi`'}\n` +
+                `**──────────────────────────**`)
+            .setFooter({ text: 'GraveOS • Ultra Gelişmiş Yönetim Paneli' })
+            .setTimestamp();
+        
+        if (step === "SUMMARY") embed.setColor('#5865F2').setTitle('📋 Yapılandırma Özeti');
+        return embed;
+    };
 
     const mainRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('setup_start').setLabel('Sistemi Yapılandır').setStyle(ButtonStyle.Primary).setEmoji('⚙️'),
-        new ButtonBuilder().setCustomId('setup_close').setLabel('Kapat').setStyle(ButtonStyle.Danger).setEmoji('🗑️')
+        new ButtonBuilder().setCustomId('start_wizard').setLabel('Sihirbazı Başlat').setStyle(ButtonStyle.Primary).setEmoji('🚀'),
+        new ButtonBuilder().setCustomId('quick_close').setLabel('Sistemi Devre Dışı Bırak').setStyle(ButtonStyle.Danger).setEmoji('🔒')
     );
 
-    const msg = await message.channel.send({ embeds: [dashboardEmbed], components: [mainRow] });
+    const msg = await message.channel.send({ embeds: [generateMainEmbed()], components: [mainRow] });
 
     const collector = msg.createMessageComponentCollector({ 
         filter: i => i.user.id === message.author.id, 
-        time: 120000 
+        time: 180000 
     });
 
     collector.on('collect', async (i) => {
-        
-        // 🗑️ KAPATMA BUTONU
-        if (i.customId === 'setup_close') {
-            await GuildSettings.findOneAndUpdate({ guildId }, { otorol: null, otorolLog: null });
-            return i.update({ 
-                embeds: [new EmbedBuilder().setColor('Red').setDescription('✅ Otorol sistemi başarıyla sıfırlandı.')], 
-                components: [] 
-            });
-        }
-
-        // ⚙️ ROL SEÇİM ADIMI
-        if (i.customId === 'setup_start') {
+        // 1. ADIM: ROL SEÇİMİ
+        if (i.customId === 'start_wizard' || i.customId === 'back_to_roles') {
             const roles = message.guild.roles.cache
                 .filter(r => r.name !== "@everyone" && !r.managed && r.position < message.guild.members.me.roles.highest.position)
                 .first(25);
 
             const roleMenu = new StringSelectMenuBuilder()
-                .setCustomId('select_role')
-                .setPlaceholder('Girişte verilecek rolü seçin...')
-                .addOptions(roles.map(r => ({ label: r.name, value: r.id, emoji: '👥' })));
+                .setCustomId('step_role')
+                .setPlaceholder('🛡️ Atanacak rolü seçiniz...')
+                .addOptions(roles.map(r => ({
+                    label: r.name,
+                    value: r.id,
+                    description: `Üye Sayısı: ${r.members.size} | ID: ${r.id}`,
+                    emoji: '👤'
+                })));
 
             await i.update({
-                embeds: [new EmbedBuilder()
-                    .setColor('#FEE75C')
-                    .setTitle('🎭 Adım 1: Rol Belirleme')
-                    .setDescription('Lütfen yeni üyelere atanacak ana rolü seçiniz.')],
+                embeds: [generateMainEmbed("ADIM 1: ROL SEÇİMİ").setDescription('**[ 1 / 3 ]**\n\nSunucuya yeni giren üyelere hangi rolün verilmesini istersiniz?\n*Not: Botun yetkisi seçilen rolden üstte olmalıdır.*')],
                 components: [new ActionRowBuilder().addComponents(roleMenu)]
             });
         }
 
-        // 📋 KANAL SEÇİM ADIMI
-        if (i.customId === 'select_role') {
-            const selectedRole = i.values[0];
+        // 2. ADIM: KANAL SEÇİMİ
+        if (i.customId === 'step_role') {
+            selection.roleId = i.values[0];
             const channels = message.guild.channels.cache.filter(c => c.type === 0).first(25);
 
             const channelMenu = new StringSelectMenuBuilder()
-                .setCustomId('select_channel')
-                .setPlaceholder('Otorol log kanalını seçin...')
-                .addOptions(channels.map(c => ({ 
-                    label: `#${c.name}`, 
-                    value: `${selectedRole}|${c.id}`, 
-                    description: c.parent ? `Kategori: ${c.parent.name}` : 'Kategorisiz Kanal'
+                .setCustomId('step_channel')
+                .setPlaceholder('📡 Log kanalını seçiniz...')
+                .addOptions(channels.map(c => ({
+                    label: `#${c.name}`,
+                    value: c.id,
+                    description: `Kategori: ${c.parent?.name || 'Yok'}`,
+                    emoji: '📩'
                 })));
 
             await i.update({
-                embeds: [new EmbedBuilder()
-                    .setColor('#FEE75C')
-                    .setTitle('📋 Adım 2: Raporlama')
-                    .setDescription('Rol verildiğinde hangi kanala bilgi mesajı gönderilsin?')],
+                embeds: [generateMainEmbed("ADIM 2: LOG SEÇİMİ").setDescription('**[ 2 / 3 ]**\n\nİşlem sonuçlarının hangi kanala raporlanmasını istersiniz?')],
                 components: [new ActionRowBuilder().addComponents(channelMenu)]
             });
         }
 
-        // ✅ FİNAL KAYIT
-        if (i.customId === 'select_channel') {
-            const [roleId, channelId] = i.values[0].split('|');
+        // 3. ADIM: ÖZET VE ONAY
+        if (i.customId === 'step_channel') {
+            selection.channelId = i.values[0];
 
+            const confirmRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('final_save').setLabel('Ayarları Kaydet ve Başlat').setStyle(ButtonStyle.Success).setEmoji('💾'),
+                new ButtonBuilder().setCustomId('start_wizard').setLabel('Baştan Başla').setStyle(ButtonStyle.Secondary).setEmoji('🔄')
+            );
+
+            await i.update({
+                embeds: [generateMainEmbed("SUMMARY")],
+                components: [confirmRow]
+            });
+        }
+
+        // FİNAL: KAYIT
+        if (i.customId === 'final_save') {
             await GuildSettings.findOneAndUpdate(
                 { guildId },
-                { otorol: roleId, otorolLog: channelId },
+                { otorol: selection.roleId, otorolLog: selection.channelId },
                 { upsert: true }
             );
 
-            const successEmbed = new EmbedBuilder()
-                .setColor('#57F287')
-                .setTitle('💎 Yapılandırma Başarılı!')
-                .setThumbnail('https://i.imgur.com/8Qf9X9S.png') // Başarı ikonu
-                .setDescription('Otorol sistemi optimize edildi ve aktif duruma getirildi.')
+            const finishEmbed = new EmbedBuilder()
+                .setColor('#00FF7F')
+                .setTitle('💎 Sistem Başarıyla Devreye Alındı')
+                .setDescription('Seçtiğiniz yapılandırma ayarları MongoDB üzerine mühürlendi. Artık her yeni üye otomatik olarak yetkilendirilecek.')
                 .addFields(
-                    { name: '🔱 Atanan Rol', value: `<@&${roleId}>`, inline: true },
-                    { name: '📡 Log Kanalı', value: `<#${channelId}>`, inline: true }
-                )
-                .setFooter({ text: 'GraveOS | Koruma Aktif' });
+                    { name: '✅ İşlem', value: 'Otorol Kurulumu', inline: true },
+                    { name: '🛠️ Modül', value: 'Apex-Engine v3', inline: true }
+                );
 
-            await i.update({ embeds: [successEmbed], components: [] });
+            await i.update({ embeds: [finishEmbed], components: [] });
+            collector.stop();
+        }
+
+        // SİSTEMİ KAPATMA (BUTONDAN)
+        if (i.customId === 'quick_close') {
+            await GuildSettings.findOneAndUpdate({ guildId }, { otorol: null, otorolLog: null });
+            await i.update({ content: '🛑 Sistem pasifleştirildi.', embeds: [], components: [] });
             collector.stop();
         }
     });
-
-    collector.on('end', (_, reason) => {
-        if (reason === 'time') msg.edit({ components: [] }).catch(() => {});
-    });
 };
 
-module.exports.conf = { aliases: ['otorol-setup'] };
+module.exports.conf = { aliases: ['oto-setup', 'advanced-role'] };
 module.exports.help = { name: 'otorol' };
