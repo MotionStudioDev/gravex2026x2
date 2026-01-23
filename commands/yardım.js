@@ -15,66 +15,140 @@ module.exports.run = async (client, message) => {
     // === KOMUT KATEGORİLERİ ===
     const commandLists = {
       'genel': {
+        name: 'Genel Sistem',
         commands: ['ping', 'istatistik', 'uptime', 'hata-bildir', 'hatırlat', 'shard', 'yapayzeka', 'yardım'],
         icon: '⚙️',
         color: '#5865F2',
-        description: 'Botun temel ve genel kullanım komutları'
+        description: 'Botun ana çekirdek komutları ve sistem araçları.'
       },
       'kullanici': {
+        name: 'Kullanıcı Araçları',
         commands: ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'rastgele-emoji', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
         icon: '👤',
         color: '#57F287',
-        description: 'Kullanıcı profil ve bilgi komutları'
+        description: 'Kullanıcı deneyimini güçlendiren profil ve bilgi komutları.'
       },
       'moderasyon': {
+        name: 'Yönetim & Güvenlik',
         commands: ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'timeout', 'untimeout', 'lock', 'unlock', 'kanal-ekle', 'üyeetiket', 'kanal-sil', 'uyar'],
         icon: '🛡️',
         color: '#ED4245',
-        description: 'Sunucu yönetimi ve moderasyon araçları'
+        description: 'Sunucu güvenliği ve düzeni için profesyonel araçlar.'
       },
       'sistem': {
+        name: 'Gelişmiş Sistemler',
         commands: ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'botlist-kur', 'botlist-ayarla', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'çekiliş', 'ticket-sistemi', 'ticket-sıfırla', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'modlog', 'slowmode'],
         icon: '🚨',
         color: '#FEE75C',
-        description: 'Gelişmiş sunucu otomasyon sistemleri'
-      },
-      'sahip': {
-        commands: ['reload', 'mesaj-gönder'],
-        icon: '👑',
-        color: '#23272A',
-        description: 'Bot sahibine özel komutlar'
+        description: 'Otomatik moderasyon ve sunucu yönetim sistemleri.'
       },
       'eğlence': {
+        name: 'Eğlence & Sosyal',
         commands: ['ship', 'espiri', 'yazı-tura', 'burger', 'iskender', 'lahmacun', '2048', 'tweet', 'çayiç', 'zar-at'],
         icon: '🎉',
         color: '#EB459E',
-        description: 'Eğlence ve oyun komutları'
+        description: 'Topluluğunuzu eğlendirecek interaktif oyunlar ve komutlar.'
       },
       'ekonomi': {
+        name: 'Ekonomi Dünyası',
         commands: ['param', 'günlük', 'çal', 'banka-oluştur', 'banka-transfer', 'banka-yatır', 'banka-çek', 'apara', 'cf', 'çalış', 'meslek', 'meslek-ayrıl', 'para-sıralama'],
         icon: '💰',
         color: '#2ECC71',
-        description: 'Ekonomi ve para yönetim sistemi'
+        description: 'Gelişmiş sanal ekonomi ve borsa yönetim sistemi.'
+      },
+      'sahip': {
+        name: 'Geliştirici Paneli',
+        commands: ['reload', 'mesaj-gönder'],
+        icon: '👑',
+        color: '#23272A',
+        description: 'Sadece bot sahiplerinin erişebileceği yönetim komutları.'
       }
     };
 
     const totalCommands = Object.values(commandLists).reduce((acc, cat) => acc + cat.commands.length, 0);
-    const formatCommands = (list) => {
-      if (list.length === 0) return '`Komut bulunamadı`';
-      return list.map(cmd => `\`${cmd}\``).join(' • ');
+
+    // === YARDIMCI GÖRSEL FONKSİYONLAR ===
+    const createProgressBar = (percent, length = 15) => {
+      const filledLength = Math.round(length * (percent / 100));
+      const emptyLength = length - filledLength;
+      return '█'.repeat(filledLength) + '░'.repeat(emptyLength);
     };
 
-    // === EMBED OLUŞTURMA FONKSİYONU ===
+    // === GLOBAL DURUM VE BİLEŞEN OLUŞTURUCU ===
+    let currentCategory = 'ana_sayfa';
+    let currentPage = 1;
+
+    const getComponents = (category, page) => {
+      const rows = [];
+
+      const rowMenu = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("help_select")
+          .setPlaceholder("📂 Bir sistem modülü seçin...")
+          .addOptions([
+            { label: "Ana Kontrol Merkezi", value: "ana_sayfa", emoji: "🏠", description: "Sistem durumunu ve genel özeti görüntüleyin." },
+            ...Object.entries(commandLists).map(([id, data]) => ({
+              label: data.name,
+              value: id,
+              emoji: data.icon,
+              description: `${data.commands.length} aktif komut mevcut.`
+            }))
+          ])
+      );
+      rows.push(rowMenu);
+
+      if (category !== 'ana_sayfa') {
+        const cat = commandLists[category];
+        const itemsPerPage = 12;
+        const totalPages = Math.ceil(cat.commands.length / itemsPerPage);
+
+        const rowPagination = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("prev_page")
+            .setLabel("Geri")
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji("⬅️")
+            .setDisabled(page <= 1),
+          new ButtonBuilder()
+            .setCustomId("page_info")
+            .setLabel(`${page} / ${totalPages}`)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true),
+          new ButtonBuilder()
+            .setCustomId("next_page")
+            .setLabel("İleri")
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji("➡️")
+            .setDisabled(page >= totalPages)
+        );
+        rows.push(rowPagination);
+      }
+
+      const rowButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("search").setLabel("Ara").setStyle(ButtonStyle.Secondary).setEmoji("🔍"),
+        new ButtonBuilder().setCustomId("stats").setLabel("Analiz").setStyle(ButtonStyle.Primary).setEmoji("📉"),
+        new ButtonBuilder().setCustomId("premium").setLabel("Quantum+").setStyle(ButtonStyle.Success).setEmoji("💎"),
+        new ButtonBuilder().setCustomId("delete").setLabel("Kapat").setStyle(ButtonStyle.Danger).setEmoji("🛑")
+      );
+      rows.push(rowButtons);
+
+      const rowLinks = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel("Web Panel").setStyle(ButtonStyle.Link).setURL("https://gravebot.vercel.app").setEmoji("🌐"),
+        new ButtonBuilder().setLabel("Destek Sunucusu").setStyle(ButtonStyle.Link).setURL("https://discord.gg/CVZ4zEkJws").setEmoji("🎧")
+      );
+      rows.push(rowLinks);
+
+      return rows;
+    };
+
     const getEmbed = (category = 'ana_sayfa', page = 1) => {
       const ping = client.ws.ping;
-      const pingColor = ping < 100 ? '🟢' : ping < 200 ? '🟡' : '🔴';
-      const pingStatus = ping < 100 ? "Mükemmel" : ping < 200 ? "İyi" : "Orta";
 
-      const baseEmbed = new EmbedBuilder()
-        .setThumbnail(client.user.displayAvatarURL({ dynamic: true, size: 512 }))
+      const embed = new EmbedBuilder()
+        .setThumbnail(client.user.displayAvatarURL({ dynamic: true, size: 1024 }))
         .setTimestamp()
         .setFooter({
-          text: `${message.author.tag} tarafından istendi • Grave Help System v3.0`,
+          text: `Grave Yardım Motoru | v4.0.0 Kararlı Sürüm | ${message.author.tag}`,
           iconURL: message.author.displayAvatarURL({ dynamic: true })
         });
 
@@ -84,423 +158,202 @@ module.exports.run = async (client, message) => {
         const hours = Math.floor((uptime % 86400) / 3600);
         const minutes = Math.floor((uptime % 3600) / 60);
 
-        return baseEmbed
-          .setColor('#0D1117')
+        return embed
+          .setColor('#0A0A0F')
           .setAuthor({
-            name: `GraveBOT Quantum Dashboard`,
+            name: `GRAVE YARDIM MERKEZİ`,
             iconURL: client.user.displayAvatarURL(),
             url: 'https://gravebot.vercel.app'
           })
-          .setTitle('🔮 Ana Kontrol Paneli')
           .setDescription(
-            `### Hoş Geldin ${message.author.username}! 👋\n` +
-            `**GraveBOT** senin için her şeyi hazır. Aşağıdaki menüden bir kategori seçerek komutları keşfedebilirsin.\n\n` +
+            `### 🌌 Hoş Geldin, Sayın ${message.author.username}!\n` +
+            `Sistem aktif. Menüden bir modül seçerek devam et.\n\n` +
             `\`\`\`ansi\n` +
-            `\x1b[1;36m╔══════════════════════════════════╗\x1b[0m\n` +
-            `\x1b[1;36m║\x1b[0m  GRAVE YARDIM SİSTEMİ v3.0  \x1b[1;36m║\x1b[0m\n` +
-            `\x1b[1;36m╚══════════════════════════════════╝\x1b[0m\n\`\`\``
+            `\x1b[1;34m┏━━ ARAYÜZ v4.0.0 ━━┓\x1b[0m\n` +
+            `\`\`\``
           )
           .addFields(
             {
-              name: '📊 Sistem Durum Raporu',
+              name: '📡 Sistem Özeti',
               value:
                 `\`\`\`yml\n` +
-                `Ping: ${pingColor} ${ping}ms (${pingStatus})\n` +
-                `Sunucular: ${client.guilds.cache.size} Aktif\n` +
-                `Kullanıcılar: ${client.users.cache.size} Kayıtlı\n` +
+                `Ping: ${ping}ms\n` +
                 `Uptime: ${days}g ${hours}s ${minutes}d\n` +
-                `Node: ${process.version}\n` +
-                `\`\`\``,
-              inline: false
-            },
-            {
-              name: '🗂️ Komut Kategorileri',
-              value:
-                `\`\`\`diff\n` +
-                `+ Genel........: ${commandLists.genel.commands.length} komut\n` +
-                `+ Kullanıcı....: ${commandLists.kullanici.commands.length} komut\n` +
-                `+ Moderasyon...: ${commandLists.moderasyon.commands.length} komut\n` +
-                `+ Sistem.......: ${commandLists.sistem.commands.length} komut\n` +
-                `+ Eğlence......: ${commandLists.eğlence.commands.length} komut\n` +
-                `+ Ekonomi......: ${commandLists.ekonomi.commands.length} komut\n` +
-                `= TOPLAM.......: ${totalCommands} komut\n` +
+                `Sunucu: ${client.guilds.cache.size}\n` +
+                `Komut: ${totalCommands}\n` +
                 `\`\`\``,
               inline: true
             },
             {
-              name: '🛡️ Premium Özellikler',
+              name: '📂 Komutlar',
               value:
-                `\`\`\`css\n` +
-                `[✓] Anti-Raid Koruması\n` +
-                `[✓] Yapay Zeka Destekli Sohbet\n` +
-                `[✓] Gelişmiş Moderasyon\n` +
-                `[✓] Özel Ekonomi\n` +
-                `[✓] Ticket Sistemi\n` +
-                `[✓] Otomatik Moderasyon\n` +
+                `\`\`\`ansi\n` +
+                Object.entries(commandLists).map(([key, cat]) =>
+                  `\x1b[1;30m${cat.icon}\x1b[0m \x1b[1;37m${cat.name}\x1b[0m`
+                ).join('  ') +
                 `\`\`\``,
-              inline: true
-            },
-            {
-              name: '🚀 Hızlı Başlangıç',
-              value:
-                `> **Komut Prefix:** \`g!\`\n` +
-                `> **Örnek Kullanım:** \`g!ping\`\n` +
-                `> **Arama Yap:** 🔍 Butonu\n` +
-                `> **Destek:** [Discord Server](https://discord.gg/CVZ4zEkJws)`,
               inline: false
             },
             {
-              name: '📈 Geliştirme Durumu',
-              value: `\`\`\`\n${'█'.repeat(14)}${'░'.repeat(6)} 71% [v3.0 Beta]\`\`\``,
+              name: '🚀 Linkler',
+              value: `[Web](https://gravebot.vercel.app) • [Destek](https://discord.gg/CVZ4zEkJws) • [Oy Ver](https://top.gg/bot/1066016782827130960/vote)`,
               inline: false
             }
-          )
-          .setImage('https://cdn.discordapp.com/attachments/1457353514337570952/1463848967677677709/standard.gif?ex=69735316&is=69720196&hm=03a70624d3c9ddb9c040501847136dcb0cc9652387c0caf48d44882d41b54d3a&'); // Buraya banner ekleyebilirsin
+          );
       }
 
-      // Kategori sayfaları
-      const catData = commandLists[category];
-      if (!catData) return baseEmbed;
+      // Kategori Sayfası
+      const cat = commandLists[category];
+      if (!cat) return embed;
 
-      const itemsPerPage = 15;
-      const startIdx = (page - 1) * itemsPerPage;
-      const endIdx = startIdx + itemsPerPage;
-      const pageCommands = catData.commands.slice(startIdx, endIdx);
-      const totalPages = Math.ceil(catData.commands.length / itemsPerPage);
+      const itemsPerPage = 12;
+      const totalPages = Math.ceil(cat.commands.length / itemsPerPage);
+      const safePage = Math.max(1, Math.min(page, totalPages));
+      const start = (safePage - 1) * itemsPerPage;
+      const pageCommands = cat.commands.slice(start, start + itemsPerPage);
 
-      return baseEmbed
-        .setColor(catData.color)
+      return embed
+        .setColor(cat.color)
         .setAuthor({
-          name: `${catData.icon} ${category.charAt(0).toUpperCase() + category.slice(1)} Komutları`,
+          name: `${cat.name.toUpperCase()} MODÜLÜ`,
           iconURL: client.user.displayAvatarURL()
         })
-        .setTitle(`📚 Kategori: ${category.toUpperCase()}`)
         .setDescription(
-          `**${catData.description}**\n\n` +
+          `**${cat.description}**\n\n` +
           `\`\`\`ansi\n` +
-          `\x1b[1;33mToplam ${catData.commands.length} komut mevcut\x1b[0m\n` +
-          `\x1b[0;36mSayfa ${page}/${totalPages}\x1b[0m\n` +
-          `\`\`\`\n\n` +
-          `${pageCommands.map((cmd, i) =>
-            `**${startIdx + i + 1}.** \`g!${cmd}\``
-          ).join('\n')}`
+          `\x1b[1;30m┌──\x1b[0m \x1b[1;36mSayfa ${safePage}/${totalPages}\x1b[0m\n` +
+          `\x1b[1;30m└──\x1b[0m \x1b[1;33mToplam ${cat.commands.length} Komut Bulundu\x1b[0m\n` +
+          `\`\`\`\n` +
+          pageCommands.map((cmd, i) =>
+            `**${(start + i + 1).toString().padStart(2, '0')}.** \`g!${cmd}\` - *Hazır*`
+          ).join('\n') +
+          `\n\n> 💡 **İpucu:** Gezinmek için aşağıdaki butonları veya menüyü kullanabilirsin.`
         )
-        .addFields(
-          {
-            name: '💡 Kullanım İpucu',
-            value: `> Detaylı bilgi için: \`g!${pageCommands[0]} --help\`\n> Hızlı arama: 🔍 Arama butonunu kullan`,
-            inline: false
-          }
-        );
+        .addFields({
+          name: '🛠️ Altyapı Sağlığı',
+          value: `\`\`\`\n${createProgressBar(100)} 100% GÜVENLİ\`\`\``
+        });
     };
 
-    // === SELECT MENU ===
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId("helpMenu")
-      .setPlaceholder("📋 Bir kategori seçin...")
-      .addOptions([
-        {
-          label: "🏠 Ana Sayfa",
-          description: "Dashboard ve genel bilgiler",
-          value: "ana_sayfa",
-          emoji: "🏠",
-          default: true
-        },
-        {
-          label: "⚙️ Genel",
-          description: `${commandLists.genel.commands.length} temel komut`,
-          value: "genel",
-          emoji: "⚙️"
-        },
-        {
-          label: "👤 Kullanıcı",
-          description: `${commandLists.kullanici.commands.length} kullanıcı aracı`,
-          value: "kullanici",
-          emoji: "👤"
-        },
-        {
-          label: "🛡️ Moderasyon",
-          description: `${commandLists.moderasyon.commands.length} yönetim komutu`,
-          value: "moderasyon",
-          emoji: "🛡️"
-        },
-        {
-          label: "🚨 Sistem",
-          description: `${commandLists.sistem.commands.length} sistem aracı`,
-          value: "sistem",
-          emoji: "🚨"
-        },
-        {
-          label: "🎉 Eğlence",
-          description: `${commandLists.eğlence.commands.length} eğlence komutu`,
-          value: "eğlence",
-          emoji: "🎉"
-        },
-        {
-          label: "💰 Ekonomi",
-          description: `${commandLists.ekonomi.commands.length} ekonomi komutu`,
-          value: "ekonomi",
-          emoji: "💰"
-        },
-      ]);
-
-    // === BUTONLAR ===
-    const linkButtons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel("Web Site")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://gravebot.vercel.app")
-        .setEmoji('🌐'),
-      new ButtonBuilder()
-        .setLabel("Destek Sunucusu")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://discord.gg/CVZ4zEkJws")
-        .setEmoji('💬'),
-      new ButtonBuilder()
-        .setLabel("Oy Ver")
-        .setStyle(ButtonStyle.Link)
-        .setURL("https://top.gg/bot/1066016782827130960/vote")
-        .setEmoji('⭐'),
-      new ButtonBuilder()
-        .setLabel("Davet Et")
-        .setStyle(ButtonStyle.Link)
-        .setURL(`https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`)
-        .setEmoji('➕')
-    );
-
-    const actionButtons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("search_btn")
-        .setLabel("Komut Ara")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🔍'),
-      new ButtonBuilder()
-        .setCustomId("refresh_btn")
-        .setLabel("Yenile")
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('🔄'),
-      new ButtonBuilder()
-        .setCustomId("stats_btn")
-        .setLabel("İstatistikler")
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('📊'),
-      new ButtonBuilder()
-        .setCustomId("premium_btn")
-        .setLabel("Premium")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('💎'),
-      new ButtonBuilder()
-        .setCustomId("close_btn")
-        .setLabel("Kapat")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('🗑️')
-    );
-
-    const msg = await message.channel.send({
+    const mainMsg = await message.channel.send({
       embeds: [getEmbed('ana_sayfa')],
-      components: [new ActionRowBuilder().addComponents(menu), actionButtons, linkButtons],
+      components: getComponents('ana_sayfa', 1)
     });
 
-    const collector = msg.createMessageComponentCollector({
+    // === COLLECTOR ===
+    const collector = mainMsg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
-      time: 300000, // 5 dakika
+      time: 600000
     });
-
-    let currentCategory = 'ana_sayfa';
-    let currentPage = 1;
 
     collector.on("collect", async i => {
       try {
-        // Select Menu
-        if (i.customId === "helpMenu") {
+        if (i.customId === "help_select") {
           currentCategory = i.values[0];
           currentPage = 1;
-          await i.update({ embeds: [getEmbed(currentCategory, currentPage)] });
+          await i.update({ embeds: [getEmbed(currentCategory, currentPage)], components: getComponents(currentCategory, currentPage) });
         }
 
-        // Arama Butonu
-        else if (i.customId === "search_btn") {
-          const modal = new ModalBuilder()
-            .setCustomId("search_modal")
-            .setTitle("🔍 Grave Akıllı Arama");
+        else if (i.customId === "next_page") {
+          currentPage++;
+          await i.update({ embeds: [getEmbed(currentCategory, currentPage)], components: getComponents(currentCategory, currentPage) });
+        }
 
+        else if (i.customId === "prev_page") {
+          currentPage--;
+          await i.update({ embeds: [getEmbed(currentCategory, currentPage)], components: getComponents(currentCategory, currentPage) });
+        }
+
+        else if (i.customId === "search") {
+          const modal = new ModalBuilder().setCustomId("search_modal").setTitle("🔍 Kuantum Arama Algoritması");
           const input = new TextInputBuilder()
-            .setCustomId("search_query")
-            .setLabel("Aramak istediğiniz komutu yazın")
+            .setCustomId("q")
+            .setLabel("Hangi fonksiyona erişmek istiyorsunuz?")
+            .setPlaceholder("Örn: ban, ping, borsa...")
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Örn: ping, avatar, ban...")
-            .setRequired(true)
-            .setMinLength(2)
-            .setMaxLength(50);
+            .setRequired(true);
 
           modal.addComponents(new ActionRowBuilder().addComponents(input));
           await i.showModal(modal);
 
-          const submitted = await i.awaitModalSubmit({ time: 60000 }).catch(() => null);
-          if (submitted) {
-            const query = submitted.fields.getTextInputValue("search_query").toLowerCase().trim();
-
-            // Tüm kategorilerde ara
+          const submit = await i.awaitModalSubmit({ time: 30000 }).catch(() => null);
+          if (submit) {
+            const query = submit.fields.getTextInputValue("q").toLowerCase();
             const results = [];
-            for (const [catName, catData] of Object.entries(commandLists)) {
-              const matches = catData.commands.filter(cmd => cmd.includes(query));
-              if (matches.length > 0) {
-                results.push({ category: catName, commands: matches, icon: catData.icon });
-              }
+
+            for (const [id, cat] of Object.entries(commandLists)) {
+              const matched = cat.commands.filter(c => c.includes(query));
+              if (matched.length > 0) results.push({ name: cat.name, icon: cat.icon, cmd: matched });
             }
 
-            const resultEmbed = new EmbedBuilder()
-              .setColor(results.length > 0 ? '#57F287' : '#ED4245')
-              .setAuthor({
-                name: 'Grave Arama Sonuçları',
-                iconURL: client.user.displayAvatarURL()
-              })
-              .setTimestamp()
-              .setFooter({ text: `Aranan: "${query}" • ${results.reduce((acc, r) => acc + r.commands.length, 0)} sonuç bulundu` });
+            const searchEmbed = new EmbedBuilder()
+              .setTitle(`🔍 Arama Sonucu: "${query}"`)
+              .setColor(results.length > 0 ? '#5865F2' : '#ED4245')
+              .setDescription(results.length > 0
+                ? `**${results.reduce((a, b) => a + b.cmd.length, 0)}** eşleşen komut bulundu.`
+                : "Arama başarısız. Veri tabanında bu isimle bir kayıt bulunamadı.")
+              .setTimestamp();
 
             if (results.length > 0) {
-              resultEmbed
-                .setTitle('✅ Komutlar Bulundu')
-                .setDescription(`**"${query}"** araması için ${results.reduce((acc, r) => acc + r.commands.length, 0)} sonuç bulundu:`)
-                .addFields(
-                  results.map(r => ({
-                    name: `${r.icon} ${r.category.charAt(0).toUpperCase() + r.category.slice(1)}`,
-                    value: r.commands.map(cmd => `\`g!${cmd}\``).join(' • '),
-                    inline: false
-                  }))
-                );
-            } else {
-              resultEmbed
-                .setTitle('❌ Sonuç Bulunamadı')
-                .setDescription(`**"${query}"** için herhangi bir komut bulunamadı.\n\n**Öneriler:**\n• Yazım hatası kontrol edin\n• Daha kısa anahtar kelime kullanın\n• Ana menüden kategorilere göz atın`);
+              results.forEach(r => {
+                searchEmbed.addFields({ name: `${r.icon} ${r.name}`, value: r.cmd.map(c => `\`g!${c}\``).join(' • ') });
+              });
             }
 
-            await submitted.reply({ embeds: [resultEmbed], flags: 64 });
+            await submit.reply({ embeds: [searchEmbed], flags: 64 });
           }
         }
 
-        // Yenile Butonu
-        else if (i.customId === "refresh_btn") {
-          await i.update({ embeds: [getEmbed(currentCategory, currentPage)] });
-        }
-
-        // İstatistikler Butonu
-        else if (i.customId === "stats_btn") {
+        else if (i.customId === "stats") {
           const statsEmbed = new EmbedBuilder()
             .setColor('#3498DB')
-            .setTitle('Detaylı Bot İstatistikleri')
-            .setThumbnail(client.user.displayAvatarURL({ dynamic: true, size: 512 }))
+            .setTitle('📊 GRAVE SİSTEM ANALİZİ')
             .addFields(
-              {
-                name: '🌐 Discord Metrikleri',
-                value: `\`\`\`yaml\nSunucular: ${client.guilds.cache.size}\nKullanıcılar: ${client.users.cache.size}\nKanallar: ${client.channels.cache.size}\n\`\`\``,
-                inline: true
-              },
-              {
-                name: '💻 Sistem Bilgileri',
-                value: `\`\`\`yaml\nPing: ${client.ws.ping}ms\nRAM: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB\nNode: ${process.version}\n\`\`\``,
-                inline: true
-              },
-              {
-                name: '📦 Komut İstatistikleri',
-                value: `\`\`\`yaml\nToplam: ${totalCommands}\nKategoriler: ${Object.keys(commandLists).length}\nEn Fazla: Sistem (${commandLists.sistem.commands.length})\n\`\`\``,
-                inline: true
-              }
+              { name: '🖥️ Donanım', value: `\`\`\`yml\nCPU: ${process.cpuUsage().system / 1000}ms\nRAM: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)}MB\nPlatform: ${process.platform}\n\`\`\``, inline: true },
+              { name: '💻 Yazılım', value: `\`\`\`yml\nDiscord.js: v14.x\nNode: ${process.version}\nShards: ${client.shard ? client.shard.count : 1}\n\`\`\``, inline: true },
+              { name: '📈 Aktivite', value: `\`\`\`yml\nKomutlar: ${totalCommands}\nModüller: ${Object.keys(commandLists).length}\nSunucu: ${client.guilds.cache.size}\n\`\`\``, inline: false }
             )
-            .setFooter({ text: 'Grave' })
             .setTimestamp();
-
           await i.reply({ embeds: [statsEmbed], flags: 64 });
         }
 
-        // Premium Butonu
-        else if (i.customId === "premium_btn") {
-          const premiumEmbed = new EmbedBuilder()
+        else if (i.customId === "premium") {
+          const premEmbed = new EmbedBuilder()
             .setColor('#FFD700')
-            .setTitle('💎 Grave Premium')
-            .setDescription('**Premium özellikleri ile botun tüm gücünü ortaya çıkarın!**')
+            .setTitle('💎 GRAVE QUANTUM+')
+            .setDescription('### Sınırları Zorlayın!\nQuantum+ abonesi olarak botun tüm premium özelliklerine erişim sağlayın.')
             .addFields(
-              {
-                name: '✨ Premium Özellikler',
-                value:
-                  '```diff\n' +
-                  '+ Özel AI Modelleri\n' +
-                  '+ Öncelikli Destek\n' +
-                  '+ Özel Komutlar\n' +
-                  '+ Reklamsız Deneyim\n' +
-                  '+ Gelişmiş İstatistikler\n' +
-                  '```',
-                inline: false
-              },
-              {
-                name: '💰 Fiyatlandırma',
-                value: '`Yakında duyurulacak!`',
-                inline: true
-              },
-              {
-                name: '📞 İletişim',
-                value: '[Destek Sunucusu](https://discord.gg/CVZ4zEkJws)',
-                inline: true
-              }
+              { name: '✨ Avantajlar', value: '• Özel AI Modelleri\n• Gelişmiş Loglama\n• Özel Prefix\n• Öncelikli İşleme\n• Reklamsız Deneyim', inline: true },
+              { name: '💰 Abonelik', value: 'Çok Yakında!', inline: true }
             )
-            .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
-            .setFooter({ text: 'Grave Premium' })
-            .setTimestamp();
-
-          await i.reply({ embeds: [premiumEmbed], flags: 64 });
+            .setFooter({ text: 'Quantum+ Güvenliği' });
+          await i.reply({ embeds: [premEmbed], flags: 64 });
         }
 
-        // Kapat Butonu
-        else if (i.customId === "close_btn") {
-          const closeEmbed = new EmbedBuilder()
-            .setColor('#2ECC71')
-            .setTitle('✅ Menü Kapatıldı')
-            .setDescription('Yardım menüsü başarıyla kapatıldı.\n\nTekrar kullanmak için: `g!yardım`')
-            .setFooter({ text: 'GraveBOT • Teşekkürler!' })
-            .setTimestamp();
-
-          await i.update({ embeds: [closeEmbed], components: [] });
+        else if (i.customId === "delete") {
+          await i.update({ content: "⚠️ Bağlantı kesildi. Arayüz kapatılıyor...", embeds: [], components: [] });
+          setTimeout(() => mainMsg.delete().catch(() => { }), 3000);
           collector.stop();
         }
 
       } catch (err) {
-        console.error('Interaction hatası:', err);
-        if (!i.replied && !i.deferred) {
-          await i.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor('#FF0000')
-                .setTitle('❌ Hata')
-                .setDescription('Bir hata oluştu. Lütfen tekrar deneyin.')
-            ],
-            flags: 64
-          }).catch(() => { });
-        }
+        console.error("Interaction Hatası:", err);
       }
     });
 
     collector.on("end", () => {
-      msg.edit({ components: [] }).catch(() => { });
+      mainMsg.edit({ components: [] }).catch(() => { });
     });
 
   } catch (err) {
-    console.error('Yardım komutu hatası:', err);
-    message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor('#FF0000')
-          .setTitle('⚠️ Kritik Hata')
-          .setDescription('Dashboard başlatılırken bir hata oluştu.\n\nLütfen daha sonra tekrar deneyin.')
-          .setFooter({ text: 'Grave Error Handler' })
-          .setTimestamp()
-      ]
-    });
+    console.error("Yardım Hatası:", err);
+    message.channel.send("⚠️ Kritik Sistem Hatası! Lütfen geliştiriciye bildirin.");
   }
 };
 
 module.exports.conf = { aliases: ["help", "yardim", "h", "commands"] };
 module.exports.help = {
   name: "yardım",
-  description: "Ultra premium yardım ve komut listesi sistemi",
-  usage: "g!yardım [kategori]"
+  description: "Gelişmiş Kuantum yardım arayüzü.",
+  usage: "g!yardım"
 };
