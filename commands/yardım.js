@@ -30,14 +30,14 @@ module.exports.run = async (client, message) => {
       },
       'moderasyon': {
         name: 'Yönetim & Güvenlik',
-        commands: ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'timeout', 'untimeout', 'lock', 'unlock', 'kanal-ekle', 'üyeetiket', 'kanal-sil', 'uyar'],
+        commands: ['ban', 'unban', 'kick', 'sil', 'herkese-rol-ver', 'herkesten-rol-al', 'rol-ver', 'rol-al', 'nuke', 'timeout', 'untimeout', 'lock', 'unlock', 'kanal-ekle', 'slowmode', 'kanal-sil', 'uyar'],
         icon: '🛡️',
         color: '#ED4245',
         description: 'Sunucu güvenliği ve düzeni için profesyonel araçlar.'
       },
       'sistem': {
         name: 'Gelişmiş Sistemler',
-        commands: ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'botlist-kur', 'botlist-ayarla', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'çekiliş', 'ticket-sistemi', 'ticket-sıfırla', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'modlog', 'slowmode'],
+        commands: ['sayaç', 'reklam-engel', 'küfür-engel', 'caps-lock', 'botlist-kur', 'botlist-ayarla', 'anti-raid', 'kayıt-sistemi', 'sa-as', 'çekiliş', 'everyoneengel', 'ticket-sistemi', 'ticket-sıfırla', 'otorol', 'ses-sistemi', 'jail-sistemi', 'emoji-log', 'modlog', 'üyeetiket'],
         icon: '🚨',
         color: '#FEE75C',
         description: 'Otomatik moderasyon ve sunucu yönetim sistemleri.'
