@@ -1,18 +1,14 @@
 const { EmbedBuilder, PermissionsBitField, ChannelType, Collection } = require("discord.js");
 const GuildSettings = require("../models/GuildSettings");
 const AfkModel = require("../models/Afk");
-const SpamLog = require("../models/SpamLog"); // MongoDB Sabıka Kaydı
+const SpamLog = require("../models/SpamLog"); 
 const moment = require("moment");
 require("moment/locale/tr");
 
-// --- SABİTLER ---
 const UYARI_SURESI = 7000;
 const CAPS_ORAN = 0.70;
-const mesajTakip = new Collection(); // RAM üzerinde anlık hız kontrolü
+const mesajTakip = new Collection(); 
 
-/**
- * Gelişmiş Filtreleme Algoritması (Apex Engine)
- */
 function sentinelAnaliz(text) {
     if (!text) return { ihlal: false };
     let ham = text.toLowerCase()
@@ -30,15 +26,64 @@ function sentinelAnaliz(text) {
 }
 
 module.exports = async (message) => {
-    // TEMEL KONTROLLER
     if (!message.guild || message.author.bot || message.channel.type === ChannelType.DM) return;
     
     const { client, author, channel, guild, member, content } = message;
+    const ayarlar = await GuildSettings.findOne({ guildId: guild.id });
+    if (!ayarlar) return;
+
     const yetkili = member.permissions.has(PermissionsBitField.Flags.ManageMessages) || 
                    member.permissions.has(PermissionsBitField.Flags.Administrator);
 
     // =========================================================
-    // 1. AFK SİSTEMİ (Dokunulmadı)
+    // 0. EVERYONE/HERE ENGEL SİSTEMİ (YENİ ENTEGRE)
+    // =========================================================
+    if (ayarlar.everyoneEngel) {
+        const beyazListedeMi = ayarlar.everyoneWhitelist?.includes(author.id) || 
+                              member.roles.cache.some(r => ayarlar.everyoneWhitelist?.includes(r.id)) ||
+                              yetkili;
+
+        if (!beyazListedeMi && (content.includes('@everyone') || content.includes('@here'))) {
+            await message.delete().catch(() => {});
+            
+            let cezaMetni = "Uyarıldı ⚠️";
+            try {
+                if (ayarlar.everyoneCeza === 'timeout') {
+                    await member.timeout(10 * 60 * 1000, "GraveOS: Everyone/Here Yasaklı Etiket");
+                    cezaMetni = "10 Dakika Susturuldu ⏳";
+                } else if (ayarlar.everyoneCeza === 'kick') {
+                    await member.kick("GraveOS: Everyone/Here Yasaklı Etiket");
+                    cezaMetni = "Sunucudan Atıldı 👢";
+                } else if (ayarlar.everyoneCeza === 'ban') {
+                    await member.ban({ reason: "GraveOS: Everyone/Here Yasaklı Etiket" });
+                    cezaMetni = "Sunucudan Yasaklandı 🔨";
+                }
+            } catch (e) { cezaMetni = "Yetki Yetersiz (Ceza Uygulanamadı)"; }
+
+            const alert = new EmbedBuilder()
+                .setColor("#ED4245")
+                .setAuthor({ name: "GraveOS Güvenlik", iconURL: author.displayAvatarURL() })
+                .setDescription(`${author}, bu sunucuda izinsiz etiket atmak yasaktır!\n\n🛡️ **İşlem:** \`${cezaMetni}\``);
+            
+            channel.send({ embeds: [alert] }).then(m => setTimeout(() => m.delete().catch(() => {}), UYARI_SURESI));
+
+            const logKanal = guild.channels.cache.get(ayarlar.everyoneLog);
+            if (logKanal) {
+                logKanal.send({ embeds: [new EmbedBuilder()
+                    .setColor("#ED4245")
+                    .setTitle("🚨 Yasaklı Etiket Kullanımı")
+                    .addFields(
+                        { name: "Kullanıcı", value: `${author} (\`${author.id}\`)`, inline: true },
+                        { name: "Ceza", value: `\`${cezaMetni}\``, inline: true },
+                        { name: "Mesaj", value: `\`\`\`${content}\`\`\`` }
+                    ).setTimestamp()] }).catch(() => {});
+            }
+            return; // Etiket yakalandıysa diğer kontrollere gerek yok
+        }
+    }
+
+    // =========================================================
+    // 1. AFK SİSTEMİ
     // =========================================================
     const afkData = await AfkModel.findOne({ guildId: guild.id, userId: author.id });
     if (afkData) {
@@ -65,11 +110,8 @@ module.exports = async (message) => {
         }
     }
 
-    const ayarlar = await GuildSettings.findOne({ guildId: guild.id });
-    if (!ayarlar) return;
-
     // =========================================================
-    // 2. ULTRA MEGA SPAM KORUMASI (YENİ ENTEGRE)
+    // 2. ULTRA MEGA SPAM KORUMASI
     // =========================================================
     if (!yetkili && ayarlar.spamSistemi) {
         const simdi = Date.now();
@@ -78,9 +120,8 @@ module.exports = async (message) => {
         const sonMesajlar = userMessages.filter(t => simdi - t < 3000);
         mesajTakip.set(author.id, sonMesajlar);
 
-        if (sonMesajlar.length >= 5) { // 3 saniyede 5 mesaj
+        if (sonMesajlar.length >= 5) {
             await message.delete().catch(() => {});
-
             let sabika = await SpamLog.findOne({ guildId: guild.id, userId: author.id });
             if (!sabika) sabika = new SpamLog({ guildId: guild.id, userId: author.id, ihlalSayisi: 0 });
 
@@ -88,32 +129,20 @@ module.exports = async (message) => {
             await sabika.save();
 
             const logKanal = guild.channels.cache.get(ayarlar.spamLogKanali);
-
             if (sabika.ihlalSayisi === 1) {
-                // 1. İHLAL: 10 DAKİKA TIMEOUT
                 try {
                     await member.timeout(10 * 60 * 1000, "Spam Koruması: 1. Uyarı");
                     channel.send(`🚨 ${author}, spam yaptığın için **10 dakika** susturuldun. (1/2)`);
-                    if (logKanal) logKanal.send({ embeds: [new EmbedBuilder().setColor('Orange').setTitle('Spam İhlali: Kademe 1').setDescription(`${author} (\`${author.id}\`) susturuldu.`)] });
-                } catch (e) { console.log("Timeout Yetki Hatası"); }
-                return; // Diğer korumalara bakmaya gerek yok
-            } 
-            else if (sabika.ihlalSayisi >= 2) {
-                // 2. İHLAL: DM + BAN
+                    if (logKanal) logKanal.send({ embeds: [new EmbedBuilder().setColor('Orange').setTitle('Spam İhlali: Kademe 1').setDescription(`${author} susturuldu.`)] });
+                } catch (e) {}
+                return;
+            } else if (sabika.ihlalSayisi >= 2) {
                 try {
-                    const dmEmbed = new EmbedBuilder()
-                        .setColor('Red')
-                        .setTitle('Sunucudan Yasaklandınız!')
-                        .setDescription(`**${guild.name}** sunucusunda spam yapmaya devam ettiğiniz için yasaklandınız.`);
-                    
-                    await author.send({ embeds: [dmEmbed] }).catch(() => {});
-                    await member.ban({ reason: 'Spam Koruması: 2. İhlal (Otomatik Ban)' });
-                    
-                    channel.send(`🚫 ${author} spam nedeniyle sunucudan **BANLANDI!** (2/2)`);
-                    if (logKanal) logKanal.send({ embeds: [new EmbedBuilder().setColor('Red').setTitle('Spam İhlali: Kademe 2 (BAN)').setDescription(`${author} (\`${author.id}\`) banlandı.`)] });
-                    
+                    await author.send({ content: `**${guild.name}** sunucusunda spam nedeniyle yasaklandınız.` }).catch(() => {});
+                    await member.ban({ reason: 'Spam Koruması: 2. İhlal' });
+                    channel.send(`🚫 ${author} spam nedeniyle sunucudan **BANLANDI!**`);
                     await SpamLog.deleteOne({ guildId: guild.id, userId: author.id });
-                } catch (e) { console.log("Ban Yetki Hatası"); }
+                } catch (e) {}
                 return;
             }
         }
@@ -155,16 +184,7 @@ module.exports = async (message) => {
             const logId = ihlalTuru.includes("Küfür") ? ayarlar.kufurLog : ayarlar.reklamLog;
             const logKanal = guild.channels.cache.get(logId);
             if (logKanal) {
-                logKanal.send({ embeds: [
-                    new EmbedBuilder()
-                        .setColor("#1a1a1a")
-                        .setTitle("🛡️ Güvenlik Logu")
-                        .addFields(
-                            { name: "Kullanıcı", value: `${author} (\`${author.id}\`)`, inline: true },
-                            { name: "İşlem", value: `\`${ihlalTuru}\``, inline: true },
-                            { name: "Mesaj", value: `\`\`\`${content}\`\`\`` }
-                        ).setTimestamp()
-                ]}).catch(() => {});
+                logKanal.send({ embeds: [new EmbedBuilder().setColor("#1a1a1a").setTitle("🛡️ Güvenlik Logu").addFields({ name: "Kullanıcı", value: `${author}`, inline: true }, { name: "İşlem", value: `\`${ihlalTuru}\``, inline: true }, { name: "Mesaj", value: `\`\`\`${content}\`\`\`` }).setTimestamp()] }).catch(() => {});
             }
             return;
         }
@@ -177,9 +197,7 @@ module.exports = async (message) => {
         const selamlar = ["sa", "selam", "sea", "selamun aleyküm", "merhaba", "slm"];
         const normalize = content.toLowerCase().replace(/[^\w\sğüşıöç]/gi, '').trim();
         if (selamlar.includes(normalize)) {
-            message.reply({ embeds: [
-                new EmbedBuilder().setColor("#3498db").setDescription(`👋 **Aleyküm Selam ${author}, hoş geldin!**`)
-            ]}).catch(() => {});
+            message.reply({ embeds: [new EmbedBuilder().setColor("#3498db").setDescription(`👋 **Aleyküm Selam ${author}, hoş geldin!**`)] }).catch(() => {});
         }
     }
 };
