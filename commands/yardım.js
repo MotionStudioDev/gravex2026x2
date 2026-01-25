@@ -77,7 +77,7 @@ module.exports.run = async (client, message) => {
     let currentCategory = 'ana_sayfa';
     let currentPage = 1;
 
-    // === V2 CONTAINER GETTER (SectionBuilder'ı kaldırdık, sadece TextDisplay + ActionRow) ===
+    // === V2 CONTAINER GETTER ===
     const getV2Container = (category = 'ana_sayfa', page = 1) => {
       const container = new ContainerBuilder()
         .setAccentColor(category === 'ana_sayfa' ? 0x0A0A0F : (commandLists[category]?.color ?? 0x5865F2));
@@ -180,7 +180,7 @@ module.exports.run = async (client, message) => {
         new ButtonBuilder().setLabel("Destek Sunucusu").setStyle(ButtonStyle.Link).setURL("https://discord.gg/CVZ4zEkJws").setEmoji("🎧")
       ));
 
-      // Separator'lar (görsel için)
+      // Separator'lar
       container.addSeparatorComponents();
       container.addSeparatorComponents();
 
@@ -193,7 +193,7 @@ module.exports.run = async (client, message) => {
       flags: MessageFlags.IsComponentsV2
     });
 
-    // === COLLECTOR (değişmedi) ===
+    // === COLLECTOR ===
     const collector = mainMsg.createMessageComponentCollector({
       filter: i => i.user.id === message.author.id,
       time: 600000
@@ -240,8 +240,9 @@ module.exports.run = async (client, message) => {
               results.forEach(r => embed.addFields({ name: `${r.icon} ${r.name}`, value: r.cmd.map(c => `\`g!${c}\``).join(' • ') }));
             }
             await submit.reply({ embeds: [embed], ephemeral: true });
-            return; // search sonrası update yapma
+            return;
           }
+          return;
         } else if (i.customId === "stats") {
           const embed = new EmbedBuilder()
             .setColor('#3498DB')
@@ -266,19 +267,38 @@ module.exports.run = async (client, message) => {
           await i.reply({ embeds: [embed], ephemeral: true });
           return;
         } else if (i.customId === "delete") {
-          await i.update({ content: "⚠️ Arayüz kapatılıyor...", components: [], flags: MessageFlags.IsComponentsV2 });
-          setTimeout(() => mainMsg.delete().catch(() => { }), 3000);
-          collector.stop();
+          // Kapat butonu FIX: Direkt delete + update
+          try {
+            await i.update({
+              content: "⚠️ Arayüz kapatılıyor...",
+              components: [],
+              flags: MessageFlags.IsComponentsV2
+            });
+            // Kısa gecikme ile sil (V2'de update sonrası delete daha stabil)
+            setTimeout(() => {
+              mainMsg.delete().catch(() => { });
+            }, 1500);
+            collector.stop();
+          } catch (deleteErr) {
+            // Update başarısız olursa direkt silmeyi dene
+            try {
+              await mainMsg.delete().catch(() => { });
+            } catch { }
+            collector.stop();
+          }
           return;
         }
 
-        // Update için (select, prev/next, delete hariç search/stats/premium reply sonrası update yok)
+        // Diğer butonlar (select, prev/next) için update
         await i.update({
           components: [getV2Container(currentCategory, currentPage)],
           flags: MessageFlags.IsComponentsV2
         });
       } catch (err) {
         console.error("Interaction Hatası:", err);
+        if (!i.replied && !i.deferred) {
+          await i.reply({ content: "Bir hata oluştu.", ephemeral: true }).catch(() => { });
+        }
       }
     });
 
