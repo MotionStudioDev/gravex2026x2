@@ -31,9 +31,10 @@ const guildSettingsSchema = new mongoose.Schema({
   // ✅ Sayaç
   sayaçHedef: { type: Number, default: null },
   sayaçKanal: { type: String, default: null },
-  // Mevcut şemanın içine bunları ekle:
-spamSistemi: { type: Boolean, default: false },
-spamLogKanali: { type: String, default: null },
+
+  // ✅ Spam Koruması
+  spamSistemi: { type: Boolean, default: false },
+  spamLogKanali: { type: String, default: null },
 
   // ✅ Anti-Raid
   antiRaidAktif: { type: Boolean, default: false },
@@ -46,12 +47,18 @@ spamLogKanali: { type: String, default: null },
 
   // ✅ Level Sistemi
   levelSystemActive: { type: Boolean, default: false },
-  levelLog: { type: String, default: null }, // level atlama log kanalı
-  levelRewardRoles: { type: Map, of: String, default: {} }, // örn: { "5":"rolId", "10":"rolId" }
+  levelLog: { type: String, default: null }, 
+  levelRewardRoles: { type: Map, of: String, default: {} },
 
   // ✅ Caps-Lock Sistemi
   capsLockEngel: { type: Boolean, default: false },
-  capsLockLog: { type: String, default: null }
+  capsLockLog: { type: String, default: null },
+
+  // ✅ Everyone-Here Engel (YENİ EKLENEN)
+  everyoneEngel: { type: Boolean, default: false },
+  everyoneCeza: { type: String, default: 'uyarı' }, // uyarı, timeout, kick, ban
+  everyoneLog: { type: String, default: null },
+  everyoneWhitelist: { type: Array, default: [] } 
 });
 
 module.exports = mongoose.model('GuildSettings', guildSettingsSchema);
