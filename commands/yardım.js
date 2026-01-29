@@ -24,7 +24,7 @@ module.exports.run = async (client, message) => {
       },
       'kullanici': {
         name: 'Kullanıcı Araçları',
-        commands: ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'rastgele-emoji', 'çeviri', 'emojiler', 'steam', 'afk', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
+        commands: ['avatar', 'profil', 'deprem', 'hesapla', 'döviz', 'rastgele-emoji', 'çeviri', 'emojiler', 'steam', 'afk', 'kodpaylaş', 'songörülme', 'üyesayısı', 'emoji-bilgi'],
         icon: '👤',
         color: 0x57F287,
         description: 'Kullanıcı deneyimini güçlendiren profil ve bilgi komutları.'
