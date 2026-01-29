@@ -86,10 +86,10 @@ client.on("ready", async () => {
 
     // Rastgele activity mesajları
     const activities = [
-        `g!davet | Gelişmiş Sistemler`,
-        `g!help  | Help Menu`,
-        `g!yardım | 7/24 Hizmet`,
-        `g!yapayzeka | Çok yakında sizinle`
+        `g!davet - Discordun Yeni Nesil Botu!`,
+        `g!kodpaylaş - Sunucunuzda Kod Paylaşın!`,
+        `g!yardım - 7/24 Kesintisiz Hizmet!`,
+        `g!spamkoruması - Sunucunuzu Spamdan Koruyun!`
     ];
 
     setInterval(() => {
